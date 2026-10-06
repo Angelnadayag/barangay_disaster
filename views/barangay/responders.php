@@ -395,7 +395,7 @@ select.form-control:disabled {
         <th style="width:140px;">Availability</th>
         <th style="width:170px;">Contact Details</th>
         <th style="width:90px;">Account Status</th>
-        <th style="text-align:right;width:140px;">Actions</th>
+        <th style="text-align:right;width:100px;">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -483,7 +483,7 @@ select.form-control:disabled {
             </td>
 
             <td style="text-align:right;">
-              <div style="display:inline-flex;gap:4px;align-items:center;">
+              <div style="display:inline-flex;gap:4px;align-items:center;justify-content:flex-end;">
                 <?php if ($r['status'] === 'archived'): ?>
                   <button type="button" class="btn btn-outline btn-sm" style="color:var(--color-success);border-color:var(--color-success);padding:3px 8px;font-size:10.5px;" onclick="restoreResponderDirect(<?= (int)$r['id'] ?>, '<?= clean($r['username']) ?>')">
                     Restore
@@ -494,9 +494,6 @@ select.form-control:disabled {
                 <?php else: ?>
                   <button type="button" class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:10.5px;" onclick="viewResponderDetails(<?= $userJson ?>)">
                     View
-                  </button>
-                  <button type="button" class="btn btn-outline btn-sm" style="color:var(--color-danger);border-color:var(--color-danger);padding:3px 8px;font-size:10.5px;" onclick="archiveResponderDirect(<?= (int)$r['id'] ?>, '<?= clean($r['username']) ?>')">
-                    Archive
                   </button>
                 <?php endif; ?>
               </div>
