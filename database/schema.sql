@@ -463,6 +463,7 @@ CREATE TABLE `users` (
   `age` int(11) DEFAULT NULL,
   `image` varchar(255) DEFAULT NULL,
   `role` enum('icdrrmo','barangay_head','responder','resident') NOT NULL,
+  `availability` enum('Available','On Duty','Responding','Standby','Off Duty') NOT NULL DEFAULT 'Available',
   `barangay_id` int(11) DEFAULT NULL,
   `purok` varchar(100) DEFAULT NULL,
   `status` enum('active','inactive','pending','archived') DEFAULT 'active',

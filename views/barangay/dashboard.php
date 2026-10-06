@@ -23,6 +23,26 @@ if (!$barangay) {
     die("Barangay jurisdiction not found or unassigned.");
 }
 
+// Fetch Connected BDRRMC Agency
+$agencyStmt = $db->prepare("SELECT * FROM agencies WHERE barangay_id = ? AND agency_type = 'BDRRMC'");
+$agencyStmt->execute([$barangayId]);
+$connectedAgency = $agencyStmt->fetch(PDO::FETCH_ASSOC);
+
+// Fetch Responder Force & Availability stats
+$respKpiStmt = $db->prepare("
+    SELECT 
+        COUNT(*) AS total_responders,
+        SUM(CASE WHEN availability = 'Available' THEN 1 ELSE 0 END) AS ready_responders,
+        SUM(CASE WHEN availability = 'Responding' THEN 1 ELSE 0 END) AS responding_responders,
+        SUM(CASE WHEN availability = 'On Duty' THEN 1 ELSE 0 END) AS onduty_responders
+    FROM users 
+    WHERE role = 'responder' AND barangay_id = ? AND status = 'active'
+");
+$respKpiStmt->execute([$barangayId]);
+$respKpis = $respKpiStmt->fetch(PDO::FETCH_ASSOC) ?: [
+    'total_responders' => 0, 'ready_responders' => 0, 'responding_responders' => 0, 'onduty_responders' => 0
+];
+
 // 1. Fetch Puroks in this Barangay (Active only)
 $purokStmt = $db->prepare("
     SELECT * FROM puroks 
@@ -513,8 +533,53 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   </div>
 
+  <!-- Connected Agency Affiliation & Command Lineage Ribbon -->
+  <div style="background:#FFF;border:1px solid #E2E8F0;border-left:4px solid var(--dash-secondary);border-radius:10px;padding:12px 18px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:38px;height:38px;border-radius:8px;background:rgba(47,111,115,0.1);color:var(--dash-secondary);display:flex;align-items:center;justify-content:center;font-size:18px;">
+        🏛️
+      </div>
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;color:#64748B;font-weight:700;letter-spacing:0.5px;">Connected Agency Affiliation</div>
+        <div style="font-size:13.5px;font-weight:800;color:#17324D;">
+          <?= clean($connectedAgency['name'] ?? ('BDRRMC - ' . $barangay['name'])) ?>
+          <span style="font-size:10.5px;font-weight:600;color:#2F6F73;">• BDRRMC Emergency Operations Unit</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div style="font-size:11px;color:#475569;">
+        <span style="color:#94A3B8;font-size:9.5px;text-transform:uppercase;font-weight:700;display:block;">Central Coordinating HQ:</span>
+        <strong>ICDRRMO Central Command</strong> (Emergency Hotline: <strong style="color:var(--color-danger);">161</strong>)
+      </div>
+      <a href="<?= BASE_URL ?>/views/barangay/agency.php" class="btn btn-outline btn-sm" style="font-size:10.5px;font-weight:700;color:var(--dash-secondary);border-color:var(--dash-secondary);padding:6px 12px;">
+        Station Profile &rarr;
+      </a>
+    </div>
+  </div>
+
   <!-- Interactive Clickable KPI Metric Cards (Click to Pop-up Data) -->
   <div class="kpi-cards-grid">
+    <!-- Card 0: Responder Force (New Tactical Readiness Module) -->
+    <a href="<?= BASE_URL ?>/views/barangay/responders.php" class="clickable-card card-theme-info" style="text-decoration:none;" title="Click to view and manage responder personnel">
+      <div class="kpi-card-header">
+        <span class="kpi-card-title">Responder Force</span>
+        <div class="kpi-icon-pill" style="background:#E0F2FE;color:#0284C7;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        </div>
+      </div>
+      <div class="kpi-value-wrap">
+        <span class="kpi-big-value"><?= number_format($respKpis['total_responders'] ?? 0) ?></span>
+        <span style="font-size:10.5px;color:#059669;font-weight:700;">
+          <?= number_format($respKpis['ready_responders'] ?? 0) ?> Ready / <?= number_format($respKpis['responding_responders'] ?? 0) ?> Responding
+        </span>
+      </div>
+      <div class="kpi-sub-hint">
+        <span>Field Mission Availability</span>
+        <span class="kpi-click-tag">Manage Responders ↗</span>
+      </div>
+    </a>
+
     <!-- Card 1: Active Disaster Incidents -->
     <div class="clickable-card card-theme-danger" onclick="openDashModal('modalActiveIncidents')" title="Click to view detailed list of active disaster incidents">
       <div class="kpi-card-header">

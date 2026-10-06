@@ -34,8 +34,17 @@ $gender = trim($_POST['gender'] ?? 'Male');
 $age = (!empty($_POST['age']) && is_numeric($_POST['age'])) ? (int)$_POST['age'] : null;
 $role = trim($_POST['role'] ?? 'resident');
 $barangayId = !empty($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
+
+$targetRoleStmt = $db->prepare("SELECT role FROM users WHERE id = ?");
+$targetRoleStmt->execute([$targetUserId]);
+$targetExistingRole = $targetRoleStmt->fetchColumn() ?: 'resident';
+
 if ($user['role'] === 'barangay_head') {
-    $role = 'resident';
+    if (in_array($targetExistingRole, ['resident', 'responder'], true)) {
+        $role = $targetExistingRole;
+    } else {
+        $role = 'resident';
+    }
     $barangayId = (int)$user['barangay_id'];
 }
 $purok = trim($_POST['purok'] ?? '');
@@ -57,6 +66,15 @@ try {
         'gender = ?', 'age = ?', 'role = ?', 'barangay_id = ?', 'purok = ?'
     ];
     $params = [$firstName, $lastName, $fullName, $username, $email, $phone, $gender, $age, $role, $barangayId, $purok];
+
+    if (isset($_POST['availability'])) {
+        $avail = trim($_POST['availability']);
+        $validAvails = ['Available', 'On Duty', 'Responding', 'Standby', 'Off Duty'];
+        if (in_array($avail, $validAvails, true)) {
+            $fields[] = 'availability = ?';
+            $params[] = $avail;
+        }
+    }
 
     if (!empty($password)) {
         $fields[] = 'password = ?';

@@ -11,7 +11,7 @@ function canUserManageTarget($user, $targetUserId, $db) {
         $stmt = $db->prepare("SELECT role, barangay_id FROM users WHERE id = ?");
         $stmt->execute([$targetUserId]);
         $target = $stmt->fetch();
-        if ($target && $target['role'] === 'resident' && (int)$target['barangay_id'] === (int)$user['barangay_id']) {
+        if ($target && in_array($target['role'], ['resident', 'responder'], true) && (int)$target['barangay_id'] === (int)$user['barangay_id']) {
             return true;
         }
     }

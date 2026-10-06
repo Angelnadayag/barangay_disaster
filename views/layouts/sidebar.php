@@ -98,6 +98,12 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
           </a>
         </li>
         <li class="nav-item">
+          <a href="<?= BASE_URL ?>/views/barangay/responders.php" class="nav-link <?= $currentPage === 'responders.php' ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>
+            Manage Responders
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/barangay/resources.php" class="nav-link <?= $currentPage === 'resources.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
             Manage Resources
@@ -119,6 +125,12 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
           <a href="<?= BASE_URL ?>/views/barangay/puroks.php" class="nav-link <?= $currentPage === 'puroks.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
             Manage Purok
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="<?= BASE_URL ?>/views/barangay/agency.php" class="nav-link <?= $currentPage === 'agency.php' ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-3"></path><path d="M9 9v.01"></path><path d="M9 12v.01"></path><path d="M9 15v.01"></path><path d="M9 18v.01"></path></svg></span>
+            Connected Agency
           </a>
         </li>
       </ul>

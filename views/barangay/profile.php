@@ -19,6 +19,11 @@ if (!empty($user['barangay_id'])) {
     $bName = $bStmt->fetchColumn() ?: '';
 }
 
+// Fetch Connected BDRRMC Agency
+$aStmt = $db->prepare("SELECT * FROM agencies WHERE barangay_id = ? AND agency_type = 'BDRRMC'");
+$aStmt->execute([$user['barangay_id']]);
+$agency = $aStmt->fetch(PDO::FETCH_ASSOC);
+
 $pageTitle = "Barangay Official Profile";
 require_once __DIR__ . '/../layouts/header.php';
 
@@ -88,6 +93,32 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['change_pas
             <div>
               <span style="color:var(--color-text-muted);font-size:9px;text-transform:uppercase;">Account Status:</span>
               <div><?= renderStatusBadge($user['status']) ?></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connected Emergency Agency Card -->
+      <div class="card" style="margin-bottom:var(--space-4);border-left:4px solid var(--color-secondary);">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 class="card-title" style="margin:0;font-size:12px;">Connected Emergency Agency</h3>
+          <a href="<?= BASE_URL ?>/views/barangay/agency.php" style="font-size:10px;font-weight:700;color:var(--color-secondary);text-decoration:none;">View Station &rarr;</a>
+        </div>
+        <div class="card-body">
+          <div style="font-size:12.5px;font-weight:800;color:var(--color-primary);margin-bottom:4px;">
+            <?= clean($agency['name'] ?? ('BDRRMC - ' . $bName)) ?>
+          </div>
+          <div style="font-size:10px;color:var(--color-text-secondary);margin-bottom:10px;">
+            Barangay Disaster Risk Reduction & Management Council (BDRRMC)
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:9.5px;background:var(--color-surface-subtle);padding:8px 10px;border-radius:6px;border:1px solid var(--color-border-light);">
+            <div>
+              <span style="color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Station Hotline:</span>
+              <div style="font-weight:700;color:var(--color-primary);"><?= clean($agency['contact_number'] ?? ($user['phone'] ?: 'Dial 161')) ?></div>
+            </div>
+            <div>
+              <span style="color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Central Command:</span>
+              <div style="font-weight:700;color:var(--color-secondary);">ICDRRMO Central</div>
             </div>
           </div>
         </div>

@@ -35,9 +35,16 @@ $role = trim($_POST['role'] ?? 'resident');
 $barangayId = !empty($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
 $purok = trim($_POST['purok'] ?? '');
 $password = $_POST['password'] ?? 'admin123';
+$availability = trim($_POST['availability'] ?? 'Available');
+$validAvailabilities = ['Available', 'On Duty', 'Responding', 'Standby', 'Off Duty'];
+if (!in_array($availability, $validAvailabilities, true)) {
+    $availability = 'Available';
+}
 
 if ($user['role'] === 'barangay_head') {
-    $role = 'resident';
+    if (!in_array($role, ['resident', 'responder'], true)) {
+        $role = 'resident';
+    }
     $barangayId = (int)$user['barangay_id'];
 }
 
@@ -56,12 +63,12 @@ try {
     $stmt = $db->prepare("
         INSERT INTO users (
             username, password, first_name, last_name, full_name, email, phone, gender, age, role,
-            barangay_id, purok, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())
+            availability, barangay_id, purok, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())
     ");
     $stmt->execute([
         $username, $hashed, $firstName, $lastName, $fullName, $email, $phone, $gender, $age, $role,
-        $barangayId, $purok
+        $availability, $barangayId, $purok
     ]);
 
     logSystemEvent('CREATE_USER', 'Users', "Created account $username ($fullName, $role)");
