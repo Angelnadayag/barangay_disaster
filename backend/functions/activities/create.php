@@ -68,8 +68,8 @@ try {
 
         $resStmt = $db->prepare("
             SELECT id, first_name, last_name, full_name, phone 
-            FROM users 
-            WHERE role = 'resident' AND barangay_id = ? AND phone IS NOT NULL AND TRIM(phone) != '' AND status != 'archived'
+            FROM residents 
+            WHERE barangay_id = ? AND phone IS NOT NULL AND TRIM(phone) != '' AND status != 'archived'
         ");
         $resStmt->execute([$barangayId]);
         $residents = $resStmt->fetchAll(PDO::FETCH_ASSOC);

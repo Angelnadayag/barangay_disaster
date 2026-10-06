@@ -330,6 +330,32 @@ CREATE TABLE `recommended_items` (
   CONSTRAINT `recommended_items_ibfk_2` FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `residents`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `residents` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `first_name` varchar(50) NOT NULL,
+  `last_name` varchar(50) NOT NULL,
+  `full_name` varchar(100) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `phone` varchar(30) NOT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT 'Male',
+  `age` int(11) DEFAULT NULL,
+  `image` varchar(255) DEFAULT NULL,
+  `barangay_id` int(11) NOT NULL,
+  `purok` varchar(100) NOT NULL,
+  `status` enum('active','inactive','pending','archived') DEFAULT 'active',
+  `created_at` datetime DEFAULT current_timestamp(),
+  `last_login` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  KEY `barangay_id` (`barangay_id`),
+  CONSTRAINT `residents_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `resource_transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -463,6 +489,8 @@ CREATE TABLE `users` (
   `age` int(11) DEFAULT NULL,
   `image` varchar(255) DEFAULT NULL,
   `role` enum('icdrrmo','barangay_head','responder','resident') NOT NULL,
+  `agency_id` int(11) DEFAULT NULL,
+  `position` varchar(100) DEFAULT NULL,
   `availability` enum('Available','On Duty','Responding','Standby','Off Duty') NOT NULL DEFAULT 'Available',
   `barangay_id` int(11) DEFAULT NULL,
   `purok` varchar(100) DEFAULT NULL,
@@ -473,6 +501,8 @@ CREATE TABLE `users` (
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `email` (`email`),
   KEY `barangay_id` (`barangay_id`),
+  KEY `fk_users_agency` (`agency_id`),
+  CONSTRAINT `fk_users_agency` FOREIGN KEY (`agency_id`) REFERENCES `agencies` (`id`) ON DELETE SET NULL,
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

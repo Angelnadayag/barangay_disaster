@@ -31,40 +31,40 @@ $filterPurok = $_GET['purok'] ?? '';
 $search = trim($_GET['search'] ?? '');
 
 // Counts for navigation tabs
-$activeCountStmt = $db->prepare("SELECT COUNT(*) FROM users WHERE role = 'resident' AND barangay_id = ? AND status != 'archived'");
+$activeCountStmt = $db->prepare("SELECT COUNT(*) FROM residents WHERE barangay_id = ? AND status != 'archived'");
 $activeCountStmt->execute([$barangayId]);
 $activeCount = (int)$activeCountStmt->fetchColumn();
 
-$archivedCountStmt = $db->prepare("SELECT COUNT(*) FROM users WHERE role = 'resident' AND barangay_id = ? AND status = 'archived'");
+$archivedCountStmt = $db->prepare("SELECT COUNT(*) FROM residents WHERE barangay_id = ? AND status = 'archived'");
 $archivedCountStmt->execute([$barangayId]);
 $archivedCount = (int)$archivedCountStmt->fetchColumn();
 
 // Query residents
 $sql = "
-    SELECT u.*, b.name AS barangay_name 
-    FROM users u 
-    LEFT JOIN barangays b ON u.barangay_id = b.id 
-    WHERE u.role = 'resident' AND u.barangay_id = ?
+    SELECT r.*, b.name AS barangay_name 
+    FROM residents r 
+    LEFT JOIN barangays b ON r.barangay_id = b.id 
+    WHERE r.barangay_id = ?
 ";
 $params = [$barangayId];
 
 if ($viewTab === 'archived') {
-    $sql .= " AND u.status = 'archived'";
+    $sql .= " AND r.status = 'archived'";
 } else {
-    $sql .= " AND u.status != 'archived'";
+    $sql .= " AND r.status != 'archived'";
     if (!empty($filterStatus)) {
-        $sql .= " AND u.status = ?";
+        $sql .= " AND r.status = ?";
         $params[] = $filterStatus;
     }
 }
 
 if (!empty($filterPurok)) {
-    $sql .= " AND u.purok = ?";
+    $sql .= " AND r.purok = ?";
     $params[] = $filterPurok;
 }
 
 if (!empty($search)) {
-    $sql .= " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)";
+    $sql .= " AND (r.first_name LIKE ? OR r.last_name LIKE ? OR r.username LIKE ? OR r.email LIKE ? OR r.phone LIKE ?)";
     $like = "%$search%";
     $params[] = $like;
     $params[] = $like;
@@ -73,7 +73,7 @@ if (!empty($search)) {
     $params[] = $like;
 }
 
-$sql .= " ORDER BY FIELD(u.status, 'pending', 'active', 'inactive', 'archived'), u.first_name ASC, u.last_name ASC";
+$sql .= " ORDER BY FIELD(r.status, 'pending', 'active', 'inactive', 'archived'), r.first_name ASC, r.last_name ASC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $residentsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -407,6 +407,7 @@ select.form-control:disabled {
     <input type="hidden" name="action" value="create">
     <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
     <input type="hidden" name="role" value="resident">
+    <input type="hidden" name="user_type" value="resident">
     <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
 
     <div class="modal-header">
@@ -496,6 +497,7 @@ select.form-control:disabled {
     <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
     <input type="hidden" name="user_id" id="view_user_id">
     <input type="hidden" name="role" value="resident">
+    <input type="hidden" name="user_type" value="resident">
     <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
 
     <div class="modal-header">
@@ -862,6 +864,7 @@ function restoreUserDirect(userId, username) {
     async () => {
       const fd = new FormData();
       fd.append('user_id', userId);
+      fd.append('user_type', 'resident');
 
       const res = await fetch(`${BASE_URL}/backend/functions/users/restore.php`, {
         method: 'POST',
@@ -888,6 +891,7 @@ function reactivateUser(userId, username) {
     async () => {
       const fd = new FormData();
       fd.append('user_id', userId);
+      fd.append('user_type', 'resident');
       fd.append('status', 'active');
 
       const res = await fetch(`${BASE_URL}/backend/functions/users/update_status.php`, {
@@ -924,6 +928,7 @@ function onModalToggleStatus() {
     async () => {
       const fd = new FormData();
       fd.append('user_id', u.id);
+      fd.append('user_type', 'resident');
       fd.append('status', newStatus);
 
       const res = await fetch(`${BASE_URL}/backend/functions/users/update_status.php`, {

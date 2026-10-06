@@ -132,8 +132,8 @@ $overallOccupancyPct = $totalCapacity > 0 ? round(($totalCurrentEvacuees / $tota
 // 5. Fetch Verified Residents
 $resStmt = $db->prepare("
     SELECT id, first_name, last_name, full_name, username, email, phone, gender, age, purok, status, created_at
-    FROM users 
-    WHERE barangay_id = ? AND role = 'resident'
+    FROM residents 
+    WHERE barangay_id = ?
     ORDER BY created_at DESC
 ");
 $resStmt->execute([$barangayId]);

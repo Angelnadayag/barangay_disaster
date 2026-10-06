@@ -68,10 +68,30 @@ class Auth {
 
     public static function switchDemoRole(string $role): bool {
         $db = getDBConnection();
+        if ($role === 'resident') {
+            $stmt = $db->prepare("
+                SELECT r.*, 'resident' AS role, b.name AS barangay_name 
+                FROM residents r 
+                LEFT JOIN barangays b ON r.barangay_id = b.id 
+                WHERE r.status = 'active'
+                LIMIT 1
+            ");
+            $stmt->execute();
+            $user = $stmt->fetch();
+            if ($user) {
+                unset($user['password']);
+                $_SESSION['user'] = $user;
+                logSystemEvent('DEMO_ROLE_SWITCH', 'Auth', 'Switched session to persona: ' . $user['username'] . ' (resident)', $user['id'], $user['full_name'], 'resident');
+                return true;
+            }
+            return false;
+        }
+
         $stmt = $db->prepare("
-            SELECT u.*, b.name AS barangay_name 
+            SELECT u.*, b.name AS barangay_name, a.name AS agency_name 
             FROM users u 
             LEFT JOIN barangays b ON u.barangay_id = b.id 
+            LEFT JOIN agencies a ON u.agency_id = a.id
             WHERE u.role = ? AND u.status = 'active'
             LIMIT 1
         ");

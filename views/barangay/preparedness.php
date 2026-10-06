@@ -34,8 +34,8 @@ $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Fetch registered residents of this barangay for quick selection in event registration
 $resStmt = $db->prepare("
     SELECT id, first_name, last_name, full_name, phone, purok 
-    FROM users 
-    WHERE role = 'resident' AND barangay_id = ? AND status != 'archived'
+    FROM residents 
+    WHERE barangay_id = ? AND status != 'archived'
     ORDER BY first_name ASC, last_name ASC
 ");
 $resStmt->execute([$barangayId]);

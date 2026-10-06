@@ -1,9 +1,8 @@
 <?php
 // ============================================================================
-// Views (Barangay Head): Responder Personnel Management Module
-// Full feature parity with Resident Management with added Tactical Availability:
-// Active & Archived Tabs, Search, Availability & Status Filters,
-// In-Place View/Edit Mode, Real-Time Availability Switch, Archive & Restore.
+// Views (Barangay Head): Responder Force Management Module
+// Enhanced Table UI with Connected Agency FK and Position Attribute
+// Real-time Availability Switcher, Search, Agency Filters, View/Edit Mode.
 // ============================================================================
 
 require_once __DIR__ . '/../../backend/config/config.php';
@@ -28,7 +27,7 @@ if (!in_array($viewTab, ['active', 'archived'], true)) {
 
 $filterStatus = $_GET['status'] ?? '';
 $filterAvailability = $_GET['availability'] ?? '';
-$filterPurok = $_GET['purok'] ?? '';
+$filterAgency = !empty($_GET['agency_id']) ? (int)$_GET['agency_id'] : 0;
 $search = trim($_GET['search'] ?? '');
 
 // Counts for navigation tabs
@@ -55,11 +54,34 @@ $availKpis = $availCountsStmt->fetch(PDO::FETCH_ASSOC) ?: [
     'count_available' => 0, 'count_onduty' => 0, 'count_responding' => 0, 'count_standby' => 0
 ];
 
-// Query responders
+// Fetch active agencies for selection and filter
+$agencyStmt = $db->prepare("
+    SELECT id, name, agency_type, barangay_id 
+    FROM agencies 
+    WHERE status = 'active'
+    ORDER BY (barangay_id = ?) DESC, agency_type DESC, name ASC
+");
+$agencyStmt->execute([$barangayId]);
+$availableAgencies = $agencyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Determine default agency ID for this barangay
+$defaultAgencyId = null;
+foreach ($availableAgencies as $ag) {
+    if ((int)$ag['barangay_id'] === $barangayId) {
+        $defaultAgencyId = (int)$ag['id'];
+        break;
+    }
+}
+if (!$defaultAgencyId && !empty($availableAgencies)) {
+    $defaultAgencyId = (int)$availableAgencies[0]['id'];
+}
+
+// Query responders with connected agency join
 $sql = "
-    SELECT u.*, b.name AS barangay_name 
+    SELECT u.*, b.name AS barangay_name, a.name AS agency_name, a.agency_type, a.contact_number AS agency_phone
     FROM users u 
     LEFT JOIN barangays b ON u.barangay_id = b.id 
+    LEFT JOIN agencies a ON u.agency_id = a.id
     WHERE u.role = 'responder' AND u.barangay_id = ?
 ";
 $params = [$barangayId];
@@ -79,14 +101,15 @@ if (!empty($filterAvailability)) {
     $params[] = $filterAvailability;
 }
 
-if (!empty($filterPurok)) {
-    $sql .= " AND u.purok = ?";
-    $params[] = $filterPurok;
+if (!empty($filterAgency)) {
+    $sql .= " AND u.agency_id = ?";
+    $params[] = $filterAgency;
 }
 
 if (!empty($search)) {
-    $sql .= " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR u.purok LIKE ?)";
+    $sql .= " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR u.position LIKE ? OR a.name LIKE ?)";
     $like = "%$search%";
+    $params[] = $like;
     $params[] = $like;
     $params[] = $like;
     $params[] = $like;
@@ -99,11 +122,6 @@ $sql .= " ORDER BY FIELD(u.availability, 'Responding', 'On Duty', 'Available', '
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $respondersList = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Fetch local puroks/teams for dropdowns
-$purokStmt = $db->prepare("SELECT id, name FROM puroks WHERE barangay_id = ? ORDER BY name ASC");
-$purokStmt->execute([$barangayId]);
-$localPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = "Manage Responders — Barangay " . ($barangay['name'] ?? '');
 require_once __DIR__ . '/../layouts/header.php';
@@ -131,7 +149,7 @@ select.form-control:disabled {
   text-decoration: underline;
 }
 
-/* Modal styling matching residents.php */
+/* Modal styling matching system design system */
 #viewResponderModal.modal-overlay,
 #createResponderModal.modal-overlay {
   position: fixed !important;
@@ -158,7 +176,7 @@ select.form-control:disabled {
 
 #viewResponderModal .modal-dialog,
 #createResponderModal .modal-dialog {
-  max-width: 640px !important;
+  max-width: 660px !important;
   width: 100% !important;
   max-height: calc(100vh - 36px) !important;
   margin: auto !important;
@@ -167,7 +185,7 @@ select.form-control:disabled {
   background-color: var(--color-surface, #FFFFFF) !important;
   border-radius: var(--radius-primary, 10px) !important;
   border: 1px solid var(--color-border, #D9E0E3) !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24) !important;
   overflow: hidden !important;
   position: relative !important;
 }
@@ -175,7 +193,7 @@ select.form-control:disabled {
 #viewResponderModal .modal-header,
 #createResponderModal .modal-header {
   flex-shrink: 0 !important;
-  padding: 14px 20px !important;
+  padding: 16px 22px !important;
   border-bottom: 1px solid var(--color-border-light, #E7EDF0) !important;
   background-color: var(--color-surface, #FFFFFF) !important;
   display: flex !important;
@@ -186,7 +204,7 @@ select.form-control:disabled {
 #viewResponderModal .modal-body,
 #createResponderModal .modal-body {
   flex: 1 1 auto !important;
-  padding: 18px 20px !important;
+  padding: 20px 22px !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
 }
@@ -194,7 +212,7 @@ select.form-control:disabled {
 #viewResponderModal .modal-footer,
 #createResponderModal .modal-footer {
   flex-shrink: 0 !important;
-  padding: 12px 20px !important;
+  padding: 14px 22px !important;
   border-top: 1px solid var(--color-border-light, #E7EDF0) !important;
   background-color: #FAFCFC !important;
 }
@@ -228,7 +246,7 @@ select.form-control:disabled {
 }
 .nav-tab-badge {
   display: inline-block;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 10px;
   font-size: 9.5px;
   font-weight: 700;
@@ -244,12 +262,13 @@ select.form-control:disabled {
 .badge-avail {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
+  gap: 6px;
+  padding: 3px 9px;
   border-radius: 12px;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 .badge-avail-available {
   background: #E8F5E9;
@@ -278,8 +297,8 @@ select.form-control:disabled {
 }
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 6.5px;
+  height: 6.5px;
   border-radius: 50%;
   display: inline-block;
 }
@@ -293,6 +312,37 @@ select.form-control:disabled {
   0% { box-shadow: 0 0 0 0 rgba(198, 40, 40, 0.6); }
   70% { box-shadow: 0 0 0 6px rgba(198, 40, 40, 0); }
   100% { box-shadow: 0 0 0 0 rgba(198, 40, 40, 0); }
+}
+
+/* Agency & Position Tags */
+.agency-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: #F0F4F8;
+  color: #1E3A5F;
+  border: 1px solid #D5E0EB;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.agency-type-tag {
+  font-size: 8.5px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #17324D;
+  color: #FFF;
+  letter-spacing: 0.3px;
+}
+.position-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--color-primary);
 }
 
 /* Mini KPI Card Grid */
@@ -315,6 +365,26 @@ select.form-control:disabled {
   justify-content: space-between;
   box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
+
+/* Enhanced Table Styling */
+.table th {
+  background-color: #F8FAFB;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+  border-bottom: 2px solid var(--color-border);
+  padding: 11px 14px;
+}
+.table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border-light);
+}
+.table tbody tr:hover {
+  background-color: #FBFDFE;
+}
 </style>
 
 <main class="main-content">
@@ -322,7 +392,7 @@ select.form-control:disabled {
     <div class="page-header-title-wrap">
       <h1>Responder Force Registry — Barangay <?= clean($barangay['name'] ?? '') ?></h1>
       <p class="page-header-desc">
-        Manage your local emergency personnel, rescue squads, medical units, and monitor real-time field mission availability.
+        Manage your local emergency personnel, rescue squads, medical units, and connect each responder with their affiliated response agency and position.
       </p>
     </div>
     <div class="page-header-actions">
@@ -337,7 +407,7 @@ select.form-control:disabled {
   <div class="kpi-mini-grid">
     <div class="kpi-mini-card">
       <div>
-        <div style="font-size:9.5px;color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Total Responders</div>
+        <div style="font-size:9.5px;color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Total Personnel</div>
         <div style="font-size:18px;font-weight:800;color:var(--color-primary);margin-top:2px;"><?= $activeCount ?></div>
       </div>
       <div style="width:34px;height:34px;border-radius:8px;background:rgba(23,50,77,0.08);color:var(--color-primary);display:flex;align-items:center;justify-content:center;">
@@ -379,11 +449,11 @@ select.form-control:disabled {
   <!-- Tabs Navigation -->
   <div class="nav-tabs">
     <a href="?tab=active" class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
-      Active Responders
+      Active Personnel
       <span class="nav-tab-badge"><?= $activeCount ?></span>
     </a>
     <a href="?tab=archived" class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
-      Archived Responders
+      Archived Personnel
       <span class="nav-tab-badge"><?= $archivedCount ?></span>
     </a>
   </div>
@@ -394,8 +464,8 @@ select.form-control:disabled {
       <form method="GET" action="" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
         <input type="hidden" name="tab" value="<?= clean($viewTab) ?>">
 
-        <div style="flex:1;min-width:200px;">
-          <input type="text" name="search" class="form-control" placeholder="Search name, callsign, unit, email, phone..." value="<?= clean($search) ?>">
+        <div style="flex:1;min-width:220px;">
+          <input type="text" name="search" class="form-control" placeholder="Search name, username, position, agency, phone..." value="<?= clean($search) ?>">
         </div>
 
         <div style="width:160px;">
@@ -409,8 +479,19 @@ select.form-control:disabled {
           </select>
         </div>
 
+        <div style="width:200px;">
+          <select name="agency_id" class="form-control" onchange="this.form.submit()">
+            <option value="">All Connected Agencies</option>
+            <?php foreach ($availableAgencies as $ag): ?>
+              <option value="<?= (int)$ag['id'] ?>" <?= $filterAgency === (int)$ag['id'] ? 'selected' : '' ?>>
+                <?= clean($ag['name']) ?> (<?= clean($ag['agency_type']) ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
         <?php if ($viewTab === 'active'): ?>
-        <div style="width:140px;">
+        <div style="width:130px;">
           <select name="status" class="form-control" onchange="this.form.submit()">
             <option value="">All Statuses</option>
             <option value="active" <?= $filterStatus === 'active' ? 'selected' : '' ?>>Active</option>
@@ -420,46 +501,41 @@ select.form-control:disabled {
         </div>
         <?php endif; ?>
 
-        <div style="width:160px;">
-          <select name="purok" class="form-control" onchange="this.form.submit()">
-            <option value="">All Teams / Zones</option>
-            <?php foreach ($localPuroks as $lp): ?>
-              <option value="<?= clean($lp['name']) ?>" <?= $filterPurok === $lp['name'] ? 'selected' : '' ?>>
-                <?= clean($lp['name']) ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-
         <button type="submit" class="btn btn-secondary">Filter</button>
-        <?php if (!empty($search) || !empty($filterStatus) || !empty($filterAvailability) || !empty($filterPurok)): ?>
+        <?php if (!empty($search) || !empty($filterStatus) || !empty($filterAvailability) || !empty($filterAgency)): ?>
           <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline" style="color:var(--color-text-muted);">Reset</a>
         <?php endif; ?>
       </form>
     </div>
   </div>
 
-  <!-- Responders Table -->
+  <!-- Responders Table UI -->
   <div class="card">
     <div class="table-container">
       <table class="table">
         <thead>
           <tr>
             <th>Responder Profile</th>
+            <th>Position / Role</th>
+            <th>Connected Agency</th>
             <th>Availability Status</th>
-            <th>Tactical Unit / Assignment</th>
             <th>Contact Details</th>
-            <th>Account Status</th>
+            <th>Status</th>
             <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($respondersList)): ?>
             <tr>
-              <td colspan="6" style="text-align:center;padding:36px;color:var(--color-text-muted);">
-                <div style="font-size:24px;margin-bottom:6px;">👨‍🚒</div>
-                <div style="font-weight:600;font-size:12px;">No responders found</div>
-                <div style="font-size:11px;margin-top:2px;">Try adjusting your filters or register a new responder personnel.</div>
+              <td colspan="7" style="text-align:center;padding:42px 20px;color:var(--color-text-muted);">
+                <div style="font-size:28px;margin-bottom:8px;">👨‍🚒</div>
+                <div style="font-weight:700;font-size:13px;color:var(--color-primary);">No responder records found</div>
+                <div style="font-size:11px;margin-top:3px;max-width:360px;margin-left:auto;margin-right:auto;">
+                  There are no personnel matching the selected criteria. Register responders to assign them to an agency and track mission status.
+                </div>
+                <button class="btn btn-primary btn-sm" style="margin-top:14px;" onclick="openCreateResponderModal()">
+                  Register New Responder
+                </button>
               </td>
             </tr>
           <?php else: ?>
@@ -468,12 +544,17 @@ select.form-control:disabled {
                 $avail = $r['availability'] ?: 'Available';
                 $availClass = 'badge-avail-' . strtolower(str_replace(' ', '', $avail));
                 $userJson = htmlspecialchars(json_encode($r), ENT_QUOTES, 'UTF-8');
+                $pos = trim($r['position'] ?? '');
+                if (empty($pos)) {
+                    $pos = 'Field Response Specialist';
+                }
               ?>
               <tr>
+                <!-- Responder Profile -->
                 <td>
                   <a href="javascript:void(0)" onclick="openViewResponderModal(<?= $userJson ?>)" class="table-user-link">
                     <div style="display:flex;align-items:center;gap:10px;">
-                      <div style="width:34px;height:34px;border-radius:8px;background:var(--color-primary);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">
+                      <div style="width:36px;height:36px;border-radius:8px;background:var(--color-primary);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;flex-shrink:0;">
                         <?php if (!empty($r['image']) && file_exists(ROOT_PATH . '/' . $r['image'])): ?>
                           <img src="<?= BASE_URL ?>/<?= clean($r['image']) ?>" alt="" style="width:100%;height:100%;border-radius:8px;object-fit:cover;">
                         <?php else: ?>
@@ -481,13 +562,38 @@ select.form-control:disabled {
                         <?php endif; ?>
                       </div>
                       <div>
-                        <div class="table-user-name" style="font-weight:700;color:var(--color-primary);font-size:11.5px;">
+                        <div class="table-user-name" style="font-weight:700;color:var(--color-primary);font-size:12px;">
                           <?= clean($r['full_name'] ?: ($r['first_name'] . ' ' . $r['last_name'])) ?>
                         </div>
-                        <div style="font-size:10px;color:var(--color-text-muted);">@<?= clean($r['username']) ?></div>
+                        <div style="font-size:10px;color:var(--color-text-muted);">
+                          @<?= clean($r['username']) ?> • ID #<?= (int)$r['id'] ?>
+                        </div>
                       </div>
                     </div>
                   </a>
+                </td>
+
+                <!-- Position / Title -->
+                <td>
+                  <div class="position-badge">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="color:var(--color-secondary);flex-shrink:0;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    <span><?= clean($pos) ?></span>
+                  </div>
+                  <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
+                    Barangay <?= clean($barangay['name'] ?? '') ?>
+                  </div>
+                </td>
+
+                <!-- Connected Agency -->
+                <td>
+                  <?php if (!empty($r['agency_name'])): ?>
+                    <div class="agency-pill">
+                      <span class="agency-type-tag"><?= clean($r['agency_type'] ?: 'AGENCY') ?></span>
+                      <span><?= clean($r['agency_name']) ?></span>
+                    </div>
+                  <?php else: ?>
+                    <span style="font-size:10.5px;color:var(--color-text-muted);font-style:italic;">No Agency Linked</span>
+                  <?php endif; ?>
                 </td>
 
                 <!-- Operational Availability Column with Quick-Switch Dropdown -->
@@ -498,11 +604,11 @@ select.form-control:disabled {
                       <?= clean($avail) ?>
                     </span>
                     <?php if ($viewTab === 'active'): ?>
-                      <div class="dropdown" style="display:inline-block;">
-                        <button class="btn btn-outline btn-sm" style="padding:1px 5px;font-size:9px;" title="Quick Switch Availability" onclick="toggleQuickAvail(event, <?= $r['id'] ?>)">
+                      <div class="dropdown" style="display:inline-block;position:relative;">
+                        <button class="btn btn-outline btn-sm" style="padding:2px 6px;font-size:9px;" title="Quick Switch Availability" onclick="toggleQuickAvail(event, <?= $r['id'] ?>)">
                           ⚡
                         </button>
-                        <div id="quickAvailMenu_<?= $r['id'] ?>" style="display:none;position:absolute;background:#FFF;border:1px solid var(--color-border);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.15);padding:4px;z-index:100;min-width:130px;">
+                        <div id="quickAvailMenu_<?= $r['id'] ?>" style="display:none;position:absolute;top:100%;left:0;background:#FFF;border:1px solid var(--color-border);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.15);padding:4px;z-index:100;min-width:130px;">
                           <?php foreach (['Available', 'On Duty', 'Responding', 'Standby', 'Off Duty'] as $st): ?>
                             <a href="javascript:void(0)" 
                                onclick="setResponderAvailability(<?= $r['id'] ?>, '<?= $st ?>')"
@@ -516,39 +622,43 @@ select.form-control:disabled {
                   </div>
                 </td>
 
+                <!-- Contact Details -->
                 <td>
-                  <div style="font-size:11px;font-weight:600;color:var(--color-primary);">
-                    <?= clean($r['purok'] ?: 'General Response Squad') ?>
+                  <div style="font-size:11px;font-weight:600;color:var(--color-text);display:flex;align-items:center;gap:4px;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    <?= clean($r['phone'] ?: 'No Phone') ?>
                   </div>
-                  <div style="font-size:9.5px;color:var(--color-text-muted);">Barangay <?= clean($barangay['name'] ?? '') ?></div>
+                  <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;display:flex;align-items:center;gap:4px;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    <?= clean($r['email']) ?>
+                  </div>
                 </td>
 
-                <td>
-                  <div style="font-size:11px;font-weight:600;"><?= clean($r['phone'] ?: 'No Phone') ?></div>
-                  <div style="font-size:9.5px;color:var(--color-text-muted);"><?= clean($r['email']) ?></div>
-                </td>
-
+                <!-- Status -->
                 <td>
                   <?= renderStatusBadge($r['status']) ?>
                 </td>
 
+                <!-- Actions -->
                 <td style="text-align:right;">
                   <div style="display:inline-flex;gap:4px;">
-                    <button class="btn btn-outline btn-sm" style="font-size:10px;" onclick="openViewResponderModal(<?= $userJson ?>)">
+                    <button class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 8px;" onclick="openViewResponderModal(<?= $userJson ?>)">
                       View / Edit
                     </button>
 
                     <?php if ($viewTab === 'active'): ?>
                       <form method="POST" action="<?= BASE_URL ?>/backend/functions/users/archive.php" style="display:inline;" onsubmit="return confirm('Archive responder <?= clean(addslashes($r['full_name'])) ?>?');">
                         <input type="hidden" name="user_id" value="<?= $r['id'] ?>">
+                        <input type="hidden" name="user_type" value="user">
                         <input type="hidden" name="return_url" value="<?= clean($_SERVER['REQUEST_URI']) ?>">
-                        <button type="submit" class="btn btn-outline btn-sm" style="color:var(--color-danger);font-size:10px;">Archive</button>
+                        <button type="submit" class="btn btn-outline btn-sm" style="color:var(--color-danger);font-size:10px;padding:3px 8px;">Archive</button>
                       </form>
                     <?php else: ?>
                       <form method="POST" action="<?= BASE_URL ?>/backend/functions/users/restore.php" style="display:inline;" onsubmit="return confirm('Restore responder <?= clean(addslashes($r['full_name'])) ?>?');">
                         <input type="hidden" name="user_id" value="<?= $r['id'] ?>">
+                        <input type="hidden" name="user_type" value="user">
                         <input type="hidden" name="return_url" value="<?= clean($_SERVER['REQUEST_URI']) ?>">
-                        <button type="submit" class="btn btn-primary btn-sm" style="font-size:10px;">Restore</button>
+                        <button type="submit" class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 8px;">Restore</button>
                       </form>
                     <?php endif; ?>
                   </div>
@@ -569,12 +679,27 @@ select.form-control:disabled {
   <input type="hidden" name="return_url" value="<?= clean($_SERVER['REQUEST_URI']) ?>">
 </form>
 
+<!-- Datalist for Position Titles -->
+<datalist id="positionSuggestions">
+  <option value="Team Alpha Rescue Leader">
+  <option value="Search and Rescue (SAR) Operative">
+  <option value="Emergency Medical Technician (EMT)">
+  <option value="Paramedic / First Responder">
+  <option value="Fire & Hazard Specialist">
+  <option value="Disaster Evacuation Marshal">
+  <option value="Incident Command Liaison">
+  <option value="Operations & Logistics Officer">
+  <option value="Safety & Communications Lead">
+  <option value="BDRRMC Quick Reaction Force">
+</datalist>
+
 <!-- ========================================================================= -->
 <!-- Modal: Register New Responder Personnel                                  -->
 <!-- ========================================================================= -->
 <div class="modal-overlay" id="createResponderModal" onclick="if(event.target===this)closeCreateResponderModal()">
   <form class="modal-dialog" id="createResponderForm" method="POST" action="<?= BASE_URL ?>/backend/functions/users/create.php">
     <input type="hidden" name="role" value="responder">
+    <input type="hidden" name="user_type" value="user">
     <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
     <input type="hidden" name="return_url" value="<?= clean($_SERVER['REQUEST_URI']) ?>">
 
@@ -626,20 +751,27 @@ select.form-control:disabled {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-bottom:12px;">
+      <!-- Position & Agency Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
-          <label class="form-label" style="font-size:10.5px;font-weight:600;">Assigned Team / Unit / Purok</label>
-          <input type="text" name="purok" class="form-control" placeholder="e.g. Team Alpha Rescue / Medical Unit" list="purokList">
-          <datalist id="purokList">
-            <option value="Team Alpha Rescue">
-            <option value="Emergency Medical Team">
-            <option value="Logistics & Transport Unit">
-            <option value="Search and Rescue (SAR)">
-            <?php foreach ($localPuroks as $lp): ?>
-              <option value="<?= clean($lp['name']) ?>">
-            <?php endforeach; ?>
-          </datalist>
+          <label class="form-label" style="font-size:10.5px;font-weight:600;">Position / Role Title *</label>
+          <input type="text" name="position" class="form-control" required placeholder="e.g. Team Alpha Rescue Leader" list="positionSuggestions">
+          <small style="font-size:9px;color:var(--color-text-muted);">Specific responder title or operational rank</small>
         </div>
+        <div>
+          <label class="form-label" style="font-size:10.5px;font-weight:600;">Connected Agency *</label>
+          <select name="agency_id" class="form-control" required>
+            <?php foreach ($availableAgencies as $ag): ?>
+              <option value="<?= (int)$ag['id'] ?>" <?= ((int)$ag['id'] === $defaultAgencyId) ? 'selected' : '' ?>>
+                <?= clean($ag['name']) ?> (<?= clean($ag['agency_type']) ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <small style="font-size:9px;color:var(--color-text-muted);">Agency or BDRRMC unit they belong to</small>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
           <label class="form-label" style="font-size:10.5px;font-weight:600;">Gender</label>
           <select name="gender" class="form-control">
@@ -648,18 +780,16 @@ select.form-control:disabled {
             <option value="Other">Other</option>
           </select>
         </div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
           <label class="form-label" style="font-size:10.5px;font-weight:600;">Age</label>
           <input type="number" name="age" class="form-control" placeholder="e.g. 28" min="18" max="75">
         </div>
-        <div>
-          <label class="form-label" style="font-size:10.5px;font-weight:600;">Account Password *</label>
-          <input type="password" name="password" class="form-control" required value="admin123" placeholder="Default: admin123">
-          <small style="font-size:9px;color:var(--color-text-muted);">Default: admin123 (can be changed on first login)</small>
-        </div>
+      </div>
+
+      <div style="margin-bottom:6px;">
+        <label class="form-label" style="font-size:10.5px;font-weight:600;">Account Password *</label>
+        <input type="password" name="password" class="form-control" required value="admin123" placeholder="Default: admin123">
+        <small style="font-size:9px;color:var(--color-text-muted);">Default: admin123 (can be changed on first login)</small>
       </div>
     </div>
 
@@ -677,6 +807,7 @@ select.form-control:disabled {
   <form class="modal-dialog" id="viewResponderForm" method="POST" action="<?= BASE_URL ?>/backend/functions/users/update.php">
     <input type="hidden" name="user_id" id="v_user_id">
     <input type="hidden" name="role" value="responder">
+    <input type="hidden" name="user_type" value="user">
     <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
     <input type="hidden" name="return_url" value="<?= clean($_SERVER['REQUEST_URI']) ?>">
 
@@ -744,12 +875,22 @@ select.form-control:disabled {
           <input type="text" name="phone" id="v_phone" class="form-control" required disabled>
         </div>
         <div>
-          <label class="form-label" style="font-size:10.5px;font-weight:600;">Assigned Team / Unit / Area</label>
-          <input type="text" name="purok" id="v_purok" class="form-control" disabled list="purokList">
+          <label class="form-label" style="font-size:10.5px;font-weight:600;">Position / Role Title *</label>
+          <input type="text" name="position" id="v_position" class="form-control" disabled list="positionSuggestions">
         </div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label class="form-label" style="font-size:10.5px;font-weight:600;">Connected Agency *</label>
+          <select name="agency_id" id="v_agency_id" class="form-control" disabled>
+            <?php foreach ($availableAgencies as $ag): ?>
+              <option value="<?= (int)$ag['id'] ?>">
+                <?= clean($ag['name']) ?> (<?= clean($ag['agency_type']) ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
         <div>
           <label class="form-label" style="font-size:10.5px;font-weight:600;">Gender</label>
           <select name="gender" id="v_gender" class="form-control" disabled>
@@ -758,9 +899,16 @@ select.form-control:disabled {
             <option value="Other">Other</option>
           </select>
         </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
           <label class="form-label" style="font-size:10.5px;font-weight:600;">Age</label>
           <input type="number" name="age" id="v_age" class="form-control" min="18" max="75" disabled>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:10.5px;font-weight:600;">Barangay</label>
+          <input type="text" class="form-control" value="Barangay <?= clean($barangay['name']) ?>" disabled>
         </div>
       </div>
 
@@ -772,9 +920,7 @@ select.form-control:disabled {
     </div>
 
     <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
-      <div id="v_left_actions">
-        <!-- Optional status toggle -->
-      </div>
+      <div id="v_left_actions"></div>
       <div style="display:flex;gap:8px;">
         <button type="button" class="btn btn-outline" id="v_cancel_btn" onclick="closeViewResponderModal()">Close</button>
         <button type="button" class="btn btn-secondary" id="v_edit_toggle_btn" onclick="toggleEditMode()">
@@ -814,7 +960,10 @@ function openViewResponderModal(r) {
   document.getElementById('v_username').value = r.username || '';
   document.getElementById('v_email').value = r.email || '';
   document.getElementById('v_phone').value = r.phone || '';
-  document.getElementById('v_purok').value = r.purok || '';
+  document.getElementById('v_position').value = r.position || '';
+  if (r.agency_id) {
+    document.getElementById('v_agency_id').value = r.agency_id;
+  }
   document.getElementById('v_gender').value = r.gender || 'Male';
   document.getElementById('v_age').value = r.age || '';
   document.getElementById('v_availability').value = r.availability || 'Available';
@@ -837,7 +986,7 @@ function closeViewResponderModal() {
 }
 
 function setInputState(editable) {
-  const inputs = ['v_first_name', 'v_last_name', 'v_username', 'v_email', 'v_phone', 'v_purok', 'v_gender', 'v_age', 'v_availability', 'v_password'];
+  const inputs = ['v_first_name', 'v_last_name', 'v_username', 'v_email', 'v_phone', 'v_position', 'v_agency_id', 'v_gender', 'v_age', 'v_availability', 'v_password'];
   inputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = !editable;
@@ -873,7 +1022,7 @@ function toggleEditMode() {
 // Quick Availability Switcher
 function toggleQuickAvail(event, id) {
   event.stopPropagation();
-  // Close any open menus
+  // Close any other open menus
   document.querySelectorAll('[id^="quickAvailMenu_"]').forEach(el => {
     if (el.id !== 'quickAvailMenu_' + id) el.style.display = 'none';
   });

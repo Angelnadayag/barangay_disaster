@@ -18,7 +18,7 @@ $bStmt = $db->prepare("
     SELECT b.*,
            (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS puroks_count,
            (SELECT COUNT(*) FROM evacuation_areas ea WHERE ea.barangay_id = b.id) AS evac_count,
-           (SELECT COUNT(*) FROM users u WHERE u.barangay_id = b.id AND u.role = 'resident') AS registered_residents
+           (SELECT COUNT(*) FROM residents r WHERE r.barangay_id = b.id) AS registered_residents
     FROM barangays b 
     WHERE b.id = ?
 ");

@@ -40,7 +40,7 @@ try {
     $stmt->execute([$availability, $responderId]);
 
     // Fetch responder info for logging
-    $uStmt = $db->prepare("SELECT full_name, username, barangay_id, purok FROM users WHERE id = ?");
+    $uStmt = $db->prepare("SELECT full_name, username, barangay_id, position FROM users WHERE id = ?");
     $uStmt->execute([$responderId]);
     $resp = $uStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -55,7 +55,7 @@ try {
         $logStmt->execute([
             $responderId,
             $resp['barangay_id'],
-            $resp['purok'] ?: 'Assigned Station',
+            $resp['position'] ?: 'Assigned Station',
             $opStatus,
             "Availability status changed to '{$availability}' by " . $currentUser['full_name']
         ]);
