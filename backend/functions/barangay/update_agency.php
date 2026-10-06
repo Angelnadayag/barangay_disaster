@@ -77,7 +77,7 @@ try {
         $user['role']
     );
 
-    redirectWithFlash($returnUrl, 'success', 'Connected Agency station details updated successfully.');
+    redirectWithFlash($returnUrl, 'success', 'Agency information updated successfully.');
 } catch (Exception $e) {
     redirectWithFlash($returnUrl, 'error', 'Error updating agency: ' . $e->getMessage());
 }

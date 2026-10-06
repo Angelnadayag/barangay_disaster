@@ -540,7 +540,7 @@ require_once __DIR__ . '/../layouts/header.php';
         🏛️
       </div>
       <div>
-        <div style="font-size:10px;text-transform:uppercase;color:#64748B;font-weight:700;letter-spacing:0.5px;">Connected Agency Affiliation</div>
+        <div style="font-size:10px;text-transform:uppercase;color:#64748B;font-weight:700;letter-spacing:0.5px;">Agency Information</div>
         <div style="font-size:13.5px;font-weight:800;color:#17324D;">
           <?= clean($connectedAgency['name'] ?? ('BDRRMC - ' . $barangay['name'])) ?>
           <span style="font-size:10.5px;font-weight:600;color:#2F6F73;">• BDRRMC Emergency Operations Unit</span>
@@ -553,7 +553,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <strong>ICDRRMO Central Command</strong> (Emergency Hotline: <strong style="color:var(--color-danger);">161</strong>)
       </div>
       <a href="<?= BASE_URL ?>/views/barangay/agency.php" class="btn btn-outline btn-sm" style="font-size:10.5px;font-weight:700;color:var(--dash-secondary);border-color:var(--dash-secondary);padding:6px 12px;">
-        Station Profile &rarr;
+        Agency Information &rarr;
       </a>
     </div>
   </div>

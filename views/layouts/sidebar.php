@@ -130,7 +130,7 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/barangay/agency.php" class="nav-link <?= $currentPage === 'agency.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-3"></path><path d="M9 9v.01"></path><path d="M9 12v.01"></path><path d="M9 15v.01"></path><path d="M9 18v.01"></path></svg></span>
-            Connected Agency
+            Agency Information
           </a>
         </li>
       </ul>
