@@ -63,9 +63,9 @@ if (strlen($normalizedPhone) < 10) {
     redirectWithFlash($returnUrl, 'error', 'Please provide a valid Philippine mobile number (e.g. 09XXXXXXXXX).');
 }
 
-// Look up user if user_id not provided
+// Look up resident if user_id not provided
 if (!$userId) {
-    $uStmt = $db->prepare("SELECT id, full_name, first_name, last_name FROM users WHERE (phone = ? OR phone = ?) AND role = 'resident' LIMIT 1");
+    $uStmt = $db->prepare("SELECT id, full_name, first_name, last_name FROM residents WHERE phone = ? OR phone = ? LIMIT 1");
     $uStmt->execute([$phone, $normalizedPhone]);
     $uMatch = $uStmt->fetch(PDO::FETCH_ASSOC);
     if ($uMatch) {
