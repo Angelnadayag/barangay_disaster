@@ -21,6 +21,19 @@ switch ($action) {
     case 'register_resident':
         require __DIR__ . '/register_resident.php';
         break;
+    case 'add_attendee':
+        require __DIR__ . '/add_attendee.php';
+        break;
+    case 'remove_attendee':
+    case 'delete_attendee':
+        require __DIR__ . '/remove_attendee.php';
+        break;
+    case 'archive':
+        require __DIR__ . '/archive.php';
+        break;
+    case 'restore':
+        require __DIR__ . '/restore.php';
+        break;
     default:
         require_once __DIR__ . '/../../config/config.php';
         require_once __DIR__ . '/../../services/Helpers.php';

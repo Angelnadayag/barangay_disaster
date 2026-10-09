@@ -48,16 +48,32 @@ if ($role === 'barangay_head' && (int)$act['barangay_id'] !== (int)$user['barang
 
 $title = trim($_POST['title'] ?? $act['title']);
 $type = trim($_POST['activity_type'] ?? $act['activity_type']);
-$venue = trim($_POST['venue'] ?? $act['venue']);
+$venue = trim($_POST['venue'] ?? ($_POST['venue_select'] ?? $act['venue']));
+if ($venue === '__custom__') {
+    $venue = trim($_POST['venue_custom'] ?? $act['venue']);
+}
 $personnel = trim($_POST['assigned_personnel'] ?? $act['assigned_personnel']);
 $target = max(5, (int)($_POST['target_participants'] ?? $act['target_participants']));
 $description = trim($_POST['description'] ?? $act['description']);
 
-// Check if event has already started
-$isStarted = (time() >= strtotime($act['start_datetime']));
+// Process content execution checklist if supplied
+$contentExecutionInput = $_POST['content_execution'] ?? ($_POST['expected_activities'] ?? null);
+$contentExecutionJson = null;
+if ($contentExecutionInput !== null) {
+    if (is_array($contentExecutionInput)) {
+        $contentExecutionJson = json_encode(array_values(array_filter($contentExecutionInput)), JSON_UNESCAPED_UNICODE);
+    } else {
+        $contentExecutionJson = trim((string)$contentExecutionInput);
+    }
+}
 
-if ($isStarted) {
-    // If event has already started, starting time and end time CANNOT be edited
+// Check if event has already started, is completed/accomplished, or archived
+$isStarted = (time() >= strtotime($act['start_datetime']));
+$isCompleted = ($act['status'] === 'Completed');
+$isArchived = !empty($act['is_archived']);
+
+if ($isStarted || $isCompleted || $isArchived) {
+    // If event has already started or is accomplished, start time and end time CANNOT be edited
     $startDate = $act['start_datetime'];
     $endDate = $act['end_datetime'];
 } else {
@@ -72,22 +88,69 @@ if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
 }
 
 try {
-    $updateStmt = $db->prepare("
-        UPDATE preparedness_activities SET
-            title = ?,
-            activity_type = ?,
-            venue = ?,
-            start_datetime = ?,
-            end_datetime = ?,
-            assigned_personnel = ?,
-            target_participants = ?,
-            description = ?
-        WHERE id = ?
-    ");
-    $updateStmt->execute([
-        $title, $type, $venue, $startDate, $endDate,
-        $personnel, $target, $description, $id
-    ]);
+    // Self-heal expected_activities column if missing
+    $colsEa = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'expected_activities'")->fetchAll();
+    if (empty($colsEa)) {
+        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
+    }
+
+    if ($contentExecutionJson !== null) {
+        if ($act['status'] === 'Completed') {
+            $updateStmt = $db->prepare("
+                UPDATE preparedness_activities SET
+                    title = ?,
+                    activity_type = ?,
+                    venue = ?,
+                    start_datetime = ?,
+                    end_datetime = ?,
+                    assigned_personnel = ?,
+                    target_participants = ?,
+                    description = ?,
+                    expected_activities = ?
+                WHERE id = ?
+            ");
+            $updateStmt->execute([
+                $title, $type, $venue, $startDate, $endDate,
+                $personnel, $target, $description, $contentExecutionJson, $id
+            ]);
+        } else {
+            $updateStmt = $db->prepare("
+                UPDATE preparedness_activities SET
+                    title = ?,
+                    activity_type = ?,
+                    venue = ?,
+                    start_datetime = ?,
+                    end_datetime = ?,
+                    assigned_personnel = ?,
+                    target_participants = ?,
+                    description = ?,
+                    content_execution = ?,
+                    expected_activities = ?
+                WHERE id = ?
+            ");
+            $updateStmt->execute([
+                $title, $type, $venue, $startDate, $endDate,
+                $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $id
+            ]);
+        }
+    } else {
+        $updateStmt = $db->prepare("
+            UPDATE preparedness_activities SET
+                title = ?,
+                activity_type = ?,
+                venue = ?,
+                start_datetime = ?,
+                end_datetime = ?,
+                assigned_personnel = ?,
+                target_participants = ?,
+                description = ?
+            WHERE id = ?
+        ");
+        $updateStmt->execute([
+            $title, $type, $venue, $startDate, $endDate,
+            $personnel, $target, $description, $id
+        ]);
+    }
 
     logSystemEvent('UPDATE_ACTIVITY', 'Preparedness', "Updated event #$id: $title ($type)");
 
