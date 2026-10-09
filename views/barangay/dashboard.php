@@ -1,8 +1,8 @@
 <?php
 // ============================================================================
 // Views (Barangay Head): Modern Command & Operations Dashboard
-// Features: Sleek Glassmorphism, Interactive/Clickable KPI Cards & Charts with Pop-ups,
-// Real-time Jurisdiction Metrics, Demographics, Disaster Incidents & Relief Tracking.
+// Refined Modern Aesthetics, Strict Color Palette & Cohesive Typography
+// Real-time Jurisdiction Metrics, Demographics, Disaster Incidents & Relief Tracking
 // ============================================================================
 
 require_once __DIR__ . '/../../backend/config/config.php';
@@ -165,245 +165,190 @@ require_once __DIR__ . '/../layouts/header.php';
 
 <style>
   /* =========================================================================
-     MODERN DASHBOARD AESTHETICS & MICRO-ANIMATIONS
+     MODERN DASHBOARD STYLING (Restrained Hierarchy & Standard Tokens)
      ========================================================================= */
-  :root {
-    --dash-primary: #17324D;
-    --dash-secondary: #2F6F73;
-    --dash-accent: #0EA5E9;
-    --dash-critical: #EF4444;
-    --dash-warning: #F59E0B;
-    --dash-success: #10B981;
-    --dash-card-bg: #FFFFFF;
-    --dash-card-border: #E2E8F0;
-    --dash-card-hover: 0 12px 28px -6px rgba(23, 50, 77, 0.12), 0 4px 12px -2px rgba(23, 50, 77, 0.06);
+  .dashboard-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
-  /* Hero Banner */
-  .hero-command-banner {
-    position: relative;
-    background: linear-gradient(135deg, #17324D 0%, #1F4565 55%, #2F6F73 100%);
-    color: #FFFFFF;
-    border-radius: 12px;
-    padding: 24px 28px;
-    margin-bottom: 24px;
-    overflow: hidden;
-    box-shadow: 0 10px 25px -5px rgba(23, 50, 77, 0.25);
+  /* Connected Agency Ribbon */
+  .agency-ribbon {
+    background: var(--color-surface, #FFFFFF);
+    border: 1px solid var(--color-border-light, #E7EDF0);
+    border-left: 3px solid var(--color-secondary, #2F6F73);
+    border-radius: var(--radius-sm, 6px);
+    padding: 8px 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 16px;
-  }
-  .hero-command-banner::after {
-    content: '';
-    position: absolute;
-    top: -50px;
-    right: -50px;
-    width: 240px;
-    height: 240px;
-    background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 70%);
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  .hero-title {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-    margin: 0 0 6px 0;
-    display: flex;
-    align-items: center;
     gap: 10px;
+    box-shadow: var(--shadow-subtle, 0 1px 3px rgba(23, 50, 77, 0.04));
   }
-  .hero-subtitle {
-    font-size: 12.5px;
-    color: #E2E8F0;
-    margin: 0;
-    line-height: 1.5;
-  }
-  .hero-badge-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
+  .agency-title {
+    font-size: var(--text-base, 12px);
     font-weight: 600;
-    backdrop-filter: blur(4px);
-    margin-top: 8px;
+    color: var(--color-primary, #17324D);
+  }
+  .agency-subtitle {
+    font-size: var(--text-xs, 10px);
+    color: var(--color-text-secondary, #66737D);
   }
 
-  /* Interactive KPI Cards Grid */
+  /* Modern KPI Stat Cards Grid (Clean Typography, No Decorative Icons) */
   .kpi-cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
   }
   .clickable-card {
-    background: var(--dash-card-bg);
-    border: 1px solid var(--dash-card-border);
-    border-radius: 12px;
-    padding: 18px 20px;
-    position: relative;
+    background: var(--color-surface, #FFFFFF);
+    border: 1px solid var(--color-border, #D9E0E3);
+    border-radius: var(--radius-primary, 10px);
+    padding: 12px 14px;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: var(--shadow-subtle, 0 1px 3px rgba(23, 50, 77, 0.04));
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    overflow: hidden;
-  }
-  .clickable-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: transparent;
-    transition: background 0.25s ease;
+    text-decoration: none;
+    color: inherit;
   }
   .clickable-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--dash-card-hover);
-    border-color: #CBD5E1;
+    border-color: var(--color-secondary, #2F6F73);
+    box-shadow: var(--shadow-card, 0 2px 6px rgba(23, 50, 77, 0.08));
   }
-  .clickable-card.card-theme-danger::before { background: var(--dash-critical); }
-  .clickable-card.card-theme-warning::before { background: var(--dash-warning); }
-  .clickable-card.card-theme-primary::before { background: var(--dash-secondary); }
-  .clickable-card.card-theme-success::before { background: var(--dash-success); }
-  .clickable-card.card-theme-info::before { background: var(--dash-accent); }
-
+  .clickable-card.card-alert {
+    border-left: 3px solid var(--color-danger, #C62828);
+  }
+  .clickable-card.card-alert .kpi-big-value {
+    color: var(--color-danger, #C62828);
+  }
   .kpi-card-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 12px;
+    align-items: center;
+    margin-bottom: 6px;
   }
   .kpi-card-title {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--text-xs, 10px);
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--color-text-secondary, #64748B);
+    letter-spacing: 0.5px;
+    color: var(--color-text-secondary, #66737D);
   }
-  .kpi-icon-pill {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s ease;
+  .kpi-card-badge {
+    font-size: var(--text-2xs, 9px);
+    font-weight: 600;
+    color: var(--color-secondary, #2F6F73);
   }
-  .clickable-card:hover .kpi-icon-pill {
-    transform: scale(1.1);
+  .clickable-card.card-alert .kpi-card-badge {
+    color: var(--color-danger, #C62828);
   }
   .kpi-value-wrap {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    margin-bottom: 6px;
+    gap: 6px;
+    margin-bottom: 4px;
   }
   .kpi-big-value {
-    font-size: 28px;
-    font-weight: 800;
+    font-size: 20px;
+    font-weight: 700;
     font-family: var(--font-secondary, inherit);
-    color: var(--dash-primary);
-    line-height: 1;
+    color: var(--color-primary, #17324D);
+    line-height: 1.2;
+  }
+  .kpi-sub-text {
+    font-size: var(--text-xs, 10px);
+    color: var(--color-text-secondary, #66737D);
   }
   .kpi-sub-hint {
-    font-size: 10px;
-    color: var(--color-text-muted, #94A3B8);
+    font-size: var(--text-2xs, 9px);
+    color: var(--color-text-muted, #8A96A0);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px dashed #E2E8F0;
-    padding-top: 8px;
+    border-top: 1px solid var(--color-border-light, #E7EDF0);
+    padding-top: 6px;
     margin-top: 6px;
   }
-  .kpi-click-tag {
+  .kpi-action-tag {
     font-weight: 600;
-    color: var(--dash-secondary);
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
+    color: var(--color-secondary, #2F6F73);
   }
 
-  /* Graphs Section */
+  /* Interactive Charts Section */
   .charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
-    gap: 20px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 14px;
   }
   @media (max-width: 992px) {
     .charts-grid {
       grid-template-columns: 1fr;
     }
   }
-
   .interactive-chart-card {
-    background: #FFFFFF;
-    border: 1px solid var(--dash-card-border);
-    border-radius: 12px;
-    padding: 18px 20px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    background: var(--color-surface, #FFFFFF);
+    border: 1px solid var(--color-border, #D9E0E3);
+    border-radius: var(--radius-primary, 10px);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-subtle, 0 1px 3px rgba(23, 50, 77, 0.04));
     display: flex;
     flex-direction: column;
-    position: relative;
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .interactive-chart-card:hover {
-    border-color: #CBD5E1;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+    border-color: var(--color-border, #D9E0E3);
+    box-shadow: var(--shadow-card, 0 2px 8px rgba(23, 50, 77, 0.06));
   }
   .chart-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #F1F5F9;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border-light, #E7EDF0);
   }
   .chart-title-wrap h3 {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: var(--dash-primary);
+    font-size: var(--text-card-title, 13px);
+    font-weight: 600;
+    color: var(--color-primary, #17324D);
     margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
   }
   .chart-title-wrap p {
-    font-size: 10px;
-    color: #64748B;
+    font-size: var(--text-xs, 10px);
+    color: var(--color-text-secondary, #66737D);
     margin: 2px 0 0 0;
   }
-  .chart-click-badge {
-    background: #F0FDFA;
-    color: var(--dash-secondary);
-    border: 1px solid #CCFBF1;
+  .chart-action-btn {
+    background: var(--color-surface-subtle, #F0F3F4);
+    color: var(--color-secondary, #2F6F73);
+    border: 1px solid var(--color-border-light, #E7EDF0);
     padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 9.5px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--text-xs, 10px);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
   }
-  .chart-click-badge:hover {
-    background: #CCFBF1;
+  .chart-action-btn:hover {
+    background: var(--color-surface, #FFFFFF);
+    border-color: var(--color-secondary, #2F6F73);
   }
   .chart-canvas-container {
     position: relative;
-    height: 250px;
+    height: 215px;
     width: 100%;
+  }
+  .chart-footnote {
+    font-size: var(--text-2xs, 9.5px);
+    color: var(--color-text-muted, #8A96A0);
+    text-align: right;
+    margin-top: 6px;
   }
 
   /* Universal Pop-up Dialogs Styling */
@@ -415,8 +360,8 @@ require_once __DIR__ . '/../layouts/header.php';
     bottom: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background-color: rgba(23, 50, 77, 0.55) !important;
-    backdrop-filter: blur(3px) !important;
+    background-color: rgba(23, 50, 77, 0.48) !important;
+    backdrop-filter: blur(2px) !important;
     display: none;
     align-items: center;
     justify-content: center;
@@ -427,13 +372,7 @@ require_once __DIR__ . '/../layouts/header.php';
   }
   .modal-overlay.active {
     display: flex !important;
-    animation: fadeInModal 0.2s ease-out;
   }
-  @keyframes fadeInModal {
-    from { opacity: 0; transform: scale(0.98); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
   .modal-dialog.modal-wide {
     max-width: 860px !important;
     width: 100% !important;
@@ -441,337 +380,324 @@ require_once __DIR__ . '/../layouts/header.php';
     margin: auto !important;
     display: flex !important;
     flex-direction: column !important;
-    background-color: #FFFFFF !important;
-    border-radius: 12px !important;
-    border: 1px solid #CBD5E1 !important;
-    box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.25) !important;
+    background-color: var(--color-surface, #FFFFFF) !important;
+    border-radius: var(--radius-primary, 10px) !important;
+    border: 1px solid var(--color-border, #D9E0E3) !important;
+    box-shadow: 0 16px 36px rgba(23, 50, 77, 0.2) !important;
     overflow: hidden !important;
     position: relative !important;
   }
   .modal-header-dash {
-    padding: 14px 20px;
-    background: #F8FAFC;
-    border-bottom: 1px solid #E2E8F0;
+    padding: 12px 18px;
+    background: var(--color-surface-subtle, #F0F3F4);
+    border-bottom: 1px solid var(--color-border-light, #E7EDF0);
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+  .modal-header-dash h3 {
+    margin: 0;
+    font-size: var(--text-section-title, 14px);
+    font-weight: 700;
+    color: var(--color-primary, #17324D);
+  }
+  .modal-header-dash p {
+    margin: 2px 0 0 0;
+    font-size: var(--text-xs, 10px);
+    color: var(--color-text-secondary, #66737D);
   }
   .modal-body-dash {
-    padding: 18px 20px;
+    padding: 14px 18px;
     overflow-y: auto;
-    max-height: calc(100vh - 180px);
+    max-height: calc(100vh - 170px);
   }
   .modal-footer-dash {
-    padding: 12px 20px;
-    background: #F8FAFC;
-    border-top: 1px solid #E2E8F0;
+    padding: 10px 18px;
+    background: var(--color-surface-subtle, #F0F3F4);
+    border-top: 1px solid var(--color-border-light, #E7EDF0);
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-  .modal-search-box {
-    margin-bottom: 12px;
-    position: relative;
+    font-size: var(--text-xs, 10px);
+    color: var(--color-text-secondary, #66737D);
   }
   .modal-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: var(--text-sm, 11px);
   }
   .modal-table th {
-    background: #F1F5F9;
-    padding: 8px 10px;
+    background: var(--color-surface-subtle, #F0F3F4);
+    padding: 7px 10px;
     font-weight: 700;
-    color: #475569;
+    color: var(--color-text-secondary, #66737D);
     text-align: left;
-    border-bottom: 1px solid #CBD5E1;
+    border-bottom: 1px solid var(--color-border, #D9E0E3);
     position: sticky;
     top: 0;
     z-index: 2;
   }
   .modal-table td {
-    padding: 8px 10px;
-    border-bottom: 1px solid #F1F5F9;
-    color: #1E293B;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--color-border-light, #E7EDF0);
+    color: var(--color-text, #24313A);
   }
   .modal-table tr:hover td {
-    background: #F8FAFC;
+    background: var(--color-surface-hover, #F9FAFB);
+  }
+
+  /* Overview Split Grid */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 992px) {
+    .overview-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .directory-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--color-surface-subtle, #F0F3F4);
+    border: 1px solid var(--color-border-light, #E7EDF0);
+    border-radius: var(--radius-sm, 6px);
+  }
+  .directory-badge {
+    width: 34px;
+    height: 28px;
+    border-radius: 4px;
+    background: var(--color-primary, #17324D);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 10.5px;
+    font-family: var(--font-secondary, inherit);
+    flex-shrink: 0;
   }
 </style>
 
 <div class="dashboard-wrap">
-  <!-- Top Command Hero Banner -->
-  <div class="hero-command-banner">
-    <div style="z-index:2;max-width:700px;">
-      <div class="hero-badge-pill" style="margin-top:0;margin-bottom:8px;">
-        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10B981;animation:pulseDot 1.5s infinite;"></span>
-        Operational Jurisdiction Active • Real-Time Command
-      </div>
-      <h1 class="hero-title">
-        Barangay <?= clean($barangay['name']) ?> Command Center
-      </h1>
-      <p class="hero-subtitle">
-        Official Lead: <strong><?= clean($barangay['contact_person'] ?? 'Barangay Captain') ?></strong> • 
-        Official Jurisdiction: <strong><?= number_format($barangay['population']) ?> citizens</strong> 
-        (<?= number_format($barangay['total_households']) ?> households) • 
-        Vulnerability: <span class="badge badge-<?= strtolower($barangay['risk_level']) === 'critical' ? 'danger' : (strtolower($barangay['risk_level']) === 'high' ? 'warning' : 'info') ?>" style="vertical-align:middle;"><?= clean($barangay['risk_level']) ?></span>
+  <!-- Page Header (Unified Standard Pattern) -->
+  <div class="page-header" style="margin-bottom:0;">
+    <div class="page-header-title-wrap">
+      <h1>Barangay <?= clean($barangay['name']) ?> Command Dashboard</h1>
+      <p class="page-header-desc">
+        Lead: <strong><?= clean($barangay['contact_person'] ?? 'Barangay Captain') ?></strong> • 
+        Jurisdiction: <strong><?= number_format($barangay['population']) ?> citizens</strong> (<?= number_format($barangay['total_households']) ?> households) • 
+        Vulnerability: <span class="badge badge-<?= strtolower($barangay['risk_level']) === 'critical' ? 'danger' : (strtolower($barangay['risk_level']) === 'high' ? 'warning' : 'info') ?>"><?= clean($barangay['risk_level']) ?></span> • 
+        Emergency Desk: <strong><?= clean($barangay['contact_number'] ?? 'Not specified') ?></strong>
       </p>
-      <div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:6px;">
-        Emergency Ops Desk: <strong><?= clean($barangay['contact_number'] ?? 'Not specified') ?></strong> • 
-        Coordinates: <strong><?= clean($barangay['coordinates_lat']) ?>, <?= clean($barangay['coordinates_lng']) ?></strong>
-      </div>
     </div>
-    <div style="display:flex;gap:8px;z-index:2;flex-wrap:wrap;">
-      <a href="<?= BASE_URL ?>/views/barangay/disaster-reports.php?action=new" class="btn btn-primary" style="background:#0EA5E9;border-color:#0EA5E9;font-weight:600;box-shadow:0 4px 12px rgba(14,165,233,0.35);">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    <div class="page-header-actions">
+      <a href="<?= BASE_URL ?>/views/barangay/disaster-reports.php?action=new" class="btn btn-primary">
         File Incident Report
       </a>
-      <a href="<?= BASE_URL ?>/views/barangay/risk-map.php" class="btn btn-outline" style="color:#FFF;border-color:rgba(255,255,255,0.4);background:rgba(255,255,255,0.08);">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon></svg>
+      <a href="<?= BASE_URL ?>/views/barangay/risk-map.php" class="btn btn-outline">
         Hazard Risk Map
       </a>
     </div>
   </div>
 
-  <!-- Connected Agency Affiliation & Command Lineage Ribbon -->
-  <div style="background:#FFF;border:1px solid #E2E8F0;border-left:4px solid var(--dash-secondary);border-radius:10px;padding:12px 18px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div style="width:38px;height:38px;border-radius:8px;background:rgba(47,111,115,0.1);color:var(--dash-secondary);display:flex;align-items:center;justify-content:center;font-size:18px;">
-        🏛️
-      </div>
-      <div>
-        <div style="font-size:10px;text-transform:uppercase;color:#64748B;font-weight:700;letter-spacing:0.5px;">Agency Information</div>
-        <div style="font-size:13.5px;font-weight:800;color:#17324D;">
-          <?= clean($connectedAgency['name'] ?? ('BDRRMC - ' . $barangay['name'])) ?>
-          <span style="font-size:10.5px;font-weight:600;color:#2F6F73;">• BDRRMC Emergency Operations Unit</span>
-        </div>
-      </div>
+  <!-- Connected Agency Lineage Strip -->
+  <div class="agency-ribbon">
+    <div>
+      <span class="agency-title"><?= clean($connectedAgency['name'] ?? ('BDRRMC - ' . $barangay['name'])) ?></span>
+      <span class="agency-subtitle"> — BDRRMC Operations Unit • Central Command: ICDRRMO HQ (Hotline: 161)</span>
     </div>
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-      <div style="font-size:11px;color:#475569;">
-        <span style="color:#94A3B8;font-size:9.5px;text-transform:uppercase;font-weight:700;display:block;">Central Coordinating HQ:</span>
-        <strong>ICDRRMO Central Command</strong> (Emergency Hotline: <strong style="color:var(--color-danger);">161</strong>)
-      </div>
-      <a href="<?= BASE_URL ?>/views/barangay/agency.php" class="btn btn-outline btn-sm" style="font-size:10.5px;font-weight:700;color:var(--dash-secondary);border-color:var(--dash-secondary);padding:6px 12px;">
-        Agency Information &rarr;
-      </a>
+    <div>
+      <a href="<?= BASE_URL ?>/views/barangay/agency.php" class="btn btn-outline btn-sm">Agency Details</a>
     </div>
   </div>
 
-  <!-- Interactive Clickable KPI Metric Cards (Click to Pop-up Data) -->
+  <!-- Unified Interactive KPI Metric Cards (Clean Typography, No Redundant Icons) -->
   <div class="kpi-cards-grid">
-    <!-- Card 0: Responder Force (New Tactical Readiness Module) -->
-    <a href="<?= BASE_URL ?>/views/barangay/responders.php" class="clickable-card card-theme-info" style="text-decoration:none;" title="Click to view and manage responder personnel">
+    <!-- Card 0: Responder Force -->
+    <a href="<?= BASE_URL ?>/views/barangay/responders.php" class="clickable-card" title="Manage responder personnel">
       <div class="kpi-card-header">
         <span class="kpi-card-title">Responder Force</span>
-        <div class="kpi-icon-pill" style="background:#E0F2FE;color:#0284C7;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        </div>
+        <span class="kpi-card-badge"><?= number_format($respKpis['ready_responders'] ?? 0) ?> Ready</span>
       </div>
       <div class="kpi-value-wrap">
         <span class="kpi-big-value"><?= number_format($respKpis['total_responders'] ?? 0) ?></span>
-        <span style="font-size:10.5px;color:#059669;font-weight:700;">
-          <?= number_format($respKpis['ready_responders'] ?? 0) ?> Ready / <?= number_format($respKpis['responding_responders'] ?? 0) ?> Responding
-        </span>
+        <span class="kpi-sub-text">Total</span>
       </div>
       <div class="kpi-sub-hint">
-        <span>Field Mission Availability</span>
-        <span class="kpi-click-tag">Manage Responders ↗</span>
+        <span>Field Readiness</span>
+        <span class="kpi-action-tag">Manage</span>
       </div>
     </a>
 
     <!-- Card 1: Active Disaster Incidents -->
-    <div class="clickable-card card-theme-danger" onclick="openDashModal('modalActiveIncidents')" title="Click to view detailed list of active disaster incidents">
+    <div class="clickable-card <?= $activeRequestsCount > 0 ? 'card-alert' : '' ?>" onclick="openDashModal('modalActiveIncidents')" title="View active disaster incident reports">
       <div class="kpi-card-header">
         <span class="kpi-card-title">Active Incidents</span>
-        <div class="kpi-icon-pill" style="background:#FEE2E2;color:#DC2626;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-        </div>
+        <span class="kpi-card-badge">
+          <?= $activeRequestsCount > 0 ? 'Action Required' : 'Normal' ?>
+        </span>
       </div>
       <div class="kpi-value-wrap">
-        <span class="kpi-big-value" style="color:<?= $activeRequestsCount > 0 ? '#DC2626' : '#1E293B' ?>;"><?= number_format($activeRequestsCount) ?></span>
-        <span style="font-size:10.5px;color:#64748B;">Pending/Active</span>
+        <span class="kpi-big-value"><?= number_format($activeRequestsCount) ?></span>
+        <span class="kpi-sub-text">Ongoing</span>
       </div>
       <div class="kpi-sub-hint">
-        <span><?= $totalRequests ?> Lifetime Reports Filed</span>
-        <span class="kpi-click-tag">View Details ↗</span>
+        <span><?= $totalRequests ?> Recorded</span>
+        <span class="kpi-action-tag">Inspect</span>
       </div>
     </div>
 
     <!-- Card 2: Relief Packs & Provisions Allocated -->
-    <div class="clickable-card card-theme-primary" onclick="openDashModal('modalReliefAllocations')" title="Click to view full relief provisions and allocation log">
+    <div class="clickable-card" onclick="openDashModal('modalReliefAllocations')" title="View relief goods allocation log">
       <div class="kpi-card-header">
-        <span class="kpi-card-title">Relief Items Received</span>
-        <div class="kpi-icon-pill" style="background:#E0F2FE;color:#0284C7;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-        </div>
+        <span class="kpi-card-title">Relief Allocated</span>
+        <span class="kpi-card-badge">Supplies</span>
       </div>
       <div class="kpi-value-wrap">
         <span class="kpi-big-value"><?= number_format($totalReliefAllocated) ?></span>
-        <span style="font-size:10.5px;color:#64748B;">Units/Packs</span>
+        <span class="kpi-sub-text">Units</span>
       </div>
       <div class="kpi-sub-hint">
-        <span>From ICDRRMO Decision Tree</span>
-        <span class="kpi-click-tag">View Items ↗</span>
+        <span>ICDRRMO Allocated</span>
+        <span class="kpi-action-tag">View Log</span>
       </div>
     </div>
 
     <!-- Card 3: Sheltered in Evacuation -->
-    <div class="clickable-card card-theme-warning" onclick="openDashModal('modalEvacuationCenters')" title="Click to view evacuation centers status and occupancy">
+    <div class="clickable-card" onclick="openDashModal('modalEvacuationCenters')" title="View evacuation center occupancy">
       <div class="kpi-card-header">
         <span class="kpi-card-title">Evacuees Sheltered</span>
-        <div class="kpi-icon-pill" style="background:#FEF3C7;color:#D97706;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-        </div>
+        <span class="kpi-card-badge"><?= $overallOccupancyPct ?>% Capacity</span>
       </div>
       <div class="kpi-value-wrap">
         <span class="kpi-big-value"><?= number_format($totalCurrentEvacuees) ?></span>
-        <span style="font-size:10.5px;color:#64748B;">/ <?= number_format($totalCapacity) ?> Cap (<?= $overallOccupancyPct ?>%)</span>
+        <span class="kpi-sub-text">Individuals</span>
       </div>
       <div class="kpi-sub-hint">
-        <span>Across <?= $totalCenters ?> Evacuation Center(s)</span>
-        <span class="kpi-click-tag">View Shelters ↗</span>
+        <span><?= $totalCenters ?> Shelters</span>
+        <span class="kpi-action-tag">Status</span>
       </div>
     </div>
 
     <!-- Card 4: Registered Residents -->
-    <div class="clickable-card card-theme-success" onclick="openDashModal('modalResidentsRegistry')" title="Click to view verified residents directory">
+    <div class="clickable-card" onclick="openDashModal('modalResidentsRegistry')" title="View resident citizen directory">
       <div class="kpi-card-header">
         <span class="kpi-card-title">Registered Residents</span>
-        <div class="kpi-icon-pill" style="background:#D1FAE5;color:#059669;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        </div>
+        <span class="kpi-card-badge"><?= $activeResidentsCount ?> Active</span>
       </div>
       <div class="kpi-value-wrap">
         <span class="kpi-big-value"><?= number_format($totalResidents) ?></span>
-        <span style="font-size:10.5px;color:#10B981;"><?= $activeResidentsCount ?> Active</span>
+        <span class="kpi-sub-text">Citizens</span>
       </div>
       <div class="kpi-sub-hint">
-        <span>Citizen Identity Records</span>
-        <span class="kpi-click-tag">View Directory ↗</span>
+        <span>Citizen Registry</span>
+        <span class="kpi-action-tag">Directory</span>
       </div>
     </div>
 
     <!-- Card 5: Purok Clusters Jurisdiction -->
-    <div class="clickable-card card-theme-info" onclick="openDashModal('modalPuroksList')" title="Click to view local puroks and hazard registry">
+    <div class="clickable-card" onclick="openDashModal('modalPuroksList')" title="View purok risk registry">
       <div class="kpi-card-header">
         <span class="kpi-card-title">Purok Clusters</span>
-        <div class="kpi-icon-pill" style="background:#E0E7FF;color:#4F46E5;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-        </div>
+        <span class="kpi-card-badge" style="color:<?= ($purokRiskCounts['Critical'] + $purokRiskCounts['High']) > 0 ? 'var(--color-danger,#C62828)' : 'var(--color-success,#2E7D32)' ?>;">
+          <?= $purokRiskCounts['Critical'] + $purokRiskCounts['High'] ?> High/Crit
+        </span>
       </div>
       <div class="kpi-value-wrap">
         <span class="kpi-big-value"><?= count($allPuroks) ?></span>
-        <span style="font-size:10.5px;color:<?= ($purokRiskCounts['Critical'] + $purokRiskCounts['High']) > 0 ? '#DC2626' : '#059669' ?>;">
-          <?= $purokRiskCounts['Critical'] + $purokRiskCounts['High'] ?> High/Crit Risk
-        </span>
+        <span class="kpi-sub-text">Zones</span>
       </div>
       <div class="kpi-sub-hint">
-        <span>Sub-community Zones</span>
-        <span class="kpi-click-tag">View Puroks ↗</span>
+        <span>Jurisdiction Zones</span>
+        <span class="kpi-action-tag">Inspect</span>
       </div>
     </div>
   </div>
 
-  <!-- Interactive Clickable Charts Section -->
+  <!-- Interactive Charts Section -->
   <div class="charts-grid">
-    <!-- Graph 1: Purok Risk & Vulnerability Breakdown (Donut Chart) -->
+    <!-- Graph 1: Purok Risk Breakdown (Donut Chart) -->
     <div class="interactive-chart-card">
       <div class="chart-header">
         <div class="chart-title-wrap">
-          <h3>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--dash-secondary);"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10"></path></svg>
-            Purok Vulnerability & Hazard Levels
-          </h3>
-          <p>Distribution of local puroks categorized by risk priority</p>
+          <h3>Purok Vulnerability & Hazard Levels</h3>
+          <p>Distribution of local community clusters by risk priority</p>
         </div>
-        <button type="button" class="chart-click-badge" onclick="openDashModal('modalPuroksList')" title="View all puroks breakdown">
-          Clickable Slices ↗
+        <button type="button" class="chart-action-btn" onclick="openDashModal('modalPuroksList')">
+          Filter Slices
         </button>
       </div>
       <div class="chart-canvas-container">
         <canvas id="purokRiskChart"></canvas>
       </div>
-      <div style="font-size:9.5px;color:#94A3B8;text-align:center;margin-top:10px;">
-        💡 <em>Tip: Click any slice in the donut chart to instantly view puroks in that risk category.</em>
-      </div>
+      <div class="chart-footnote">Click any slice to filter puroks by risk level</div>
     </div>
 
-    <!-- Graph 2: Disaster Reports by Type & Severity (Bar Chart) -->
+    <!-- Graph 2: Disaster Reports by Type (Bar Chart) -->
     <div class="interactive-chart-card">
       <div class="chart-header">
         <div class="chart-title-wrap">
-          <h3>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--dash-accent);"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-            Disaster Incidents Reported
-          </h3>
+          <h3>Disaster Incidents Reported</h3>
           <p>Historical and active disaster assistance events logged</p>
         </div>
-        <button type="button" class="chart-click-badge" onclick="openDashModal('modalActiveIncidents')" title="View incidents list">
-          Clickable Bars ↗
+        <button type="button" class="chart-action-btn" onclick="openDashModal('modalActiveIncidents')">
+          Filter Bars
         </button>
       </div>
       <div class="chart-canvas-container">
         <canvas id="disasterTypeChart"></canvas>
       </div>
-      <div style="font-size:9.5px;color:#94A3B8;text-align:center;margin-top:10px;">
-        💡 <em>Tip: Click on any disaster type bar to view incident reports for that hazard.</em>
-      </div>
+      <div class="chart-footnote">Click any bar to filter incidents by disaster type</div>
     </div>
 
     <!-- Graph 3: Evacuation Shelters Capacity vs Occupancy -->
     <div class="interactive-chart-card">
       <div class="chart-header">
         <div class="chart-title-wrap">
-          <h3>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#D97706;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-            Evacuation Shelters Capacity vs Current Occupancy
-          </h3>
-          <p>Real-time intake tracking across designated barangay centers</p>
+          <h3>Evacuation Shelters Capacity vs Occupancy</h3>
+          <p>Capacity intake tracking across designated barangay centers</p>
         </div>
-        <button type="button" class="chart-click-badge" onclick="openDashModal('modalEvacuationCenters')" title="View evacuation center details">
-          Explore Shelters ↗
+        <button type="button" class="chart-action-btn" onclick="openDashModal('modalEvacuationCenters')">
+          View Shelters
         </button>
       </div>
       <div class="chart-canvas-container">
         <canvas id="evacOccupancyChart"></canvas>
       </div>
-      <div style="font-size:9.5px;color:#94A3B8;text-align:center;margin-top:10px;">
-        💡 <em>Tip: Click any center's bar to view amenities, contact personnel, and status.</em>
-      </div>
+      <div class="chart-footnote">Click any bar to inspect shelter facility profile</div>
     </div>
 
-    <!-- Graph 4: Purok Demographics (Population & Households) -->
+    <!-- Graph 4: Purok Demographics Distribution -->
     <div class="interactive-chart-card">
       <div class="chart-header">
         <div class="chart-title-wrap">
-          <h3>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#10B981;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
-            Purok Demographics Distribution
-          </h3>
-          <p>Population and household density across local community clusters</p>
+          <h3>Purok Demographics Distribution</h3>
+          <p>Population and household counts across local clusters</p>
         </div>
-        <button type="button" class="chart-click-badge" onclick="openDashModal('modalPuroksList')" title="View full demographic table">
-          View Puroks ↗
+        <button type="button" class="chart-action-btn" onclick="openDashModal('modalPuroksList')">
+          Demographics
         </button>
       </div>
       <div class="chart-canvas-container">
         <canvas id="purokDemographicsChart"></canvas>
       </div>
-      <div style="font-size:9.5px;color:#94A3B8;text-align:center;margin-top:10px;">
-        💡 <em>Tip: Click any purok bar to view localized hazard exposures and coordinates.</em>
-      </div>
+      <div class="chart-footnote">Click any bar to view cluster hazard exposure</div>
     </div>
   </div>
 
   <!-- Operational Overview & Quick Access Panels -->
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start;">
+  <div class="overview-grid">
     <!-- Recent Disaster Assistance Reports -->
     <div class="card" style="margin-bottom:0;">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
         <div>
           <h3 class="card-title">Recent Disaster Incident Reports</h3>
-          <div class="card-subtitle">Tracking assistance requests submitted to ICDRRMO for Decision Tree allocation</div>
+          <div class="card-subtitle">Assistance requests submitted for Decision Tree resource recommendations</div>
         </div>
         <a href="<?= BASE_URL ?>/views/barangay/disaster-reports.php" class="btn btn-outline btn-sm">Full Registry</a>
       </div>
@@ -790,13 +716,13 @@ require_once __DIR__ . '/../layouts/header.php';
           </thead>
           <tbody>
             <?php if (empty($allRequests)): ?>
-              <tr><td colspan="7" style="text-align:center;padding:24px;color:#94A3B8;">No disaster incidents recorded for Barangay <?= clean($barangay['name']) ?>.</td></tr>
+              <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-text-muted);">No disaster incidents recorded for Barangay <?= clean($barangay['name']) ?>.</td></tr>
             <?php else: ?>
               <?php foreach (array_slice($allRequests, 0, 6) as $r): ?>
                 <tr style="cursor:pointer;" onclick="openIncidentDetailsModal(<?= htmlspecialchars(json_encode($r)) ?>)" title="Click to view details">
                   <td>
                     <span style="font-weight:700;color:var(--color-primary);font-family:var(--font-secondary);"><?= clean($r['tracking_code']) ?></span>
-                    <div style="font-size:9px;color:#64748B;"><?= formatDate($r['created_at'], 'M d, Y') ?></div>
+                    <div style="font-size:9px;color:var(--color-text-muted);"><?= formatDate($r['created_at'], 'M d, Y') ?></div>
                   </td>
                   <td><?= clean($r['purok_name']) ?></td>
                   <td><span style="font-weight:600;"><?= clean($r['disaster_type']) ?></span></td>
@@ -807,7 +733,7 @@ require_once __DIR__ . '/../layouts/header.php';
                     <?php if (!empty($r['recommendation_id'])): ?>
                       <span class="badge badge-success" style="font-size:8.5px;">Ready (<?= number_format($r['confidence_score'], 0) ?>%)</span>
                     <?php else: ?>
-                      <span style="font-size:9px;color:#94A3B8;">Pending</span>
+                      <span style="font-size:9px;color:var(--color-text-muted);">Pending</span>
                     <?php endif; ?>
                   </td>
                 </tr>
@@ -818,34 +744,34 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
 
-    <!-- Right Panel: Emergency Directory & Local Centers -->
-    <div style="display:flex;flex-direction:column;gap:18px;">
+    <!-- Right Panel: Emergency Directory & Local Events -->
+    <div style="display:flex;flex-direction:column;gap:14px;">
       <!-- Quick Action Directory Card -->
       <div class="card" style="margin-bottom:0;">
         <div class="card-header">
-          <h3 class="card-title">Emergency Response Dispatch Directory</h3>
+          <h3 class="card-title">Emergency Dispatch Directory</h3>
         </div>
-        <div class="card-body" style="padding:14px 16px;">
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;">
-              <div style="width:30px;height:30px;border-radius:6px;background:#DC2626;color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;">161</div>
+        <div class="card-body" style="padding:12px 14px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="directory-item">
+              <div class="directory-badge">161</div>
               <div>
-                <div style="font-weight:700;font-size:11px;color:#1E293B;">ICDRRMO Central Dispatch</div>
-                <div style="font-size:9.5px;color:#64748B;">Hotline 161 / (063) 221-1234</div>
+                <div style="font-weight:700;font-size:11px;color:var(--color-primary);">ICDRRMO Central Dispatch</div>
+                <div style="font-size:9.5px;color:var(--color-text-secondary);">Hotline 161 / (063) 221-1234</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;">
-              <div style="width:30px;height:30px;border-radius:6px;background:#0284C7;color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;">911</div>
+            <div class="directory-item">
+              <div class="directory-badge" style="background:var(--color-secondary,#2F6F73);">911</div>
               <div>
-                <div style="font-weight:700;font-size:11px;color:#1E293B;">Iligan City Police / PNP</div>
-                <div style="font-size:9.5px;color:#64748B;">Station Desk: (063) 221-2222</div>
+                <div style="font-weight:700;font-size:11px;color:var(--color-primary);">Iligan City Police / PNP</div>
+                <div style="font-size:9.5px;color:var(--color-text-secondary);">Station Desk: (063) 221-2222</div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;">
-              <div style="width:30px;height:30px;border-radius:6px;background:#D97706;color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;">BFP</div>
+            <div class="directory-item">
+              <div class="directory-badge" style="background:var(--color-primary-light,#214364);">BFP</div>
               <div>
-                <div style="font-weight:700;font-size:11px;color:#1E293B;">Bureau of Fire Protection</div>
-                <div style="font-size:9.5px;color:#64748B;">Fire Command: (063) 221-3333</div>
+                <div style="font-weight:700;font-size:11px;color:var(--color-primary);">Bureau of Fire Protection</div>
+                <div style="font-size:9.5px;color:var(--color-text-secondary);">Fire Command: (063) 221-3333</div>
               </div>
             </div>
           </div>
@@ -856,17 +782,17 @@ require_once __DIR__ . '/../layouts/header.php';
       <div class="card" style="margin-bottom:0;">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
           <h3 class="card-title">Community Drills & Events</h3>
-          <a href="<?= BASE_URL ?>/views/barangay/events.php" class="btn btn-outline btn-sm">All</a>
+          <a href="<?= BASE_URL ?>/views/barangay/preparedness.php" class="btn btn-outline btn-sm">All</a>
         </div>
         <div class="card-body" style="padding:10px 14px;">
           <?php if (empty($recentActivities)): ?>
-            <div style="text-align:center;padding:12px;font-size:10px;color:#94A3B8;">No recent preparedness events logged.</div>
+            <div style="text-align:center;padding:12px;font-size:10px;color:var(--color-text-muted);">No recent preparedness events logged.</div>
           <?php else: ?>
             <div style="display:flex;flex-direction:column;gap:8px;">
               <?php foreach ($recentActivities as $act): ?>
-                <div style="padding:8px 10px;background:#F8FAFC;border-radius:6px;border-left:3px solid var(--color-primary);font-size:10.5px;">
-                  <div style="font-weight:700;color:var(--color-primary);"><?= clean($act['title']) ?></div>
-                  <div style="font-size:9px;color:#64748B;display:flex;justify-content:space-between;margin-top:2px;">
+                <div style="padding:7px 10px;background:var(--color-surface-subtle,#F0F3F4);border-radius:var(--radius-sm,6px);border-left:3px solid var(--color-primary,#17324D);font-size:10.5px;">
+                  <div style="font-weight:700;color:var(--color-primary,#17324D);"><?= clean($act['title']) ?></div>
+                  <div style="font-size:9px;color:var(--color-text-secondary,#66737D);display:flex;justify-content:space-between;margin-top:2px;">
                     <span><?= clean($act['venue'] ?? 'Barangay Center') ?></span>
                     <span><?= formatDate($act['start_datetime'], 'M d, Y') ?></span>
                   </div>
@@ -887,16 +813,13 @@ require_once __DIR__ . '/../layouts/header.php';
   <div class="modal-dialog modal-wide">
     <div class="modal-header-dash">
       <div>
-        <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--dash-primary);display:flex;align-items:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
-          <span id="modalIncidentsTitle">Disaster Incident Reports — Barangay <?= clean($barangay['name']) ?></span>
-        </h3>
-        <p style="margin:2px 0 0 0;font-size:10px;color:#64748B;" id="modalIncidentsSubtitle">Showing all active and recorded disaster assistance requests</p>
+        <h3 id="modalIncidentsTitle">Disaster Incident Reports — Barangay <?= clean($barangay['name']) ?></h3>
+        <p id="modalIncidentsSubtitle">Active and recorded disaster assistance requests</p>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('modalActiveIncidents')">&times;</button>
     </div>
     <div class="modal-body-dash">
-      <div class="modal-search-box">
+      <div style="margin-bottom:10px;">
         <input type="text" class="form-control form-control-sm" placeholder="Search by tracking code, purok, disaster type, severity..." oninput="filterModalTable(this, 'incidentsModalTable')">
       </div>
       <div class="table-responsive">
@@ -917,7 +840,7 @@ require_once __DIR__ . '/../layouts/header.php';
           </thead>
           <tbody>
             <?php if (empty($allRequests)): ?>
-              <tr><td colspan="10" style="text-align:center;padding:24px;color:#94A3B8;">No disaster incident records found.</td></tr>
+              <tr><td colspan="10" style="text-align:center;padding:24px;color:var(--color-text-muted);">No disaster incident records found.</td></tr>
             <?php else: ?>
               <?php foreach ($allRequests as $r): ?>
                 <tr data-disaster="<?= clean($r['disaster_type']) ?>" data-severity="<?= clean($r['severity']) ?>">
@@ -929,9 +852,9 @@ require_once __DIR__ . '/../layouts/header.php';
                   <td><?= renderStatusBadge($r['severity']) ?></td>
                   <td><span style="font-size:9.5px;font-weight:600;"><?= clean($r['urgency'] ?? 'Medium') ?></span></td>
                   <td style="font-family:var(--font-secondary);"><?= number_format($r['affected_families']) ?></td>
-                  <td style="font-family:var(--font-secondary);font-weight:700;color:#DC2626;"><?= number_format($r['displaced_families']) ?></td>
+                  <td style="font-family:var(--font-secondary);font-weight:700;color:var(--color-danger,#C62828);"><?= number_format($r['displaced_families']) ?></td>
                   <td><?= renderStatusBadge($r['status']) ?></td>
-                  <td style="font-size:9.5px;color:#64748B;"><?= formatDate($r['created_at'], 'M d, Y h:i A') ?></td>
+                  <td style="font-size:9.5px;color:var(--color-text-secondary);"><?= formatDate($r['created_at'], 'M d, Y h:i A') ?></td>
                   <td>
                     <a href="<?= BASE_URL ?>/views/barangay/disaster-reports.php" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:9.5px;">View</a>
                   </td>
@@ -943,7 +866,7 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
     <div class="modal-footer-dash">
-      <span style="font-size:10px;color:#64748B;">Total Records: <?= count($allRequests) ?> Incident Requests</span>
+      <span>Total Records: <?= count($allRequests) ?> Incident Requests</span>
       <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modalActiveIncidents')">Close</button>
     </div>
   </div>
@@ -956,16 +879,13 @@ require_once __DIR__ . '/../layouts/header.php';
   <div class="modal-dialog modal-wide">
     <div class="modal-header-dash">
       <div>
-        <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--dash-primary);display:flex;align-items:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-          Relief Provisions Allocated & Dispatched
-        </h3>
-        <p style="margin:2px 0 0 0;font-size:10px;color:#64748B;">Decision Tree generated relief goods dispatched to Barangay <?= clean($barangay['name']) ?></p>
+        <h3>Relief Provisions Allocated & Dispatched</h3>
+        <p>Decision Tree generated relief goods dispatched to Barangay <?= clean($barangay['name']) ?></p>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('modalReliefAllocations')">&times;</button>
     </div>
     <div class="modal-body-dash">
-      <div class="modal-search-box">
+      <div style="margin-bottom:10px;">
         <input type="text" class="form-control form-control-sm" placeholder="Search by item name, SKU, tracking code, category..." oninput="filterModalTable(this, 'reliefModalTable')">
       </div>
       <div class="table-responsive">
@@ -984,23 +904,23 @@ require_once __DIR__ . '/../layouts/header.php';
           </thead>
           <tbody>
             <?php if (empty($allocatedItems)): ?>
-              <tr><td colspan="8" style="text-align:center;padding:24px;color:#94A3B8;">No relief provisions currently recorded for this barangay.</td></tr>
+              <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--color-text-muted);">No relief provisions currently recorded for this barangay.</td></tr>
             <?php else: ?>
               <?php foreach ($allocatedItems as $it): ?>
                 <tr>
-                  <td style="font-family:var(--font-secondary);font-size:9.5px;color:#64748B;"><?= clean($it['sku'] ?? 'N/A') ?></td>
+                  <td style="font-family:var(--font-secondary);font-size:9.5px;color:var(--color-text-secondary);"><?= clean($it['sku'] ?? 'N/A') ?></td>
                   <td style="font-weight:700;color:var(--color-primary);"><?= clean($it['resource_name']) ?></td>
                   <td><span class="badge badge-neutral"><?= clean($it['category'] ?? 'Relief Goods') ?></span></td>
-                  <td style="font-family:var(--font-secondary);font-weight:700;color:#0284C7;font-size:12px;">
+                  <td style="font-family:var(--font-secondary);font-weight:700;color:var(--color-primary);font-size:11px;">
                     <?= number_format($it['allocated_quantity']) ?> <?= clean($it['unit'] ?? 'packs') ?>
                   </td>
                   <td>
                     <span style="font-weight:600;"><?= clean($it['tracking_code']) ?></span>
-                    <div style="font-size:8.5px;color:#64748B;"><?= clean($it['disaster_type']) ?></div>
+                    <div style="font-size:8.5px;color:var(--color-text-secondary);"><?= clean($it['disaster_type']) ?></div>
                   </td>
                   <td><?= clean($it['purok_name']) ?></td>
                   <td><?= renderStatusBadge($it['status'] ?? 'Allocated') ?></td>
-                  <td style="font-size:9.5px;color:#64748B;"><?= formatDate($it['allocated_at'], 'M d, Y') ?></td>
+                  <td style="font-size:9.5px;color:var(--color-text-secondary);"><?= formatDate($it['allocated_at'], 'M d, Y') ?></td>
                 </tr>
               <?php endforeach; ?>
             <?php endif; ?>
@@ -1009,7 +929,7 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
     <div class="modal-footer-dash">
-      <span style="font-size:10px;color:#64748B;">Total Relief Supplies: <strong><?= number_format($totalReliefAllocated) ?> units</strong> across <?= count($allocatedItems) ?> item records</span>
+      <span>Total Relief Supplies: <strong><?= number_format($totalReliefAllocated) ?> units</strong> across <?= count($allocatedItems) ?> item records</span>
       <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modalReliefAllocations')">Close</button>
     </div>
   </div>
@@ -1022,16 +942,13 @@ require_once __DIR__ . '/../layouts/header.php';
   <div class="modal-dialog modal-wide">
     <div class="modal-header-dash">
       <div>
-        <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--dash-primary);display:flex;align-items:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
-          <span id="modalEvacTitle">Barangay Evacuation Shelters & Capacity</span>
-        </h3>
-        <p style="margin:2px 0 0 0;font-size:10px;color:#64748B;" id="modalEvacSubtitle">Operational status, amenities, and current occupancy rates</p>
+        <h3 id="modalEvacTitle">Barangay Evacuation Shelters & Capacity</h3>
+        <p id="modalEvacSubtitle">Operational status, amenities, and current occupancy rates</p>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('modalEvacuationCenters')">&times;</button>
     </div>
     <div class="modal-body-dash">
-      <div class="modal-search-box">
+      <div style="margin-bottom:10px;">
         <input type="text" class="form-control form-control-sm" placeholder="Search evacuation center name, address, officer..." oninput="filterModalTable(this, 'evacModalTable')">
       </div>
       <div class="table-responsive">
@@ -1051,38 +968,46 @@ require_once __DIR__ . '/../layouts/header.php';
           </thead>
           <tbody>
             <?php if (empty($evacuationCenters)): ?>
-              <tr><td colspan="9" style="text-align:center;padding:24px;color:#94A3B8;">No evacuation centers registered in this barangay.</td></tr>
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--color-text-muted);">No evacuation centers registered in this barangay.</td></tr>
             <?php else: ?>
               <?php foreach ($evacuationCenters as $ec): ?>
                 <?php
                   $pct = $ec['capacity_individuals'] > 0 ? min(100, round(($ec['current_evacuees_count'] / $ec['capacity_individuals']) * 100)) : 0;
+                  $utils = [];
+                  if (!empty($ec['has_potable_water'])) $utils[] = 'Water';
+                  if (!empty($ec['has_electricity'])) $utils[] = 'Power';
+                  if (!empty($ec['has_medical_station'])) $utils[] = 'Clinic';
                 ?>
                 <tr data-center="<?= clean($ec['name']) ?>">
                   <td style="font-weight:700;color:var(--color-primary);"><?= clean($ec['name']) ?></td>
                   <td><span style="font-size:9.5px;"><?= clean($ec['center_type'] ?? 'Shelter') ?></span></td>
-                  <td style="font-size:10px;color:#64748B;"><?= clean($ec['location_address']) ?></td>
+                  <td style="font-size:10px;color:var(--color-text-secondary);"><?= clean($ec['location_address']) ?></td>
                   <td style="font-family:var(--font-secondary);"><?= number_format($ec['capacity_individuals']) ?></td>
-                  <td style="font-family:var(--font-secondary);font-weight:700;color:<?= $pct >= 90 ? '#DC2626' : '#1E293B' ?>;">
+                  <td style="font-family:var(--font-secondary);font-weight:700;color:<?= $pct >= 90 ? 'var(--color-danger,#C62828)' : 'var(--color-text)' ?>;">
                     <?= number_format($ec['current_evacuees_count']) ?>
                   </td>
                   <td>
                     <div style="display:flex;align-items:center;gap:6px;">
-                      <div style="flex:1;height:5px;background:#E2E8F0;border-radius:3px;overflow:hidden;min-width:50px;">
-                        <div style="width:<?= $pct ?>%;height:100%;background:<?= $pct >= 90 ? '#DC2626' : ($pct >= 70 ? '#F59E0B' : '#10B981') ?>;"></div>
+                      <div style="flex:1;height:5px;background:var(--color-border-light,#E7EDF0);border-radius:3px;overflow:hidden;min-width:45px;">
+                        <div style="width:<?= $pct ?>%;height:100%;background:<?= $pct >= 90 ? 'var(--color-danger,#C62828)' : ($pct >= 70 ? 'var(--color-warning,#B78103)' : 'var(--color-success,#2E7D32)') ?>;"></div>
                       </div>
                       <span style="font-size:9.5px;font-weight:700;"><?= $pct ?>%</span>
                     </div>
                   </td>
                   <td>
-                    <div style="display:flex;gap:4px;font-size:9px;">
-                      <?= $ec['has_potable_water'] ? '<span title="Potable Water">💧</span>' : '' ?>
-                      <?= $ec['has_electricity'] ? '<span title="Electricity">⚡</span>' : '' ?>
-                      <?= $ec['has_medical_station'] ? '<span title="Medical Station">🏥</span>' : '' ?>
+                    <div style="display:flex;gap:3px;flex-wrap:wrap;">
+                      <?php if (!empty($utils)): ?>
+                        <?php foreach ($utils as $u): ?>
+                          <span class="badge badge-neutral" style="font-size:8.5px;padding:1px 5px;"><?= $u ?></span>
+                        <?php endforeach; ?>
+                      <?php else: ?>
+                        <span style="color:var(--color-text-muted);font-size:9px;">Standard</span>
+                      <?php endif; ?>
                     </div>
                   </td>
                   <td>
                     <div style="font-size:10px;font-weight:600;"><?= clean($ec['contact_officer']) ?></div>
-                    <div style="font-size:8.5px;color:#64748B;"><?= clean($ec['contact_number']) ?></div>
+                    <div style="font-size:8.5px;color:var(--color-text-secondary);"><?= clean($ec['contact_number']) ?></div>
                   </td>
                   <td><?= renderStatusBadge($ec['status']) ?></td>
                 </tr>
@@ -1093,9 +1018,9 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
     <div class="modal-footer-dash">
-      <span style="font-size:10px;color:#64748B;">Total Capacity: <strong><?= number_format($totalCapacity) ?> individuals</strong> across <?= $totalCenters ?> centers</span>
+      <span>Total Capacity: <strong><?= number_format($totalCapacity) ?> individuals</strong> across <?= $totalCenters ?> centers</span>
       <div>
-        <a href="<?= BASE_URL ?>/views/barangay/evacuation.php" class="btn btn-primary btn-sm" style="margin-right:6px;">Manage Shelters</a>
+        <a href="<?= BASE_URL ?>/views/barangay/evacuation.php" class="btn btn-primary btn-sm" style="margin-right:6px;font-size:10.5px;">Manage Shelters</a>
         <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modalEvacuationCenters')">Close</button>
       </div>
     </div>
@@ -1109,16 +1034,13 @@ require_once __DIR__ . '/../layouts/header.php';
   <div class="modal-dialog modal-wide">
     <div class="modal-header-dash">
       <div>
-        <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--dash-primary);display:flex;align-items:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
-          Registered Resident Citizens — Barangay <?= clean($barangay['name']) ?>
-        </h3>
-        <p style="margin:2px 0 0 0;font-size:10px;color:#64748B;">Official household registrations and emergency contact directory</p>
+        <h3>Registered Resident Citizens — Barangay <?= clean($barangay['name']) ?></h3>
+        <p>Household registrations and emergency contact directory</p>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('modalResidentsRegistry')">&times;</button>
     </div>
     <div class="modal-body-dash">
-      <div class="modal-search-box">
+      <div style="margin-bottom:10px;">
         <input type="text" class="form-control form-control-sm" placeholder="Search resident name, username, purok, contact phone, email..." oninput="filterModalTable(this, 'residentsModalTable')">
       </div>
       <div class="table-responsive">
@@ -1135,20 +1057,20 @@ require_once __DIR__ . '/../layouts/header.php';
           </thead>
           <tbody>
             <?php if (empty($residentsList)): ?>
-              <tr><td colspan="6" style="text-align:center;padding:24px;color:#94A3B8;">No residents registered yet in this jurisdiction.</td></tr>
+              <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--color-text-muted);">No residents registered yet in this jurisdiction.</td></tr>
             <?php else: ?>
               <?php foreach ($residentsList as $res): ?>
                 <tr>
                   <td>
-                    <div style="font-weight:700;color:var(--color-primary);font-size:11.5px;">
+                    <div style="font-weight:700;color:var(--color-primary);font-size:11px;">
                       <?= clean(trim(($res['first_name'] ?? '') . ' ' . ($res['last_name'] ?? '')) ?: ($res['full_name'] ?? $res['username'])) ?>
                     </div>
-                    <div style="font-size:9px;color:#64748B;">@<?= clean($res['username']) ?></div>
+                    <div style="font-size:9px;color:var(--color-text-secondary);">@<?= clean($res['username']) ?></div>
                   </td>
                   <td><span style="font-weight:600;font-size:10.5px;"><?= clean($res['purok'] ?: 'Standard Zone') ?></span></td>
                   <td>
                     <div style="font-size:10px;font-family:var(--font-secondary);font-weight:600;"><?= clean($res['phone'] ?: 'N/A') ?></div>
-                    <div style="font-size:9px;color:#64748B;"><?= clean($res['email']) ?></div>
+                    <div style="font-size:9px;color:var(--color-text-secondary);"><?= clean($res['email']) ?></div>
                   </td>
                   <td style="font-size:10px;">
                     <?= clean($res['gender'] ?: 'Unspecified') ?>
@@ -1157,7 +1079,7 @@ require_once __DIR__ . '/../layouts/header.php';
                     <?php endif; ?>
                   </td>
                   <td><?= renderStatusBadge($res['status']) ?></td>
-                  <td style="font-size:9.5px;color:#64748B;"><?= formatDate($res['created_at'], 'M d, Y') ?></td>
+                  <td style="font-size:9.5px;color:var(--color-text-secondary);"><?= formatDate($res['created_at'], 'M d, Y') ?></td>
                 </tr>
               <?php endforeach; ?>
             <?php endif; ?>
@@ -1166,9 +1088,9 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
     <div class="modal-footer-dash">
-      <span style="font-size:10px;color:#64748B;">Total Registered Residents: <strong><?= number_format($totalResidents) ?></strong> (<?= $activeResidentsCount ?> Active)</span>
+      <span>Total Registered: <strong><?= number_format($totalResidents) ?></strong> (<?= $activeResidentsCount ?> Active)</span>
       <div>
-        <a href="<?= BASE_URL ?>/views/barangay/residents.php" class="btn btn-primary btn-sm" style="margin-right:6px;">Manage Residents Module</a>
+        <a href="<?= BASE_URL ?>/views/barangay/residents.php" class="btn btn-primary btn-sm" style="margin-right:6px;font-size:10.5px;">Manage Residents</a>
         <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modalResidentsRegistry')">Close</button>
       </div>
     </div>
@@ -1182,16 +1104,13 @@ require_once __DIR__ . '/../layouts/header.php';
   <div class="modal-dialog modal-wide">
     <div class="modal-header-dash">
       <div>
-        <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--dash-primary);display:flex;align-items:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          <span id="modalPurokTitle">Purok Clusters & Hazard Risk Registry</span>
-        </h3>
-        <p style="margin:2px 0 0 0;font-size:10px;color:#64748B;" id="modalPurokSubtitle">Community clusters, local hazards, and demographic breakdowns</p>
+        <h3 id="modalPurokTitle">Purok Clusters & Hazard Risk Registry</h3>
+        <p id="modalPurokSubtitle">Community clusters, local hazards, and demographic breakdowns</p>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('modalPuroksList')">&times;</button>
     </div>
     <div class="modal-body-dash">
-      <div class="modal-search-box">
+      <div style="margin-bottom:10px;">
         <input type="text" class="form-control form-control-sm" id="purokModalSearchInput" placeholder="Search by purok name, hazard types, risk level..." oninput="filterModalTable(this, 'puroksModalTable')">
       </div>
       <div class="table-responsive">
@@ -1209,7 +1128,7 @@ require_once __DIR__ . '/../layouts/header.php';
           </thead>
           <tbody>
             <?php if (empty($allPuroks)): ?>
-              <tr><td colspan="7" style="text-align:center;padding:24px;color:#94A3B8;">No purok clusters recorded for this barangay.</td></tr>
+              <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-text-muted);">No purok clusters recorded for this barangay.</td></tr>
             <?php else: ?>
               <?php foreach ($allPuroks as $pk): ?>
                 <?php
@@ -1218,14 +1137,14 @@ require_once __DIR__ . '/../layouts/header.php';
                   $badgeCls = $pColors[$pRisk] ?? 'badge-neutral';
                 ?>
                 <tr data-risk="<?= clean($pRisk) ?>" data-purok="<?= clean($pk['name']) ?>">
-                  <td style="font-weight:700;color:var(--color-primary);font-size:12px;"><?= clean($pk['name']) ?></td>
-                  <td style="font-size:10px;color:#475569;max-width:260px;"><?= clean($pk['hazard_types'] ?: 'Standard Flood/Squall Risk') ?></td>
+                  <td style="font-weight:700;color:var(--color-primary);font-size:11.5px;"><?= clean($pk['name']) ?></td>
+                  <td style="font-size:10px;color:var(--color-text-secondary);max-width:260px;"><?= clean($pk['hazard_types'] ?: 'Standard Flood/Squall Risk') ?></td>
                   <td><span class="badge <?= $badgeCls ?>" style="font-size:9.5px;"><?= clean($pRisk) ?></span></td>
                   <td style="font-family:var(--font-secondary);font-size:11px;"><?= number_format($pk['households']) ?></td>
                   <td style="font-family:var(--font-secondary);font-weight:700;color:var(--color-primary);"><?= number_format($pk['population']) ?></td>
-                  <td style="font-family:var(--font-secondary);font-size:10px;color:#64748B;white-space:nowrap;"><?= clean($pk['coordinates_lat']) ?>, <?= clean($pk['coordinates_lng']) ?></td>
+                  <td style="font-family:var(--font-secondary);font-size:10px;color:var(--color-text-secondary);white-space:nowrap;"><?= clean($pk['coordinates_lat']) ?>, <?= clean($pk['coordinates_lng']) ?></td>
                   <td>
-                    <a href="<?= BASE_URL ?>/views/barangay/puroks.php" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:9.5px;">View Module</a>
+                    <a href="<?= BASE_URL ?>/views/barangay/puroks.php" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:9.5px;">View</a>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -1235,9 +1154,9 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
     <div class="modal-footer-dash">
-      <span style="font-size:10px;color:#64748B;">Total Registered Puroks: <strong><?= count($allPuroks) ?> clusters</strong></span>
+      <span>Total Registered: <strong><?= count($allPuroks) ?> clusters</strong></span>
       <div>
-        <a href="<?= BASE_URL ?>/views/barangay/puroks.php" class="btn btn-primary btn-sm" style="margin-right:6px;">Manage Puroks</a>
+        <a href="<?= BASE_URL ?>/views/barangay/puroks.php" class="btn btn-primary btn-sm" style="margin-right:6px;font-size:10.5px;">Manage Puroks</a>
         <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modalPuroksList')">Close</button>
       </div>
     </div>
@@ -1249,13 +1168,13 @@ require_once __DIR__ . '/../layouts/header.php';
 <!-- ========================================================================= -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // Chart Global Defaults
+  // Chart Global Defaults (Cohesive Typography & Clean Borders)
   Chart.defaults.font.family = "'Poppins', 'Roboto', sans-serif";
-  Chart.defaults.color = '#64748B';
-  Chart.defaults.plugins.tooltip.padding = 10;
-  Chart.defaults.plugins.tooltip.cornerRadius = 8;
-  Chart.defaults.plugins.tooltip.titleFont = { weight: 'bold', size: 12 };
-  Chart.defaults.plugins.tooltip.bodyFont = { size: 11 };
+  Chart.defaults.color = '#66737D';
+  Chart.defaults.plugins.tooltip.padding = 8;
+  Chart.defaults.plugins.tooltip.cornerRadius = 6;
+  Chart.defaults.plugins.tooltip.titleFont = { weight: '600', size: 11 };
+  Chart.defaults.plugins.tooltip.bodyFont = { size: 10 };
 
   // --------------------------------------------------------------------------
   // CHART 1: Purok Vulnerability & Hazard Levels (Donut Chart)
@@ -1277,20 +1196,20 @@ document.addEventListener('DOMContentLoaded', function () {
         labels: riskLabels,
         datasets: [{
           data: riskData,
-          backgroundColor: ['#EF4444', '#F59E0B', '#06B6D4', '#10B981'],
+          backgroundColor: ['#C62828', '#B78103', '#2F6F73', '#2E7D32'],
           borderWidth: 2,
           borderColor: '#FFFFFF',
-          hoverOffset: 8
+          hoverOffset: 6
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '66%',
+        cutout: '68%',
         plugins: {
           legend: {
             position: 'right',
-            labels: { boxWidth: 12, font: { size: 10.5, weight: '500' }, padding: 12 }
+            labels: { boxWidth: 10, font: { size: 10, weight: '500' }, padding: 10 }
           }
         },
         onClick: function (evt, elements) {
@@ -1321,9 +1240,10 @@ document.addEventListener('DOMContentLoaded', function () {
         datasets: [{
           label: 'Incidents Reported',
           data: disasterValues,
-          backgroundColor: '#0EA5E9',
-          borderRadius: 6,
-          maxBarThickness: 36
+          backgroundColor: '#17324D',
+          hoverBackgroundColor: '#2F6F73',
+          borderRadius: 4,
+          maxBarThickness: 32
         }]
       },
       options: {
@@ -1335,11 +1255,11 @@ document.addEventListener('DOMContentLoaded', function () {
         scales: {
           y: {
             beginAtZero: true,
-            ticks: { precision: 0, font: { size: 10 } },
-            grid: { color: '#F1F5F9' }
+            ticks: { precision: 0, font: { size: 9.5 } },
+            grid: { color: '#E7EDF0' }
           },
           x: {
-            ticks: { font: { size: 10, weight: '600' } },
+            ticks: { font: { size: 9.5, weight: '600' } },
             grid: { display: false }
           }
         },
@@ -1373,16 +1293,16 @@ document.addEventListener('DOMContentLoaded', function () {
           {
             label: 'Capacity',
             data: centerCap,
-            backgroundColor: '#CBD5E1',
-            borderRadius: 4,
-            maxBarThickness: 16
+            backgroundColor: '#D9E0E3',
+            borderRadius: 3,
+            maxBarThickness: 14
           },
           {
             label: 'Current Occupants',
             data: centerOcc,
-            backgroundColor: '#F59E0B',
-            borderRadius: 4,
-            maxBarThickness: 16
+            backgroundColor: '#2F6F73',
+            borderRadius: 3,
+            maxBarThickness: 14
           }
         ]
       },
@@ -1391,16 +1311,16 @@ document.addEventListener('DOMContentLoaded', function () {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } }
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 9.5 } } }
         },
         scales: {
           x: {
             beginAtZero: true,
-            ticks: { font: { size: 9.5 } },
-            grid: { color: '#F1F5F9' }
+            ticks: { font: { size: 9 } },
+            grid: { color: '#E7EDF0' }
           },
           y: {
-            ticks: { font: { size: 10, weight: '600' } },
+            ticks: { font: { size: 9.5, weight: '500' } },
             grid: { display: false }
           }
         },
@@ -1434,16 +1354,16 @@ document.addEventListener('DOMContentLoaded', function () {
           {
             label: 'Population',
             data: pPops,
-            backgroundColor: '#2F6F73',
-            borderRadius: 4,
-            maxBarThickness: 20
+            backgroundColor: '#17324D',
+            borderRadius: 3,
+            maxBarThickness: 18
           },
           {
             label: 'Households',
             data: pHouse,
-            backgroundColor: '#10B981',
-            borderRadius: 4,
-            maxBarThickness: 20
+            backgroundColor: '#2F6F73',
+            borderRadius: 3,
+            maxBarThickness: 18
           }
         ]
       },
@@ -1451,16 +1371,16 @@ document.addEventListener('DOMContentLoaded', function () {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } }
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 9.5 } } }
         },
         scales: {
           y: {
             beginAtZero: true,
-            ticks: { font: { size: 9.5 } },
-            grid: { color: '#F1F5F9' }
+            ticks: { font: { size: 9 } },
+            grid: { color: '#E7EDF0' }
           },
           x: {
-            ticks: { font: { size: 9.5, weight: '600' } },
+            ticks: { font: { size: 9.5, weight: '500' } },
             grid: { display: false }
           }
         },
@@ -1482,7 +1402,6 @@ document.addEventListener('DOMContentLoaded', function () {
 // INTERACTIVE FILTER MODAL DISPATCHERS (Triggered by Clicking Chart Elements)
 // ----------------------------------------------------------------------------
 
-// Filter Puroks Modal by Risk Level slice click
 function openFilteredPuroksModal(riskLevel) {
   const modal = document.getElementById('modalPuroksList');
   const title = document.getElementById('modalPurokTitle');
@@ -1502,7 +1421,6 @@ function openFilteredPuroksModal(riskLevel) {
   openModal('modalPuroksList');
 }
 
-// Filter Puroks Modal by Purok Name bar click
 function openFilteredPuroksModalByName(purokName) {
   const modal = document.getElementById('modalPuroksList');
   const title = document.getElementById('modalPurokTitle');
@@ -1522,7 +1440,6 @@ function openFilteredPuroksModalByName(purokName) {
   openModal('modalPuroksList');
 }
 
-// Filter Incidents Modal by Tracking Code or row click
 function openIncidentDetailsModal(r) {
   if (r && r.tracking_code) {
     openFilteredIncidentsByCode(r.tracking_code);
@@ -1534,21 +1451,20 @@ function openIncidentDetailsModal(r) {
 function openFilteredIncidentsByCode(trackingCode) {
   const title = document.getElementById('modalIncidentsTitle');
   const subtitle = document.getElementById('modalIncidentsSubtitle');
-  const searchInput = document.querySelector('#modalActiveIncidents .modal-search-box input');
+  const searchInput = document.querySelector('#modalActiveIncidents .form-control');
 
   if (title) title.innerText = `Incident Record: ${trackingCode}`;
-  if (subtitle) subtitle.innerText = `Full assistance request overview and situational impact`;
+  if (subtitle) subtitle.innerText = `Assistance request overview and situational impact`;
   if (searchInput) searchInput.value = trackingCode;
 
   filterModalTable({ value: trackingCode }, 'incidentsModalTable');
   openModal('modalActiveIncidents');
 }
 
-// Filter Incidents Modal by Disaster Type bar click
 function openFilteredIncidentsModal(disasterType) {
   const title = document.getElementById('modalIncidentsTitle');
   const subtitle = document.getElementById('modalIncidentsSubtitle');
-  const searchInput = document.querySelector('#modalActiveIncidents .modal-search-box input');
+  const searchInput = document.querySelector('#modalActiveIncidents .form-control');
 
   if (title) title.innerText = `${disasterType} Incidents — Barangay <?= clean($barangay['name']) ?>`;
   if (subtitle) subtitle.innerText = `Filtered list of assistance requests triggered by ${disasterType}`;
@@ -1563,7 +1479,6 @@ function openFilteredIncidentsModal(disasterType) {
   openModal('modalActiveIncidents');
 }
 
-// Filter Evac Modal by Center Name bar click
 function openFilteredEvacModal(centerName) {
   const title = document.getElementById('modalEvacTitle');
   const subtitle = document.getElementById('modalEvacSubtitle');
@@ -1580,16 +1495,14 @@ function openFilteredEvacModal(centerName) {
   openModal('modalEvacuationCenters');
 }
 
-// Open a popup in its full, unfiltered state (used by cards & chart background clicks).
-// Chart element clicks filter rows/titles; this restores them so stale filters never linger.
 const dashModalDefaults = {};
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.modal-overlay').forEach(function (m) {
-    const h3 = m.querySelector('.modal-header-dash h3 span[id]');
-    const p = m.querySelector('.modal-header-dash p[id]');
+    const h3 = m.querySelector('.modal-header-dash h3');
+    const p = m.querySelector('.modal-header-dash p');
     dashModalDefaults[m.id] = {
-      titleId: h3 ? h3.id : null, title: h3 ? h3.innerText : '',
-      subId: p ? p.id : null, sub: p ? p.innerText : ''
+      titleId: h3 && h3.id ? h3.id : null, title: h3 ? h3.innerText : '',
+      subId: p && p.id ? p.id : null, sub: p ? p.innerText : ''
     };
   });
 });
@@ -1602,13 +1515,12 @@ function openDashModal(modalId) {
     if (d.titleId) document.getElementById(d.titleId).innerText = d.title;
     if (d.subId) document.getElementById(d.subId).innerText = d.sub;
   }
-  const search = modal.querySelector('.modal-search-box input');
+  const search = modal.querySelector('.modal-body-dash input');
   if (search) search.value = '';
   modal.querySelectorAll('tbody tr').forEach(function (tr) { tr.style.display = ''; });
   openModal(modalId);
 }
 
-// Interactive Live Filter function for Tables inside Modals
 function filterModalTable(input, tableId) {
   const filter = input.value.trim().toLowerCase();
   const table = document.getElementById(tableId);

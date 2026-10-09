@@ -9,7 +9,8 @@ require_once __DIR__ . '/../../services/Auth.php';
 require_once __DIR__ . '/../../services/Helpers.php';
 
 $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
-    || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+    || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+    || (isset($_POST['is_ajax']) && $_POST['is_ajax'] == '1');
 
 requireLogin();
 $user = getCurrentUser();
@@ -45,17 +46,42 @@ if ($role === 'barangay_head' && (int)$act['barangay_id'] !== (int)$user['barang
     redirectWithFlash($returnUrl, 'error', 'Unauthorized to cancel events outside your barangay.');
 }
 
-try {
-    $cancelStmt = $db->prepare("UPDATE preparedness_activities SET status = 'Cancelled' WHERE id = ?");
-    $cancelStmt->execute([$id]);
+// Read reason inputs
+$reasonCategory = trim($_POST['cancellation_reason_category'] ?? '');
+$reasonDetails = trim($_POST['cancellation_reason_details'] ?? '');
 
-    logSystemEvent('CANCEL_ACTIVITY', 'Preparedness', "Cancelled event #$id: " . $act['title']);
+if (empty($reasonCategory) && empty($reasonDetails)) {
+    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Please provide a reason for cancellation.'], 400);
+    redirectWithFlash($returnUrl, 'error', 'Please provide a reason for cancellation.');
+}
+
+$fullReason = $reasonCategory;
+if (!empty($reasonDetails)) {
+    if (!empty($fullReason) && strpos($reasonDetails, $fullReason) === false) {
+        $fullReason .= ' — ' . $reasonDetails;
+    } else {
+        $fullReason = $reasonDetails;
+    }
+}
+
+try {
+    // Ensure cancellation_reason column exists
+    $colCheck = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'cancellation_reason'")->fetchAll();
+    if (empty($colCheck)) {
+        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN cancellation_reason TEXT NULL AFTER status");
+    }
+
+    $cancelStmt = $db->prepare("UPDATE preparedness_activities SET status = 'Cancelled', cancellation_reason = ? WHERE id = ?");
+    $cancelStmt->execute([$fullReason, $id]);
+
+    logSystemEvent('CANCEL_ACTIVITY', 'Preparedness', "Cancelled event #$id: {$act['title']} (Reason: $fullReason)");
 
     if ($isAjax) {
         jsonResponse([
             'success' => true,
             'message' => "Event '{$act['title']}' has been cancelled.",
-            'id' => $id
+            'id' => $id,
+            'reason' => $fullReason
         ]);
     }
 

@@ -22,28 +22,52 @@ if (!in_array($user['role'], ['icdrrmo', 'barangay_head'], true)) {
 $title = trim($_POST['title'] ?? '');
 $type = trim($_POST['activity_type'] ?? 'Disaster Drill');
 $barangayId = !empty($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
-$venue = trim($_POST['venue'] ?? '');
+
+// Venue handling from select or custom text input
+$venue = trim($_POST['venue'] ?? ($_POST['venue_select'] ?? ''));
+if ($venue === '__custom__' || empty($venue)) {
+    $venue = trim($_POST['venue_custom'] ?? '');
+}
+
 $startDate = trim($_POST['start_datetime'] ?? '');
 $endDate = trim($_POST['end_datetime'] ?? '');
 $personnel = trim($_POST['assigned_personnel'] ?? '');
 $target = max(10, (int)($_POST['target_participants'] ?? 50));
 $description = trim($_POST['description'] ?? '');
 
+// Process expected activities list as initial content execution
+$contentExecutionInput = $_POST['content_execution'] ?? ($_POST['expected_activities'] ?? []);
+if (is_array($contentExecutionInput)) {
+    $contentExecutionJson = json_encode(array_values(array_filter($contentExecutionInput)), JSON_UNESCAPED_UNICODE);
+} else {
+    $contentExecutionJson = trim((string)$contentExecutionInput);
+}
+
 if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
-    redirectWithFlash($returnUrl, 'error', 'Please provide all required fields.');
+    redirectWithFlash($returnUrl, 'error', 'Please provide all required fields including venue.');
 }
 
 try {
+    // Self-heal content_execution & expected_activities columns if missing
+    $colsCe = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'content_execution'")->fetchAll();
+    if (empty($colsCe)) {
+        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
+    }
+    $colsEa = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'expected_activities'")->fetchAll();
+    if (empty($colsEa)) {
+        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
+    }
+
     $stmt = $db->prepare("
         INSERT INTO preparedness_activities (
             title, activity_type, barangay_id, venue, start_datetime, end_datetime,
             assigned_personnel, target_participants, actual_participants, description,
-            status, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, NOW())
+            status, content_execution, expected_activities, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
     ");
     $stmt->execute([
         $title, $type, $barangayId, $venue, $startDate, $endDate,
-        $personnel, $target, $description, $user['id']
+        $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $user['id']
     ]);
     $actId = $db->lastInsertId();
 
