@@ -519,7 +519,7 @@ require_once __DIR__ . '/../layouts/header.php';
   <!-- Unified Interactive KPI Metric Cards (Clean Typography, No Redundant Icons) -->
   <div class="kpi-cards-grid">
     <!-- Card 0: Responder Force -->
-    <a href="<?= BASE_URL ?>/views/barangay/responders.php" class="clickable-card" title="Manage responder personnel">
+    <a href="<?= BASE_URL ?>/views/barangay/users.php?tab=responders" class="clickable-card" title="Manage responder personnel">
       <div class="kpi-card-header">
         <span class="kpi-card-title">Responder Force</span>
         <span class="kpi-card-badge"><?= number_format($respKpis['ready_responders'] ?? 0) ?> Ready</span>
@@ -1090,7 +1090,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <div class="modal-footer-dash">
       <span>Total Registered: <strong><?= number_format($totalResidents) ?></strong> (<?= $activeResidentsCount ?> Active)</span>
       <div>
-        <a href="<?= BASE_URL ?>/views/barangay/residents.php" class="btn btn-primary btn-sm" style="margin-right:6px;font-size:10.5px;">Manage Residents</a>
+        <a href="<?= BASE_URL ?>/views/barangay/users.php?tab=residents" class="btn btn-primary btn-sm" style="margin-right:6px;font-size:10.5px;">Manage Users</a>
         <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('modalResidentsRegistry')">Close</button>
       </div>
     </div>
