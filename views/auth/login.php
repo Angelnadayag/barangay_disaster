@@ -61,7 +61,7 @@ $allocStmt = $db->query("
     JOIN recommendations r ON ri.recommendation_id = r.id
     JOIN disaster_requests dr ON r.disaster_request_id = dr.id
     WHERE ri.status = 'Allocated' AND ri.allocated_quantity > 0
-    GROUP BY dr.barangay_id, res.id
+    GROUP BY dr.barangay_id, res.id, res.name, res.category, res.unit
 ");
 $barangayAllocations = [];
 while ($row = $allocStmt->fetch(PDO::FETCH_ASSOC)) {
