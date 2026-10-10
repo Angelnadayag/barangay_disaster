@@ -46,6 +46,12 @@ class Database {
 
             try {
                 self::$pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+                // Ensure sql_mode does not strictly break on ONLY_FULL_GROUP_BY in production MySQL
+                try {
+                    self::$pdo->exec("SET SESSION sql_mode=(SELECT REPLACE(REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY,',''),'ONLY_FULL_GROUP_BY',''))");
+                } catch (Throwable $t) {
+                    // Ignore if session variable manipulation is restricted
+                }
             } catch (PDOException $e) {
                 die("Database Connection Failed: " . htmlspecialchars($e->getMessage()));
             }

@@ -98,7 +98,7 @@ $pendingRecBatches = $db->query("
     JOIN disaster_requests dr ON r.disaster_request_id = dr.id
     JOIN barangays b ON dr.barangay_id = b.id
     JOIN recommended_items ri ON ri.recommendation_id = r.id AND ri.status = 'Pending'
-    GROUP BY r.id
+    GROUP BY r.id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity, b.name
     ORDER BY r.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
