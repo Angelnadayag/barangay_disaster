@@ -13,6 +13,7 @@ $db = getDBConnection();
 $pendingReqs = 0;
 $pendingRecs = 0;
 $lowStockCount = 0;
+$localLowStockCount = 0;
 
 if ($role === 'icdrrmo' || $role === 'barangay_head') {
     $reqSql = ($role === 'barangay_head') 
@@ -26,7 +27,7 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
         $recStmt = $db->query("SELECT COUNT(*) FROM recommendations WHERE status = 'Pending Review'");
         $pendingRecs = (int)$recStmt->fetchColumn();
 
-        $stockStmt = $db->query("SELECT COUNT(*) FROM resources WHERE available_quantity <= min_threshold");
+        $stockStmt = $db->query("SELECT COUNT(*) FROM resources WHERE (barangay_id IS NULL OR status = 'active') AND available_quantity <= min_threshold");
         $lowStockCount = (int)$stockStmt->fetchColumn();
 
         try {
@@ -34,6 +35,14 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
             $pendingResourceReqs = (int)$resReqStmt->fetchColumn();
         } catch (Exception $e) {
             $pendingResourceReqs = 0;
+        }
+    } elseif ($role === 'barangay_head') {
+        try {
+            $bStockStmt = $db->prepare("SELECT COUNT(*) FROM resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold");
+            $bStockStmt->execute([$user['barangay_id']]);
+            $localLowStockCount = (int)$bStockStmt->fetchColumn();
+        } catch (Exception $e) {
+            $localLowStockCount = 0;
         }
     }
 }
@@ -65,9 +74,9 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
           </a>
         </li>
         <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/icdrrmo/resources.php" class="nav-link <?= $currentPage === 'resources.php' ? 'active' : '' ?>">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/inventory.php" class="nav-link <?= in_array($currentPage, ['inventory.php', 'resources.php']) ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></span>
-            Resources Inventory
+            Inventory
             <?php if ($lowStockCount > 0): ?><span class="nav-badge nav-badge-warning"><?= $lowStockCount ?> Low</span><?php endif; ?>
           </a>
         </li>
@@ -105,8 +114,15 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
         </li>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/barangay/resources.php" class="nav-link <?= $currentPage === 'resources.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
             Manage Resources
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="<?= BASE_URL ?>/views/barangay/inventory.php" class="nav-link <?= $currentPage === 'inventory.php' ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></span>
+            Inventory
+            <?php if (!empty($localLowStockCount) && $localLowStockCount > 0): ?><span class="nav-badge nav-badge-warning"><?= $localLowStockCount ?> Low</span><?php endif; ?>
           </a>
         </li>
         <li class="nav-item">

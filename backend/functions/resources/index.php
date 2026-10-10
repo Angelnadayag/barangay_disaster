@@ -27,6 +27,21 @@ switch ($action) {
     case 'delete':
         require __DIR__ . '/delete.php';
         break;
+    case 'request':
+        require __DIR__ . '/request.php';
+        break;
+    case 'review':
+    case 'review_request':
+        require __DIR__ . '/review_request.php';
+        break;
+    case 'catalog':
+    case 'get_catalog':
+        require __DIR__ . '/get_catalog.php';
+        break;
+    case 'allocate':
+    case 'process_allocation':
+        require __DIR__ . '/allocate.php';
+        break;
     default:
         require_once __DIR__ . '/../../config/config.php';
         require_once __DIR__ . '/../../services/Helpers.php';
