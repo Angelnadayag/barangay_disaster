@@ -13,7 +13,7 @@ if (isLoggedIn()) {
     if ($user['role'] === 'icdrrmo') {
         $url = BASE_URL . '/views/icdrrmo/users.php';
     } elseif ($user['role'] === 'barangay_head') {
-        $url = BASE_URL . '/views/barangay/residents.php';
+        $url = BASE_URL . '/views/barangay/dashboard.php';
     } else {
         $url = BASE_URL . "/views/{$folder}/dashboard.php";
     }

@@ -49,7 +49,7 @@ function initRoleSwitcher() {
         const data = await res.json();
         if (data.success) {
           const folder = (data.role === 'barangay_head') ? 'barangay' : data.role;
-          const targetPage = (data.role === 'barangay_head') ? 'residents.php' : ((data.role === 'icdrrmo') ? 'users.php' : 'dashboard.php');
+          const targetPage = (data.role === 'barangay_head') ? 'users.php' : ((data.role === 'icdrrmo') ? 'users.php' : 'dashboard.php');
           window.location.href = `${BASE_URL}/views/${folder}/${targetPage}`;
         } else {
           showToast(data.message || 'Unable to switch role', 'danger');
