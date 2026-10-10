@@ -1067,22 +1067,50 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     </div>
 
     <div class="modal-body">
-      <div class="info-banner">
-        Submitted requests will immediately notify <strong>ICDRRMO Central Logistics</strong>. Upon review and acceptance, stock will be deducted from Central Depot and credited to this barangay's local stock.
+      <div class="info-banner" style="background:#EFF6FF;border-left:4px solid var(--color-primary);padding:10px 14px;border-radius:6px;font-size:11.5px;color:#1E3A8A;margin-bottom:14px;line-height:1.45;">
+        Submitted requisitions directly link to <strong>ICDRRMO Central Logistics</strong>. Available quantities reflect central depot inventory in real-time. Once accepted by the admin, stock is automatically deducted from Central Depot and credited to this barangay's local stock.
+      </div>
+
+      <!-- Live Depot Stock Card (Appears upon selecting commodity) -->
+      <div id="centralDepotInfoBox" style="display:none;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:8px;padding:12px 16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <div>
+            <span style="font-size:9.5px;text-transform:uppercase;font-weight:700;color:var(--color-primary);letter-spacing:0.5px;">ICDRRMO Central Depot Live Stock</span>
+            <div id="boxDepotItemName" style="font-weight:700;font-size:13.5px;color:#0F172A;margin-top:2px;"></div>
+            <div id="boxDepotLocation" style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">Central ICDRRMO Depot</div>
+          </div>
+          <div style="text-align:right;">
+            <div id="boxDepotStockNum" style="font-size:20px;font-weight:800;color:var(--color-success);font-family:var(--font-secondary);line-height:1.1;">0</div>
+            <span id="boxDepotBadge" class="badge badge-success" style="font-size:9px;margin-top:2px;">In Stock</span>
+          </div>
+        </div>
+        <div id="boxDepotWarning" style="display:none;margin-top:10px;font-size:11px;color:#991B1B;background:#FEE2E2;border:1px solid #FECACA;border-radius:6px;padding:8px 12px;font-weight:600;display:flex;align-items:center;gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <span id="boxDepotWarningText">Exceeds available Central Depot inventory.</span>
+        </div>
       </div>
 
       <!-- Select from Catalog or Custom -->
       <div class="form-group" style="margin-bottom:14px;">
-        <label class="form-label form-label-required">Select Central Depot Commodity</label>
+        <label class="form-label form-label-required" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Select ICDRRMO Central Commodity</span>
+          <span style="font-size:9.5px;color:var(--color-text-muted);font-weight:normal;">Real-time stock synced</span>
+        </label>
         <select name="resource_id" id="req_central_resource_id" class="form-control" onchange="onSelectCentralResource(this)">
-          <option value="">-- Choose from ICDRRMO Catalog (or specify custom below) --</option>
+          <option value="">-- Choose from ICDRRMO Catalog (or specify custom item below) --</option>
           <?php foreach ($centralCatalog as $catItem): ?>
+            <?php 
+              $isOutOfStock = ((int)$catItem['available_quantity'] <= 0);
+              $isLow = ((int)$catItem['available_quantity'] <= (int)($catItem['min_threshold'] ?? 50));
+            ?>
             <option value="<?= $catItem['id'] ?>"
                     data-name="<?= htmlspecialchars($catItem['name']) ?>"
                     data-category="<?= htmlspecialchars($catItem['category']) ?>"
                     data-unit="<?= htmlspecialchars($catItem['unit']) ?>"
-                    data-avail="<?= (int)$catItem['available_quantity'] ?>">
-              [<?= clean($catItem['category']) ?>] <?= clean($catItem['name']) ?> (<?= number_format($catItem['available_quantity']) ?> <?= clean($catItem['unit']) ?> available at Depot)
+                    data-avail="<?= (int)$catItem['available_quantity'] ?>"
+                    data-location="<?= htmlspecialchars($catItem['storage_location'] ?? 'Central ICDRRMO Depot') ?>"
+                    <?= $isOutOfStock ? 'disabled style="color:#94A3B8;background:#F8FAFC;"' : '' ?>>
+              [<?= clean($catItem['category']) ?>] <?= clean($catItem['name']) ?> — <?= number_format($catItem['available_quantity']) ?> <?= clean($catItem['unit']) ?> available <?= $isOutOfStock ? '(DEPOT DEPLETED)' : ($isLow ? '(LOW STOCK)' : '') ?>
             </option>
           <?php endforeach; ?>
         </select>
@@ -1090,8 +1118,8 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label form-label-required">Item Name / Specification</label>
-          <input type="text" name="item_name" id="req_item_name" class="form-control" placeholder="e.g. Family Food Packs (10-Day), Folding Cots" required>
+          <label class="form-label form-label-required">Item Name / Commodity Title</label>
+          <input type="text" name="item_name" id="req_item_name" class="form-control" placeholder="e.g. Standard Family Food Pack (3-day ration)" required>
         </div>
         <div class="form-group">
           <label class="form-label form-label-required">Commodity Category</label>
@@ -1105,9 +1133,12 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label form-label-required">Requested Quantity</label>
-          <input type="number" name="requested_quantity" id="req_quantity" class="form-control" min="1" value="50" required>
-          <div id="depotStockAlert" style="font-size:9.5px;color:var(--color-primary);margin-top:2px;"></div>
+          <label class="form-label form-label-required" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Requested Quantity</span>
+            <span id="reqQuantityMaxHint" style="font-size:9.5px;color:var(--color-primary);font-weight:600;"></span>
+          </label>
+          <input type="number" name="requested_quantity" id="req_quantity" class="form-control" min="1" value="50" required oninput="validateRequisitionQuantity()">
+          <div id="depotStockAlert" style="font-size:10px;margin-top:3px;font-weight:500;"></div>
         </div>
         <div class="form-group">
           <label class="form-label form-label-required">Unit of Measure</label>
@@ -1138,13 +1169,16 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 
       <div class="form-group">
         <label class="form-label form-label-required">Purpose & Operational Justification</label>
-        <textarea name="purpose" class="form-control" rows="3" placeholder="Provide background justification for this request (e.g. Pre-positioning relief ahead of storm surge warning for Purok Riverside families)..." required></textarea>
+        <textarea name="purpose" id="req_purpose" class="form-control" rows="3" placeholder="Provide background justification for this request (e.g. Pre-positioning relief ahead of storm surge warning for Purok Riverside families)..." required></textarea>
       </div>
     </div>
 
     <div class="modal-footer">
       <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('requestResourceModal')">Cancel</button>
-      <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitRequisition">Submit Requisition to ICDRRMO</button>
+      <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitRequisition">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        Submit Requisition to ICDRRMO
+      </button>
     </div>
   </form>
 </div>
@@ -1371,34 +1405,240 @@ function openCreateResourceModal() {
 }
 
 // 2. Open Request Supplies Modal
+let selectedCentralResourceMax = null;
+
 function openRequestResourceModal() {
   const form = document.getElementById('requestResourceForm');
   if (form) {
     form.reset();
-    document.getElementById('depotStockAlert').innerText = '';
   }
+  selectedCentralResourceMax = null;
+  const infoBox = document.getElementById('centralDepotInfoBox');
+  if (infoBox) infoBox.style.display = 'none';
+  const alertEl = document.getElementById('depotStockAlert');
+  if (alertEl) alertEl.innerText = '';
+  const hintEl = document.getElementById('reqQuantityMaxHint');
+  if (hintEl) hintEl.innerText = '';
+  const submitBtn = document.getElementById('btnSubmitRequisition');
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Submit Requisition to ICDRRMO';
+  }
+
+  // Refresh latest catalog data in background
+  fetch('<?= BASE_URL ?>/backend/functions/resources/get_catalog.php')
+    .then(r => r.json())
+    .then(data => {
+      if (data.success && data.catalog) {
+        updateCentralCatalogDropdown(data.catalog);
+      }
+    })
+    .catch(() => {});
+
   openModal('requestResourceModal');
 }
 
-// Auto-fill item details when choosing from Central Depot catalog
+function updateCentralCatalogDropdown(items) {
+  const sel = document.getElementById('req_central_resource_id');
+  if (!sel) return;
+  const currentVal = sel.value;
+  
+  sel.innerHTML = '<option value="">-- Choose from ICDRRMO Catalog (or specify custom item below) --</option>';
+  items.forEach(item => {
+    const isOut = parseInt(item.available_quantity) <= 0;
+    const isLow = parseInt(item.available_quantity) <= parseInt(item.min_threshold || 50);
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.setAttribute('data-name', item.name);
+    opt.setAttribute('data-category', item.category);
+    opt.setAttribute('data-unit', item.unit);
+    opt.setAttribute('data-avail', item.available_quantity);
+    opt.setAttribute('data-location', item.storage_location || 'Central ICDRRMO Depot');
+    
+    if (isOut) {
+      opt.disabled = true;
+      opt.style.color = '#94A3B8';
+    }
+    opt.textContent = `[${item.category}] ${item.name} — ${parseInt(item.available_quantity).toLocaleString()} ${item.unit} available ${isOut ? '(DEPOT DEPLETED)' : (isLow ? '(LOW STOCK)' : '')}`;
+    sel.appendChild(opt);
+  });
+  if (currentVal) sel.value = currentVal;
+}
+
+// Auto-fill item details and show live depot stock card
 function onSelectCentralResource(sel) {
   const opt = sel.options[sel.selectedIndex];
+  const infoBox = document.getElementById('centralDepotInfoBox');
+  const alertEl = document.getElementById('depotStockAlert');
+  const hintEl = document.getElementById('reqQuantityMaxHint');
+
   if (!opt || !opt.value) {
-    document.getElementById('depotStockAlert').innerText = '';
+    selectedCentralResourceMax = null;
+    if (infoBox) infoBox.style.display = 'none';
+    if (alertEl) alertEl.innerText = '';
+    if (hintEl) hintEl.innerText = '';
+    validateRequisitionQuantity();
     return;
   }
+
   const name = opt.getAttribute('data-name');
   const cat = opt.getAttribute('data-category');
   const unit = opt.getAttribute('data-unit');
-  const avail = opt.getAttribute('data-avail');
+  const avail = parseInt(opt.getAttribute('data-avail') || 0);
+  const location = opt.getAttribute('data-location') || 'Central ICDRRMO Depot';
+
+  selectedCentralResourceMax = avail;
 
   if (name) document.getElementById('req_item_name').value = name;
   if (cat) document.getElementById('req_category').value = cat;
   if (unit) document.getElementById('req_unit').value = unit;
-  if (avail !== null) {
-    document.getElementById('depotStockAlert').innerText = `Available in Central Depot: ${parseInt(avail).toLocaleString()} ${unit}`;
+
+  // Set quantity input max
+  const qtyInput = document.getElementById('req_quantity');
+  if (qtyInput) {
+    qtyInput.max = avail;
+    if (avail > 0 && parseInt(qtyInput.value) > avail) {
+      qtyInput.value = avail;
+    } else if (avail > 0 && (!qtyInput.value || parseInt(qtyInput.value) <= 0)) {
+      qtyInput.value = Math.min(50, avail);
+    }
+  }
+
+  // Populate Live Stock Info Card
+  if (infoBox) {
+    infoBox.style.display = 'block';
+    document.getElementById('boxDepotItemName').innerText = name;
+    document.getElementById('boxDepotLocation').innerText = `Location: ${location}`;
+    document.getElementById('boxDepotStockNum').innerText = `${avail.toLocaleString()} ${unit}`;
+
+    const badge = document.getElementById('boxDepotBadge');
+    if (avail <= 0) {
+      badge.className = 'badge badge-danger';
+      badge.innerText = 'Out of Stock';
+      document.getElementById('boxDepotStockNum').style.color = 'var(--color-danger)';
+    } else if (avail < 50) {
+      badge.className = 'badge badge-warning';
+      badge.innerText = 'Limited Depot Stock';
+      document.getElementById('boxDepotStockNum').style.color = '#D97706';
+    } else {
+      badge.className = 'badge badge-success';
+      badge.innerText = 'Sufficient In Stock';
+      document.getElementById('boxDepotStockNum').style.color = 'var(--color-success)';
+    }
+  }
+
+  if (hintEl) {
+    hintEl.innerText = `Max available: ${avail.toLocaleString()} ${unit}`;
+  }
+
+  validateRequisitionQuantity();
+}
+
+// Live validation for requested quantity against available depot stock
+function validateRequisitionQuantity() {
+  const qtyInput = document.getElementById('req_quantity');
+  const submitBtn = document.getElementById('btnSubmitRequisition');
+  const warningBox = document.getElementById('boxDepotWarning');
+  const warningText = document.getElementById('boxDepotWarningText');
+  const alertEl = document.getElementById('depotStockAlert');
+
+  if (!qtyInput) return;
+  const qty = parseInt(qtyInput.value) || 0;
+
+  if (qty <= 0) {
+    if (alertEl) {
+      alertEl.style.color = 'var(--color-danger)';
+      alertEl.innerText = '⚠ Requested quantity must be at least 1.';
+    }
+    if (warningBox) warningBox.style.display = 'none';
+    if (submitBtn) submitBtn.disabled = true;
+    return;
+  }
+
+  if (selectedCentralResourceMax !== null) {
+    if (selectedCentralResourceMax <= 0) {
+      if (warningBox) {
+        warningBox.style.display = 'flex';
+        warningText.innerText = 'Selected commodity is depleted at ICDRRMO Depot. Please choose another commodity.';
+      }
+      if (alertEl) {
+        alertEl.style.color = 'var(--color-danger)';
+        alertEl.innerText = '⚠ Item depleted at central depot.';
+      }
+      if (submitBtn) submitBtn.disabled = true;
+      return;
+    }
+
+    if (qty > selectedCentralResourceMax) {
+      if (warningBox) {
+        warningBox.style.display = 'flex';
+        warningText.innerText = `Cannot request ${qty}. Only ${selectedCentralResourceMax.toLocaleString()} units available at Central Depot.`;
+      }
+      if (alertEl) {
+        alertEl.style.color = 'var(--color-danger)';
+        alertEl.innerText = `⚠ Exceeds depot available stock (Max: ${selectedCentralResourceMax.toLocaleString()}).`;
+      }
+      if (submitBtn) submitBtn.disabled = true;
+      return;
+    }
+
+    // Valid quantity within stock
+    if (warningBox) warningBox.style.display = 'none';
+    if (alertEl) {
+      alertEl.style.color = 'var(--color-success)';
+      alertEl.innerText = `✓ Within depot available stock (${selectedCentralResourceMax.toLocaleString()} available).`;
+    }
+    if (submitBtn) submitBtn.disabled = false;
+  } else {
+    // Custom item not bound to central catalog
+    if (warningBox) warningBox.style.display = 'none';
+    if (alertEl) alertEl.innerText = '';
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
+
+// AJAX Submission for Resource Requisition
+document.addEventListener('DOMContentLoaded', function() {
+  const reqForm = document.getElementById('requestResourceForm');
+  if (reqForm) {
+    reqForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const submitBtn = document.getElementById('btnSubmitRequisition');
+      const origHtml = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner" style="display:inline-block;width:12px;height:12px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;margin-right:6px;vertical-align:-1px;"></span> Submitting to ICDRRMO...';
+
+      try {
+        const formData = new FormData(reqForm);
+        const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/request.php', {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast(data.message, 'success');
+          closeModal('requestResourceModal');
+          // Navigate dynamically to the Supply Requisitions tab
+          setTimeout(() => {
+            window.location.href = '<?= BASE_URL ?>/views/barangay/resources.php?tab=requests';
+          }, 600);
+        } else {
+          showToast(data.message || 'Failed to submit requisition.', 'danger');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origHtml;
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Network error while submitting requisition to ICDRRMO.', 'danger');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origHtml;
+      }
+    });
+  }
+});
 
 // 3. View Resource Details (in-place View / Edit)
 function viewResourceDetails(res) {
