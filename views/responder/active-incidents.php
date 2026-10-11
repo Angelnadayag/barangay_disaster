@@ -16,7 +16,7 @@ $search = trim($_GET['search'] ?? '');
 
 $sql = "
     SELECT dr.*, b.name AS barangay_name, u.full_name AS submitted_by_name
-    FROM disaster_requests dr
+    FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     JOIN users u ON dr.submitted_by = u.id
     WHERE dr.status NOT IN ('Completed', 'Rejected')

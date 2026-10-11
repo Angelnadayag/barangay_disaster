@@ -30,7 +30,7 @@ if (!$actId) {
 
 // Verify jurisdiction for barangay head
 if ($user['role'] === 'barangay_head') {
-    $chkStmt = $db->prepare("SELECT barangay_id FROM preparedness_activities WHERE id = ?");
+    $chkStmt = $db->prepare("SELECT barangay_id FROM events WHERE id = ?");
     $chkStmt->execute([$actId]);
     $actOwner = $chkStmt->fetch();
     if ($actOwner && (int)$actOwner['barangay_id'] !== (int)$user['barangay_id']) {
@@ -43,19 +43,19 @@ $status = trim($_POST['status'] ?? 'Completed');
 $summary = trim($_POST['evaluation_summary'] ?? '');
 
 // Self-heal table schema if necessary
-$colsAct = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'content_execution'")->fetchAll();
+$colsAct = $db->query("SHOW COLUMNS FROM events LIKE 'content_execution'")->fetchAll();
 if (empty($colsAct)) {
-    $db->exec("ALTER TABLE preparedness_activities ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
+    $db->exec("ALTER TABLE events ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
 }
 
-$colsAtt = $db->query("SHOW COLUMNS FROM activity_attendees LIKE 'attended'")->fetchAll();
+$colsAtt = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'attended'")->fetchAll();
 if (empty($colsAtt)) {
-    $db->exec("ALTER TABLE activity_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
+    $db->exec("ALTER TABLE event_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
 }
 
-$colsEa = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'expected_activities'")->fetchAll();
+$colsEa = $db->query("SHOW COLUMNS FROM events LIKE 'expected_activities'")->fetchAll();
 if (empty($colsEa)) {
-    $db->exec("ALTER TABLE preparedness_activities ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
+    $db->exec("ALTER TABLE events ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
 }
 
 // Process participants attended roster
@@ -66,13 +66,13 @@ if (isset($_POST['has_attendee_roster']) && $_POST['has_attendee_roster'] == '1'
         : [];
     
     // Reset all registered attendees for this activity to unattended
-    $resetStmt = $db->prepare("UPDATE activity_attendees SET attended = 0 WHERE activity_id = ?");
+    $resetStmt = $db->prepare("UPDATE event_attendees SET attended = 0 WHERE activity_id = ?");
     $resetStmt->execute([$actId]);
 
     // Mark checked participants as attended
     if (!empty($attendedIds)) {
         $inPlaceholders = implode(',', array_fill(0, count($attendedIds), '?'));
-        $markStmt = $db->prepare("UPDATE activity_attendees SET attended = 1 WHERE activity_id = ? AND id IN ($inPlaceholders)");
+        $markStmt = $db->prepare("UPDATE event_attendees SET attended = 1 WHERE activity_id = ? AND id IN ($inPlaceholders)");
         $markStmt->execute(array_merge([$actId], $attendedIds));
         $attendedCount = count($attendedIds);
     }
@@ -103,7 +103,7 @@ if ($expectedActivitiesInput !== null) {
 try {
     if ($expectedActivitiesJson !== null && $expectedActivitiesJson !== '') {
         $stmt = $db->prepare("
-            UPDATE preparedness_activities SET
+            UPDATE events SET
                 status = ?,
                 actual_participants = ?,
                 evaluation_summary = ?,
@@ -114,7 +114,7 @@ try {
         $stmt->execute([$status, $actual, $summary, $contentExecutionJson, $expectedActivitiesJson, $actId]);
     } else {
         $stmt = $db->prepare("
-            UPDATE preparedness_activities SET
+            UPDATE events SET
                 status = ?,
                 actual_participants = ?,
                 evaluation_summary = ?,

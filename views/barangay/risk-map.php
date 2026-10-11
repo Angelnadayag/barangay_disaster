@@ -27,7 +27,7 @@ $evacStmt = $db->prepare("SELECT * FROM evacuation_areas WHERE barangay_id = ?")
 $evacStmt->execute([$barangayId]);
 $localEvac = $evacStmt->fetchAll();
 
-$incStmt = $db->prepare("SELECT * FROM disaster_requests WHERE barangay_id = ? AND status NOT IN ('Completed', 'Rejected')");
+$incStmt = $db->prepare("SELECT * FROM disaster_reports WHERE barangay_id = ? AND status NOT IN ('Completed', 'Rejected')");
 $incStmt->execute([$barangayId]);
 $activeIncidents = $incStmt->fetchAll();
 

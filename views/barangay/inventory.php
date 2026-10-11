@@ -112,31 +112,79 @@ $categories = [
 }
 .brgy-inv-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(23, 50, 77, 0.08);
 }
 .row-updated-highlight {
   animation: brgyHighlightFade 2.4s ease forwards !important;
 }
 @keyframes brgyHighlightFade {
-  0% { background-color: rgba(34, 197, 94, 0.28) !important; }
+  0% { background-color: rgba(46, 125, 50, 0.22) !important; }
   100% { background-color: transparent !important; }
 }
 .brgy-tab-btn {
-  padding: 8px 14px;
-  font-size: 11.5px;
-  font-weight: 600;
-  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-family: var(--font-primary);
+  font-weight: 500;
+  border-radius: var(--radius-sm, 6px);
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   transition: all 0.15s ease;
 }
-.brgy-tab-btn.active {
-  background: #FFFFFF;
+.brgy-tab-btn:hover {
   color: var(--color-primary);
-  border-color: #CBD5E1;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.brgy-tab-btn.active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 600;
+  border-color: var(--color-border);
+  box-shadow: 0 1px 3px rgba(23, 50, 77, 0.08);
+}
+
+/* Modal layout and auto-scrollbar for inventory modal */
+#barangayItemModal .modal-dialog {
+  max-width: 680px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#barangayItemModal .modal-body {
+  overflow-y: auto !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px 20px;
+}
+
+#barangayItemModal .modal-footer {
+  flex-shrink: 0;
+  padding: 12px 20px;
+  background: var(--color-surface-subtle);
+  border-top: 1px solid var(--color-border-light);
+}
+
+#barangayItemModal .modal-body::-webkit-scrollbar,
+#brgyItemHistoryContainer::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+#barangayItemModal .modal-body::-webkit-scrollbar-track,
+#brgyItemHistoryContainer::-webkit-scrollbar-track {
+  background: var(--color-surface-subtle);
+  border-radius: 4px;
+}
+#barangayItemModal .modal-body::-webkit-scrollbar-thumb,
+#brgyItemHistoryContainer::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+#barangayItemModal .modal-body::-webkit-scrollbar-thumb:hover,
+#brgyItemHistoryContainer::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
 }
 </style>
 
@@ -146,16 +194,6 @@ $categories = [
     <p class="page-header-desc">
       Prepositioned relief supplies, emergency equipment, and real-time relief distribution for Brgy. <strong><?= clean($barangay['name']) ?></strong>.
     </p>
-  </div>
-  <div class="page-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button type="button" class="btn btn-outline" onclick="openBarangayReceiveModal()" style="display:inline-flex;align-items:center;gap:6px;">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-      + Receive / Restock Supplies
-    </button>
-    <button type="button" class="btn btn-primary" onclick="openCreateLocalResourceModal()" style="display:inline-flex;align-items:center;gap:6px;">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      + Add Local Resource
-    </button>
   </div>
 </div>
 
@@ -350,8 +388,7 @@ $categories = [
                   <?php endif; ?>
                 </td>
                 <td style="text-align:right;" id="brgy-cell-actions-<?= $res['id'] ?>">
-                  <button type="button" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:11px;display:inline-flex;align-items:center;gap:4px;" onclick="openBarangayItemModal(<?= htmlspecialchars(json_encode($res)) ?>)">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  <button type="button" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:11px;" onclick="openBarangayItemModal(<?= htmlspecialchars(json_encode($res)) ?>)">
                     View
                   </button>
                 </td>
@@ -425,14 +462,14 @@ $categories = [
 <?php endif; ?>
 
 <!-- ========================================================================= -->
-<!-- MODAL: Barangay Resource Item Details & Dynamic In-Place Operations       -->
+<!-- MODAL: Barangay Resource Item Details, Adjustment & History               -->
 <!-- ========================================================================= -->
 <div class="modal-overlay" id="barangayItemModal">
   <div class="modal-dialog" style="max-width:680px;">
     <div class="modal-header">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="badge badge-neutral" id="brgyModalItemCode" style="font-family:var(--font-secondary);font-weight:700;"></span>
-        <span id="brgyModalItemCategory" class="badge"></span>
+        <span class="badge badge-neutral" id="brgyModalItemCode" style="font-family:var(--font-secondary);font-weight:700;font-size:10px;"></span>
+        <span id="brgyModalItemCategory" class="badge badge-neutral" style="font-size:10px;"></span>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('barangayItemModal')">&times;</button>
     </div>
@@ -440,154 +477,125 @@ $categories = [
     <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
       <!-- Title & Basic Specs -->
       <div>
-        <h2 id="brgyModalItemName" style="font-weight:800;font-size:18px;color:var(--color-primary);margin:0 0 4px 0;"></h2>
-        <div id="brgyModalItemSub" style="font-size:11px;color:var(--color-text-muted);"></div>
+        <h2 id="brgyModalItemName" style="font-weight:700;font-size:16px;color:var(--color-primary);margin:0 0 4px 0;font-family:var(--font-primary);"></h2>
+        <div id="brgyModalItemSub" style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-primary);"></div>
       </div>
 
       <!-- Live Stock Metric Cards -->
       <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;">
-        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;padding:8px 10px;text-align:center;">
-          <div style="font-size:9px;color:#166534;font-weight:700;text-transform:uppercase;">Available</div>
-          <div id="brgyStockAvail" style="font-size:16px;font-weight:800;color:#15803D;margin-top:2px;"></div>
+        <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:var(--radius-sm, 6px);padding:8px 10px;text-align:center;">
+          <div style="font-size:9.5px;color:var(--color-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Available</div>
+          <div id="brgyStockAvail" style="font-size:16px;font-weight:700;color:var(--color-success);font-family:var(--font-secondary);margin-top:2px;"></div>
         </div>
-        <div style="background:#F8FAFC;border:1px solid var(--color-border-light);border-radius:6px;padding:8px 10px;text-align:center;">
-          <div style="font-size:9px;color:var(--color-text-muted);font-weight:700;text-transform:uppercase;">Disbursed / Field</div>
-          <div id="brgyStockInUse" style="font-size:16px;font-weight:800;color:#0F172A;margin-top:2px;"></div>
+        <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:var(--radius-sm, 6px);padding:8px 10px;text-align:center;">
+          <div style="font-size:9.5px;color:var(--color-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Disbursed / Field</div>
+          <div id="brgyStockInUse" style="font-size:16px;font-weight:700;color:var(--color-text);font-family:var(--font-secondary);margin-top:2px;"></div>
         </div>
-        <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:8px 10px;text-align:center;">
-          <div style="font-size:9px;color:#991B1B;font-weight:700;text-transform:uppercase;">Damaged</div>
-          <div id="brgyStockDamaged" style="font-size:16px;font-weight:800;color:#DC2626;margin-top:2px;"></div>
+        <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:var(--radius-sm, 6px);padding:8px 10px;text-align:center;">
+          <div style="font-size:9.5px;color:var(--color-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Damaged</div>
+          <div id="brgyStockDamaged" style="font-size:16px;font-weight:700;color:var(--color-danger);font-family:var(--font-secondary);margin-top:2px;"></div>
         </div>
-        <div style="background:#F8FAFC;border:1px solid var(--color-border-light);border-radius:6px;padding:8px 10px;text-align:center;">
-          <div style="font-size:9px;color:var(--color-text-muted);font-weight:700;text-transform:uppercase;">Total Hall Stock</div>
-          <div id="brgyStockTotal" style="font-size:16px;font-weight:800;color:#0F172A;margin-top:2px;"></div>
+        <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:var(--radius-sm, 6px);padding:8px 10px;text-align:center;">
+          <div style="font-size:9.5px;color:var(--color-text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Total Stock</div>
+          <div id="brgyStockTotal" style="font-size:16px;font-weight:700;color:var(--color-primary);font-family:var(--font-secondary);margin-top:2px;"></div>
         </div>
       </div>
 
       <!-- Segmented Navigation inside Modal -->
-      <div style="display:flex;gap:4px;background:#F1F5F9;padding:3px;border-radius:8px;">
+      <div style="display:flex;gap:4px;background:var(--color-surface-subtle);padding:3px;border-radius:var(--radius-sm, 6px);border:1px solid var(--color-border-light);">
         <button type="button" class="brgy-tab-btn active" id="brgyTabBtnSpecs" onclick="switchBrgyModalTab('specs')">
-          📋 Specifications
-        </button>
-        <button type="button" class="brgy-tab-btn" id="brgyTabBtnDisburse" onclick="switchBrgyModalTab('disburse')">
-          🚚 Distribute to Purok
-        </button>
-        <button type="button" class="brgy-tab-btn" id="brgyTabBtnRestock" onclick="switchBrgyModalTab('restock')">
-          📦 Receive Stock
+          Specifications
         </button>
         <button type="button" class="brgy-tab-btn" id="brgyTabBtnAdjust" onclick="switchBrgyModalTab('adjust')">
-          ⚖️ Damage / Return
+          Inventory Adjustment
+        </button>
+        <button type="button" class="brgy-tab-btn" id="brgyTabBtnHistory" onclick="switchBrgyModalTab('history')">
+          Inventory History
         </button>
       </div>
 
       <!-- Tab Content 1: Specifications -->
       <div id="brgyModalTabSpecs" style="display:block;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11.5px;background:#F8FAFC;padding:12px;border-radius:6px;border:1px solid var(--color-border-light);">
-          <div><strong>Storage Room / Shelf:</strong> <span id="brgySpecLocation"></span></div>
-          <div><strong>Source / Donor:</strong> <span id="brgySpecSupplier"></span></div>
-          <div><strong>Condition:</strong> <span id="brgySpecCondition"></span></div>
-          <div><strong>Expiry Date:</strong> <span id="brgySpecExpiry"></span></div>
-          <div><strong>Safety Threshold:</strong> <span id="brgySpecMinThreshold"></span></div>
-          <div><strong>Unit of Measure:</strong> <span id="brgySpecUnit"></span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11.5px;background:var(--color-surface-subtle);padding:12px;border-radius:var(--radius-sm, 6px);border:1px solid var(--color-border-light);color:var(--color-text);">
+          <div><strong style="color:var(--color-text-secondary);">Storage Room / Shelf:</strong> <span id="brgySpecLocation"></span></div>
+          <div><strong style="color:var(--color-text-secondary);">Source / Donor:</strong> <span id="brgySpecSupplier"></span></div>
+          <div><strong style="color:var(--color-text-secondary);">Condition:</strong> <span id="brgySpecCondition"></span></div>
+          <div><strong style="color:var(--color-text-secondary);">Expiry Date:</strong> <span id="brgySpecExpiry"></span></div>
+          <div><strong style="color:var(--color-text-secondary);">Safety Threshold:</strong> <span id="brgySpecMinThreshold"></span></div>
+          <div><strong style="color:var(--color-text-secondary);">Unit of Measure:</strong> <span id="brgySpecUnit"></span></div>
         </div>
       </div>
 
-      <!-- Tab Content 2: Dynamic Local Distribution Form -->
-      <div id="brgyModalTabDisburse" style="display:none;">
-        <form id="brgyDisburseForm" onsubmit="event.preventDefault(); submitBrgyDistribution();">
-          <input type="hidden" id="brgyDisburseResId">
-          <div style="background:#F0F9FF;border:1px solid #BAE6FD;padding:12px;border-radius:6px;display:flex;flex-direction:column;gap:10px;">
-            <div style="font-size:11px;font-weight:700;color:#0369A1;text-transform:uppercase;">
-              🚚 Disburse Supplies to Purok / Evacuees
-            </div>
+      <!-- Tab Content 2: Unified Inventory Adjustment Form -->
+      <div id="brgyModalTabAdjust" style="display:none;">
+        <form id="brgyUnifiedAdjustForm" onsubmit="event.preventDefault(); submitBrgyUnifiedAdjustment();">
+          <input type="hidden" id="brgyUnifiedAdjustResId">
+          <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);padding:14px;border-radius:var(--radius-sm, 6px);display:flex;flex-direction:column;gap:10px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="margin-bottom:2px;font-weight:700;">Target Purok / Facility <span style="color:var(--color-danger)">*</span></label>
-                <select id="brgyDisbursePurok" class="form-control" required style="font-size:12px;">
-                  <option value="">Select Target Purok</option>
-                  <?php foreach ($localPuroks as $p): ?>
-                    <option value="<?= clean($p['name']) ?>"><?= clean($p['name']) ?></option>
-                  <?php endforeach; ?>
-                  <option value="Evacuation Center">Barangay Evacuation Center</option>
-                  <option value="Barangay Responders">Field Response Team</option>
+                <label class="form-label" style="margin-bottom:3px;font-size:11px;font-weight:600;">Adjustment Action <span style="color:var(--color-danger)">*</span></label>
+                <select id="brgyUnifiedAdjustType" class="form-control" required style="font-size:12px;" onchange="onBrgyAdjustTypeChange(this.value)">
+                  <option value="Restock">Restock / Receive Supplies (+)</option>
+                  <option value="Dispatched">Distribute to Purok / Field (-)</option>
+                  <option value="Damaged">Record Damaged / Spoiled Stock (-)</option>
+                  <option value="Returned">Return Unused Supplies from Field (+)</option>
+                  <option value="Adjusted">Count Correction (+ / -)</option>
                 </select>
               </div>
               <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label" style="margin-bottom:2px;font-weight:700;">Quantity to Distribute <span style="color:var(--color-danger)">*</span></label>
-                <input type="number" id="brgyDisburseQty" class="form-control" min="1" value="10" required style="font-weight:700;font-size:14px;">
+                <label class="form-label" style="margin-bottom:3px;font-size:11px;font-weight:600;">Quantity <span id="brgyAdjustUnitLabel" style="font-weight:normal;color:var(--color-text-muted);font-size:10px;"></span> <span style="color:var(--color-danger)">*</span></label>
+                <input type="number" id="brgyUnifiedAdjustQty" class="form-control" min="1" value="1" required style="font-weight:600;font-size:12px;font-family:var(--font-secondary);">
               </div>
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="margin-bottom:2px;">Disbursement Purpose / Relief Notes <span style="color:var(--color-danger)">*</span></label>
-              <input type="text" id="brgyDisburseRemarks" class="form-control" placeholder="e.g. Distributed to 10 flooded households in Purok 3" required>
-            </div>
-            <div style="text-align:right;margin-top:4px;">
-              <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitBrgyDisburse" style="background:#0284C7;border-color:#0284C7;display:inline-flex;align-items:center;gap:4px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                Confirm Distribution
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
 
-      <!-- Tab Content 3: Dynamic Receive / Restock Form -->
-      <div id="brgyModalTabRestock" style="display:none;">
-        <form id="brgyRestockForm" onsubmit="event.preventDefault(); submitBrgyRestock();">
-          <input type="hidden" id="brgyRestockResId">
-          <div style="background:#F0FDF4;border:1px solid #BBF7D0;padding:12px;border-radius:6px;display:flex;flex-direction:column;gap:10px;">
-            <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;">
-              📦 Receive Inflow / Local Restock
-            </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="margin-bottom:2px;font-weight:700;">Quantity Received <span style="color:var(--color-danger)">*</span></label>
-              <input type="number" id="brgyRestockQty" class="form-control" min="1" value="25" required style="font-weight:700;font-size:14px;">
-            </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="margin-bottom:2px;">Source / Donor Notes <span style="color:var(--color-danger)">*</span></label>
-              <input type="text" id="brgyRestockRemarks" class="form-control" placeholder="e.g. Donation from local church / BDRRMC local fund purchase" required>
-            </div>
-            <div style="text-align:right;margin-top:4px;">
-              <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitBrgyRestock" style="background:var(--color-success);border-color:var(--color-success);display:inline-flex;align-items:center;gap:4px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                Record Inflow
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <!-- Tab Content 4: Dynamic Damage / Return Form -->
-      <div id="brgyModalTabAdjust" style="display:none;">
-        <form id="brgyAdjustForm" onsubmit="event.preventDefault(); submitBrgyAdjustment();">
-          <input type="hidden" id="brgyAdjustResId">
-          <div style="background:#FFFDF8;border:1px solid #FCD34D;padding:12px;border-radius:6px;display:flex;flex-direction:column;gap:10px;">
-            <div style="font-size:11px;font-weight:700;color:#92400E;text-transform:uppercase;">
-              ⚖️ Record Damage or Field Return
-            </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="margin-bottom:2px;font-weight:700;">Adjustment Action <span style="color:var(--color-danger)">*</span></label>
-              <select id="brgyAdjustType" class="form-control" required style="font-size:12px;">
-                <option value="Damaged">Record Damaged / Spoiled Stock (Deducts from Available −)</option>
-                <option value="Returned">Return Unused Supplies from Field (Adds to Available +)</option>
+            <div class="form-group" id="brgyAdjustTargetGroup" style="display:none;margin-bottom:0;">
+              <label class="form-label" style="margin-bottom:3px;font-size:11px;font-weight:600;">Target Purok / Facility <span style="color:var(--color-danger)">*</span></label>
+              <select id="brgyUnifiedAdjustTarget" class="form-control" style="font-size:12px;">
+                <option value="">Select Target Purok / Facility</option>
+                <?php foreach ($localPuroks as $p): ?>
+                  <option value="<?= clean($p['name']) ?>"><?= clean($p['name']) ?></option>
+                <?php endforeach; ?>
+                <option value="Evacuation Center">Barangay Evacuation Center</option>
+                <option value="Barangay Responders">Field Response Team</option>
               </select>
             </div>
+
             <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="margin-bottom:2px;font-weight:700;">Quantity <span style="color:var(--color-danger)">*</span></label>
-              <input type="number" id="brgyAdjustQty" class="form-control" min="1" value="2" required style="font-weight:700;font-size:14px;">
+              <label class="form-label" style="margin-bottom:3px;font-size:11px;font-weight:600;">Remarks / Purpose / Justification <span style="color:var(--color-danger)">*</span></label>
+              <input type="text" id="brgyUnifiedAdjustRemarks" class="form-control" placeholder="Enter reason, donor, purok notes, or explanation" required style="font-size:12px;">
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="margin-bottom:2px;">Justification / Remarks <span style="color:var(--color-danger)">*</span></label>
-              <input type="text" id="brgyAdjustRemarks" class="form-control" placeholder="e.g. Expired canned items disposed; or flashlights returned after patrol" required>
-            </div>
+
             <div style="text-align:right;margin-top:4px;">
-              <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitBrgyAdjust" style="display:inline-flex;align-items:center;gap:4px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                Confirm Action
+              <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitBrgyUnifiedAdjust" style="font-size:11.5px;padding:5px 14px;">
+                Confirm Adjustment
               </button>
             </div>
           </div>
         </form>
+      </div>
+
+      <!-- Tab Content 3: Inventory History Log -->
+      <div id="brgyModalTabHistory" style="display:none;">
+        <div id="brgyItemHistoryContainer" style="max-height:280px;overflow-y:auto;border:1px solid var(--color-border-light);border-radius:var(--radius-sm, 6px);background:var(--color-surface);">
+          <table class="data-table" style="margin-bottom:0;font-size:11px;">
+            <thead style="position:sticky;top:0;background:var(--color-surface-subtle);z-index:2;">
+              <tr>
+                <th style="font-size:10px;padding:8px 10px;">Date & Time</th>
+                <th style="font-size:10px;padding:8px 10px;">Action Type</th>
+                <th style="font-size:10px;padding:8px 10px;">Quantity</th>
+                <th style="font-size:10px;padding:8px 10px;">Remarks / Target</th>
+                <th style="font-size:10px;padding:8px 10px;">Logged By</th>
+              </tr>
+            </thead>
+            <tbody id="brgyItemHistoryTableBody">
+              <tr>
+                <td colspan="5" style="text-align:center;padding:24px;color:var(--color-text-muted);">
+                  Loading transaction history...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -599,132 +607,26 @@ $categories = [
   </div>
 </div>
 
-<!-- ========================================================================= -->
-<!-- MODAL: Global Receive / Restock Supplies Modal for Barangay               -->
-<!-- ========================================================================= -->
-<div class="modal-overlay" id="barangayReceiveModal">
-  <div class="modal-dialog" style="max-width:540px;">
-    <div class="modal-header">
-      <h3 class="modal-title">Receive Supplies / Local Restock</h3>
-      <button type="button" class="modal-close-btn" onclick="closeModal('barangayReceiveModal')">&times;</button>
-    </div>
-    <form id="globalBrgyReceiveForm" onsubmit="event.preventDefault(); submitGlobalBrgyReceive();">
-      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label form-label-required">Select Commodity Item</label>
-          <select id="globalBrgyResId" class="form-control" required style="font-size:12px;">
-            <?php foreach ($localCatalog as $c): ?>
-              <option value="<?= $c['id'] ?>">
-                <?= clean($c['code']) ?> — <?= clean($c['name']) ?> (Current Stock: <?= number_format($c['available_quantity']) ?> <?= clean($c['unit']) ?>)
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label form-label-required">Quantity to Add</label>
-          <input type="number" id="globalBrgyQty" class="form-control" min="1" value="50" required style="font-weight:700;font-size:14px;">
-        </div>
-
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label form-label-required">Source / Donor / Procurement Notes</label>
-          <input type="text" id="globalBrgyRemarks" class="form-control" placeholder="e.g. Received from NGO relief truck / Local purchase for evacuation shelter" required>
-        </div>
-      </div>
-      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;">
-        <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('barangayReceiveModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitGlobalBrgyReceive" style="background:var(--color-success);border-color:var(--color-success);">
-          Record Inflow
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ========================================================================= -->
-<!-- MODAL: Add New Local Resource Item for Barangay                           -->
-<!-- ========================================================================= -->
-<div class="modal-overlay" id="createLocalResourceModal">
-  <div class="modal-dialog" style="max-width:620px;">
-    <div class="modal-header">
-      <h3 class="modal-title">Register Local Barangay Resource</h3>
-      <button type="button" class="modal-close-btn" onclick="closeModal('createLocalResourceModal')">&times;</button>
-    </div>
-    <form id="createLocalResourceForm" onsubmit="event.preventDefault(); submitCreateLocalResource();">
-      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">SKU Code (Optional)</label>
-            <input type="text" id="newBrgyCode" class="form-control" placeholder="Auto-generated if blank">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label form-label-required">Category</label>
-            <select id="newBrgyCategory" class="form-control" required>
-              <?php foreach ($categories as $cat): ?>
-                <option value="<?= clean($cat) ?>"><?= clean($cat) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label form-label-required">Item Description / Commodity Name</label>
-          <input type="text" id="newBrgyName" class="form-control" placeholder="e.g. Emergency Sleeping Mats (Heavy Duty)" required>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label form-label-required">Initial Available Quantity</label>
-            <input type="number" id="newBrgyQty" class="form-control" min="0" value="50" required>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label form-label-required">Unit of Measure</label>
-            <input type="text" id="newBrgyUnit" class="form-control" placeholder="pieces, packs, sets" value="pieces" required>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label form-label-required">Safety Buffer Alert</label>
-            <input type="number" id="newBrgyThreshold" class="form-control" min="1" value="15" required>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Storage Location in Barangay</label>
-            <input type="text" id="newBrgyLocation" class="form-control" value="Barangay Hall Stockroom — Shelf 1">
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Supplier / Donor</label>
-            <input type="text" id="newBrgySupplier" class="form-control" placeholder="BDRRMC Fund, NGO Donor">
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Condition</label>
-            <select id="newBrgyCondition" class="form-control">
-              <option value="New">New</option>
-              <option value="Good">Good</option>
-              <option value="Fair">Fair</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Expiry Date (If Perishable)</label>
-            <input type="date" id="newBrgyExpiry" class="form-control">
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;">
-        <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('createLocalResourceModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitCreateLocalRes">
-          Save Local Resource
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <script>
 let currentBrgyItem = null;
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function formatHistoryDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+         d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
 
 function openModal(id) {
   const el = document.getElementById(id);
@@ -746,7 +648,7 @@ function closeModal(id) {
 
 // Switch Tab inside Barangay Item Modal
 function switchBrgyModalTab(tab) {
-  ['specs', 'disburse', 'restock', 'adjust'].forEach(t => {
+  ['specs', 'adjust', 'history'].forEach(t => {
     const btn = document.getElementById(`brgyTabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
     const pane = document.getElementById(`brgyModalTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
     if (btn) btn.classList.toggle('active', t === tab);
@@ -754,161 +656,129 @@ function switchBrgyModalTab(tab) {
   });
 }
 
+// Adjust Type Change Handler
+function onBrgyAdjustTypeChange(type) {
+  const targetGroup = document.getElementById('brgyAdjustTargetGroup');
+  const targetSelect = document.getElementById('brgyUnifiedAdjustTarget');
+  if (type === 'Dispatched') {
+    if (targetGroup) targetGroup.style.display = 'block';
+    if (targetSelect) targetSelect.required = true;
+  } else {
+    if (targetGroup) targetGroup.style.display = 'none';
+    if (targetSelect) {
+      targetSelect.required = false;
+      targetSelect.value = '';
+    }
+  }
+}
+
 // Open Item Details Modal
 function openBarangayItemModal(res) {
   currentBrgyItem = res;
-  document.getElementById('brgyModalItemCode').innerText = res.code;
-  document.getElementById('brgyModalItemCategory').innerText = res.category;
-  document.getElementById('brgyModalItemName').innerText = res.name;
-  document.getElementById('brgyModalItemSub').innerText = `${res.storage_location || 'Barangay Hall Stockroom'}`;
+  document.getElementById('brgyModalItemCode').innerText = res.code || '';
+  document.getElementById('brgyModalItemCategory').innerText = res.category || '';
+  document.getElementById('brgyModalItemName').innerText = res.name || '';
+  document.getElementById('brgyModalItemSub').innerText = res.storage_location || 'Barangay Hall Stockroom';
 
-  document.getElementById('brgyStockAvail').innerText = `${parseInt(res.available_quantity).toLocaleString()} ${res.unit}`;
-  document.getElementById('brgyStockInUse').innerText = `${parseInt(res.in_use_quantity).toLocaleString()} ${res.unit}`;
-  document.getElementById('brgyStockDamaged').innerText = `${parseInt(res.damaged_quantity).toLocaleString()} ${res.unit}`;
-  document.getElementById('brgyStockTotal').innerText = `${parseInt(res.total_quantity).toLocaleString()} ${res.unit}`;
+  document.getElementById('brgyStockAvail').innerText = `${parseInt(res.available_quantity || 0).toLocaleString()} ${res.unit || ''}`;
+  document.getElementById('brgyStockInUse').innerText = `${parseInt(res.in_use_quantity || 0).toLocaleString()} ${res.unit || ''}`;
+  document.getElementById('brgyStockDamaged').innerText = `${parseInt(res.damaged_quantity || 0).toLocaleString()} ${res.unit || ''}`;
+  document.getElementById('brgyStockTotal').innerText = `${parseInt(res.total_quantity || 0).toLocaleString()} ${res.unit || ''}`;
 
   document.getElementById('brgySpecLocation').innerText = res.storage_location || 'Barangay Hall Stockroom';
   document.getElementById('brgySpecSupplier').innerText = res.supplier_donor || 'Local Barangay Inventory';
   document.getElementById('brgySpecCondition').innerText = res.item_condition || 'Good';
   document.getElementById('brgySpecExpiry').innerText = res.expiry_date || 'N/A (Non-perishable)';
-  document.getElementById('brgySpecMinThreshold').innerText = `${parseInt(res.min_threshold).toLocaleString()} ${res.unit}`;
-  document.getElementById('brgySpecUnit').innerText = res.unit;
+  document.getElementById('brgySpecMinThreshold').innerText = `${parseInt(res.min_threshold || 0).toLocaleString()} ${res.unit || ''}`;
+  document.getElementById('brgySpecUnit').innerText = res.unit || '';
 
-  document.getElementById('brgyDisburseResId').value = res.id;
-  document.getElementById('brgyDisburseQty').value = Math.min(10, parseInt(res.available_quantity) || 1);
-  document.getElementById('brgyDisburseRemarks').value = '';
+  // Setup adjustment form
+  document.getElementById('brgyUnifiedAdjustResId').value = res.id;
+  document.getElementById('brgyUnifiedAdjustType').value = 'Restock';
+  onBrgyAdjustTypeChange('Restock');
+  document.getElementById('brgyAdjustUnitLabel').innerText = `(${res.unit || ''})`;
+  document.getElementById('brgyUnifiedAdjustQty').value = 1;
+  document.getElementById('brgyUnifiedAdjustRemarks').value = '';
 
-  document.getElementById('brgyRestockResId').value = res.id;
-  document.getElementById('brgyRestockQty').value = 25;
-  document.getElementById('brgyRestockRemarks').value = '';
-
-  document.getElementById('brgyAdjustResId').value = res.id;
-  document.getElementById('brgyAdjustQty').value = 2;
-  document.getElementById('brgyAdjustRemarks').value = '';
+  // Load history in background
+  loadItemHistory(res.id);
 
   switchBrgyModalTab('specs');
   openModal('barangayItemModal');
 }
 
-// Open Global Receive Modal
-function openBarangayReceiveModal() {
-  const form = document.getElementById('globalBrgyReceiveForm');
-  if (form) form.reset();
-  openModal('barangayReceiveModal');
-}
-
-// Open Create Local Resource Modal
-function openCreateLocalResourceModal() {
-  const form = document.getElementById('createLocalResourceForm');
-  if (form) form.reset();
-  openModal('createLocalResourceModal');
-}
-
-// Submit Local Distribution via AJAX
-async function submitBrgyDistribution() {
-  const resId = document.getElementById('brgyDisburseResId').value;
-  const purok = document.getElementById('brgyDisbursePurok').value;
-  const qty = parseInt(document.getElementById('brgyDisburseQty').value) || 0;
-  const remarks = document.getElementById('brgyDisburseRemarks').value.trim();
-  const btn = document.getElementById('btnSubmitBrgyDisburse');
-
-  if (!purok) return showToast('Please select target purok or facility.', 'danger');
-  if (qty <= 0) return showToast('Please enter a valid distribution quantity.', 'danger');
-  if (!remarks) return showToast('Please provide relief notes.', 'danger');
-
-  btn.disabled = true;
-  const origText = btn.innerHTML;
-  btn.innerHTML = 'Disbursing...';
+// Fetch and render item history via AJAX
+async function loadItemHistory(resourceId) {
+  const tbody = document.getElementById('brgyItemHistoryTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:11px;">Loading transaction history...</td></tr>';
 
   try {
-    const formData = new FormData();
-    formData.append('resource_id', resId);
-    formData.append('transaction_type', 'Dispatched');
-    formData.append('quantity', qty);
-    formData.append('remarks', `Disbursed to ${purok}: ${remarks}`);
-
-    const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/adjust.php', {
-      method: 'POST',
-      body: formData,
+    const res = await fetch(`<?= BASE_URL ?>/backend/functions/resources/get_history.php?resource_id=${encodeURIComponent(resourceId)}`, {
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
     });
     const data = await res.json();
 
-    if (data.success) {
-      showToast(data.message, 'success');
-      updateBrgyRowInDOM(data.resource);
-      if (data.metrics && data.metrics.total_stock !== undefined) {
-        document.getElementById('kpiLocalStock').innerText = parseInt(data.metrics.total_stock).toLocaleString();
-      }
-      closeModal('barangayItemModal');
+    if (data.success && Array.isArray(data.transactions) && data.transactions.length > 0) {
+      let html = '';
+      data.transactions.forEach(t => {
+        let badgeClass = 'badge-neutral';
+        let qtyColor = 'var(--color-text)';
+        let sign = '';
+
+        if (['Restock', 'New Product', 'Returned'].includes(t.transaction_type)) {
+          badgeClass = 'badge-success';
+          qtyColor = 'var(--color-success)';
+          sign = '+';
+        } else if (['Dispatched', 'Allocation'].includes(t.transaction_type)) {
+          badgeClass = 'badge-info';
+          qtyColor = 'var(--color-primary)';
+          sign = '-';
+        } else if (t.transaction_type === 'Damaged') {
+          badgeClass = 'badge-danger';
+          qtyColor = 'var(--color-danger)';
+          sign = '-';
+        }
+
+        const dateStr = formatHistoryDate(t.created_at);
+        const performedBy = t.performed_by_name || 'Barangay Staff';
+        const remarks = t.remarks || '—';
+
+        html += `
+          <tr>
+            <td style="font-size:10px;color:var(--color-text-secondary);font-family:var(--font-secondary);white-space:nowrap;padding:7px 10px;">${escapeHtml(dateStr)}</td>
+            <td style="padding:7px 10px;"><span class="badge ${badgeClass}" style="font-size:9px;">${escapeHtml(t.transaction_type)}</span></td>
+            <td style="font-family:var(--font-secondary);font-weight:700;color:${qtyColor};font-size:11.5px;white-space:nowrap;padding:7px 10px;">${sign}${parseInt(t.quantity).toLocaleString()} ${escapeHtml(t.unit || '')}</td>
+            <td style="font-size:11px;color:var(--color-text);max-width:220px;padding:7px 10px;">${escapeHtml(remarks)}</td>
+            <td style="font-size:10.5px;color:var(--color-text-secondary);white-space:nowrap;padding:7px 10px;">${escapeHtml(performedBy)}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
     } else {
-      showToast(data.message || 'Distribution failed.', 'danger');
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:11px;">No transaction history recorded for this item.</td></tr>';
     }
   } catch (err) {
     console.error(err);
-    showToast('Network error during distribution.', 'danger');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origText;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--color-danger);font-size:11px;">Failed to load transaction history.</td></tr>';
   }
 }
 
-// Submit Local Restock via AJAX
-async function submitBrgyRestock() {
-  const resId = document.getElementById('brgyRestockResId').value;
-  const qty = parseInt(document.getElementById('brgyRestockQty').value) || 0;
-  const remarks = document.getElementById('brgyRestockRemarks').value.trim();
-  const btn = document.getElementById('btnSubmitBrgyRestock');
-
-  if (qty <= 0) return showToast('Please enter a valid restock quantity.', 'danger');
-  if (!remarks) return showToast('Please provide source/donor notes.', 'danger');
-
-  btn.disabled = true;
-  const origText = btn.innerHTML;
-  btn.innerHTML = 'Recording...';
-
-  try {
-    const formData = new FormData();
-    formData.append('resource_id', resId);
-    formData.append('quantity', qty);
-    formData.append('remarks', remarks);
-
-    const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/restock.php', {
-      method: 'POST',
-      body: formData,
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      showToast(data.message, 'success');
-      updateBrgyRowInDOM(data.resource);
-      if (data.metrics && data.metrics.total_stock !== undefined) {
-        document.getElementById('kpiLocalStock').innerText = parseInt(data.metrics.total_stock).toLocaleString();
-      }
-      closeModal('barangayItemModal');
-    } else {
-      showToast(data.message || 'Restock failed.', 'danger');
-    }
-  } catch (err) {
-    console.error(err);
-    showToast('Network error during restock.', 'danger');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origText;
-  }
-}
-
-// Submit Local Damage/Return Adjustment via AJAX
-async function submitBrgyAdjustment() {
-  const resId = document.getElementById('brgyAdjustResId').value;
-  const type = document.getElementById('brgyAdjustType').value;
-  const qty = parseInt(document.getElementById('brgyAdjustQty').value) || 0;
-  const remarks = document.getElementById('brgyAdjustRemarks').value.trim();
-  const btn = document.getElementById('btnSubmitBrgyAdjust');
+// Submit Unified Inventory Adjustment via AJAX
+async function submitBrgyUnifiedAdjustment() {
+  const resId = document.getElementById('brgyUnifiedAdjustResId').value;
+  const type = document.getElementById('brgyUnifiedAdjustType').value;
+  const qty = parseInt(document.getElementById('brgyUnifiedAdjustQty').value) || 0;
+  let remarks = document.getElementById('brgyUnifiedAdjustRemarks').value.trim();
+  const target = document.getElementById('brgyUnifiedAdjustTarget') ? document.getElementById('brgyUnifiedAdjustTarget').value : '';
+  const btn = document.getElementById('btnSubmitBrgyUnifiedAdjust');
 
   if (qty <= 0) return showToast('Please enter a valid quantity.', 'danger');
-  if (!remarks) return showToast('Please enter remarks.', 'danger');
+  if (type === 'Dispatched') {
+    if (!target) return showToast('Please select target purok or facility.', 'danger');
+    remarks = `Disbursed to ${target}: ${remarks}`;
+  }
+  if (!remarks) return showToast('Please provide remarks or purpose.', 'danger');
 
   btn.disabled = true;
   const origText = btn.innerHTML;
@@ -930,119 +800,36 @@ async function submitBrgyAdjustment() {
 
     if (data.success) {
       showToast(data.message, 'success');
+      currentBrgyItem = data.resource;
+
+      // Update modal live stock metrics
+      document.getElementById('brgyStockAvail').innerText = `${parseInt(data.resource.available_quantity).toLocaleString()} ${data.resource.unit}`;
+      document.getElementById('brgyStockInUse').innerText = `${parseInt(data.resource.in_use_quantity).toLocaleString()} ${data.resource.unit}`;
+      document.getElementById('brgyStockDamaged').innerText = `${parseInt(data.resource.damaged_quantity).toLocaleString()} ${data.resource.unit}`;
+      document.getElementById('brgyStockTotal').innerText = `${parseInt(data.resource.total_quantity).toLocaleString()} ${data.resource.unit}`;
+
+      // Update DOM table row in background
       updateBrgyRowInDOM(data.resource);
+
       if (data.metrics && data.metrics.total_stock !== undefined) {
-        document.getElementById('kpiLocalStock').innerText = parseInt(data.metrics.total_stock).toLocaleString();
+        const kpi = document.getElementById('kpiLocalStock');
+        if (kpi) kpi.innerText = parseInt(data.metrics.total_stock).toLocaleString();
       }
-      closeModal('barangayItemModal');
+
+      // Reset form
+      document.getElementById('brgyUnifiedAdjustQty').value = '1';
+      document.getElementById('brgyUnifiedAdjustRemarks').value = '';
+      if (document.getElementById('brgyUnifiedAdjustTarget')) document.getElementById('brgyUnifiedAdjustTarget').value = '';
+
+      // Reload history and switch to history tab
+      await loadItemHistory(resId);
+      switchBrgyModalTab('history');
     } else {
       showToast(data.message || 'Adjustment failed.', 'danger');
     }
   } catch (err) {
     console.error(err);
-    showToast('Network error during adjustment.', 'danger');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origText;
-  }
-}
-
-// Submit Global Receive Supplies via AJAX
-async function submitGlobalBrgyReceive() {
-  const resId = document.getElementById('globalBrgyResId').value;
-  const qty = parseInt(document.getElementById('globalBrgyQty').value) || 0;
-  const remarks = document.getElementById('globalBrgyRemarks').value.trim();
-  const btn = document.getElementById('btnSubmitGlobalBrgyReceive');
-
-  if (qty <= 0) return showToast('Please enter a valid quantity.', 'danger');
-  if (!remarks) return showToast('Please enter remarks.', 'danger');
-
-  btn.disabled = true;
-  const origText = btn.innerHTML;
-  btn.innerHTML = 'Recording...';
-
-  try {
-    const formData = new FormData();
-    formData.append('resource_id', resId);
-    formData.append('quantity', qty);
-    formData.append('remarks', remarks);
-
-    const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/restock.php', {
-      method: 'POST',
-      body: formData,
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      showToast(data.message, 'success');
-      updateBrgyRowInDOM(data.resource);
-      if (data.metrics && data.metrics.total_stock !== undefined) {
-        document.getElementById('kpiLocalStock').innerText = parseInt(data.metrics.total_stock).toLocaleString();
-      }
-      closeModal('barangayReceiveModal');
-    } else {
-      showToast(data.message || 'Restock failed.', 'danger');
-    }
-  } catch (err) {
-    console.error(err);
-    showToast('Network error receiving supplies.', 'danger');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = origText;
-  }
-}
-
-// Submit Create Local Resource via AJAX
-async function submitCreateLocalResource() {
-  const name = document.getElementById('newBrgyName').value.trim();
-  const category = document.getElementById('newBrgyCategory').value;
-  const code = document.getElementById('newBrgyCode').value.trim();
-  const qty = parseInt(document.getElementById('newBrgyQty').value) || 0;
-  const unit = document.getElementById('newBrgyUnit').value.trim() || 'pieces';
-  const threshold = parseInt(document.getElementById('newBrgyThreshold').value) || 15;
-  const location = document.getElementById('newBrgyLocation').value.trim();
-  const supplier = document.getElementById('newBrgySupplier').value.trim();
-  const condition = document.getElementById('newBrgyCondition').value;
-  const expiry = document.getElementById('newBrgyExpiry').value;
-  const btn = document.getElementById('btnSubmitCreateLocalRes');
-
-  if (!name) return showToast('Please enter an item description.', 'danger');
-
-  btn.disabled = true;
-  const origText = btn.innerHTML;
-  btn.innerHTML = 'Saving...';
-
-  try {
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('category', category);
-    formData.append('code', code);
-    formData.append('available_quantity', qty);
-    formData.append('unit', unit);
-    formData.append('min_threshold', threshold);
-    formData.append('storage_location', location);
-    formData.append('supplier_donor', supplier);
-    formData.append('item_condition', condition);
-    if (expiry) formData.append('expiry_date', expiry);
-
-    const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/create.php', {
-      method: 'POST',
-      body: formData,
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      showToast(data.message, 'success');
-      closeModal('createLocalResourceModal');
-      setTimeout(() => location.reload(), 800);
-    } else {
-      showToast(data.message || 'Failed to create resource.', 'danger');
-    }
-  } catch (err) {
-    console.error(err);
-    showToast('Network error registering local resource.', 'danger');
+    showToast('Network error during inventory adjustment.', 'danger');
   } finally {
     btn.disabled = false;
     btn.innerHTML = origText;
@@ -1069,9 +856,9 @@ function updateBrgyRowInDOM(res) {
   const availCell = document.getElementById(`brgy-cell-avail-${res.id}`);
   if (availCell) {
     availCell.innerHTML = `
-      <div style="font-family:var(--font-secondary);font-weight:800;font-size:13px;color:${isLow ? 'var(--color-danger)' : 'var(--color-success)'};">
+      <div style="font-family:var(--font-secondary);font-weight:700;font-size:12.5px;color:${isLow ? 'var(--color-danger)' : 'var(--color-success)'};">
         <span class="val-avail">${parseInt(res.available_quantity).toLocaleString()}</span>
-        <span style="font-size:9px;font-weight:500;color:var(--color-text-muted);">${res.unit}</span>
+        <span style="font-size:9.5px;font-weight:500;color:var(--color-text-muted);">${res.unit}</span>
       </div>
       ${isLow ? `<span class="badge badge-danger" style="font-size:8px;padding:1px 4px;">Low Stock (Min: ${parseInt(res.min_threshold).toLocaleString()})</span>` : ''}
     `;
@@ -1095,8 +882,7 @@ function updateBrgyRowInDOM(res) {
   const actionsCell = document.getElementById(`brgy-cell-actions-${res.id}`);
   if (actionsCell) {
     actionsCell.innerHTML = `
-      <button type="button" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:11px;display:inline-flex;align-items:center;gap:4px;" onclick='openBarangayItemModal(${JSON.stringify(res)})'>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <button type="button" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:11px;" onclick='openBarangayItemModal(${JSON.stringify(res)})'>
         View
       </button>
     `;
@@ -1143,14 +929,12 @@ function resetBarangayFilters() {
 
 // Backdrop click closer
 document.addEventListener('DOMContentLoaded', () => {
-  ['barangayItemModal', 'barangayReceiveModal', 'createLocalResourceModal'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('click', (e) => {
-        if (e.target === el) closeModal(id);
-      });
-    }
-  });
+  const el = document.getElementById('barangayItemModal');
+  if (el) {
+    el.addEventListener('click', (e) => {
+      if (e.target === el) closeModal('barangayItemModal');
+    });
+  }
 });
 </script>
 

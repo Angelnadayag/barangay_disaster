@@ -17,8 +17,8 @@ $localLowStockCount = 0;
 
 if ($role === 'icdrrmo' || $role === 'barangay_head') {
     $reqSql = ($role === 'barangay_head') 
-        ? "SELECT COUNT(*) FROM disaster_requests WHERE status IN ('Submitted', 'Recommendation Ready') AND barangay_id = ?"
-        : "SELECT COUNT(*) FROM disaster_requests WHERE status IN ('Submitted', 'Recommendation Ready')";
+        ? "SELECT COUNT(*) FROM disaster_reports WHERE status IN ('Submitted', 'Recommendation Ready', 'Ongoing') AND barangay_id = ?"
+        : "SELECT COUNT(*) FROM disaster_reports WHERE status IN ('Submitted', 'Recommendation Ready', 'Ongoing', 'Under Review')";
     $reqStmt = $db->prepare($reqSql);
     $reqStmt->execute($role === 'barangay_head' ? [$user['barangay_id']] : []);
     $pendingReqs = (int)$reqStmt->fetchColumn();
@@ -67,6 +67,13 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
           </a>
         </li>
         <li class="nav-item">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-reports.php" class="nav-link <?= in_array($currentPage, ['disaster-reports.php', 'disaster-requests.php'], true) ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
+            Disaster Reports
+            <?php if (!empty($pendingReqs) && $pendingReqs > 0): ?><span class="nav-badge nav-badge-danger"><?= $pendingReqs ?> Active</span><?php endif; ?>
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php" class="nav-link <?= $currentPage === 'manage-resources.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
             Manage Resources
@@ -74,7 +81,7 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
           </a>
         </li>
         <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/icdrrmo/inventory.php" class="nav-link <?= in_array($currentPage, ['inventory.php', 'resources.php']) ? 'active' : '' ?>">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/inventory.php" class="nav-link <?= in_array($currentPage, ['inventory.php', 'resources.php', 'inventory-history.php', 'inventory-adjustment.php']) ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></span>
             Inventory
             <?php if ($lowStockCount > 0): ?><span class="nav-badge nav-badge-warning"><?= $lowStockCount ?> Low</span><?php endif; ?>

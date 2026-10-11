@@ -928,6 +928,8 @@ select.form-control {
   justify-content: center;
   z-index: 1000;
   padding: var(--space-4);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .modal-overlay.active {
@@ -941,10 +943,24 @@ select.form-control {
   box-shadow: var(--shadow-modal);
   width: 100%;
   max-width: 580px;
-  max-height: 90vh;
+  max-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin: auto;
+  position: relative;
+}
+
+/* Ensure forms inside modals flex properly so body scrolls without hiding footer */
+.modal-dialog form,
+.modal-dialog > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  margin: 0;
 }
 
 .modal-dialog-lg {
@@ -957,6 +973,7 @@ select.form-control {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -977,6 +994,7 @@ select.form-control {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-primary);
+  flex-shrink: 0;
 }
 
 .modal-close-btn:hover {
@@ -987,6 +1005,10 @@ select.form-control {
 .modal-body {
   padding: var(--space-4);
   overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-footer {
@@ -997,6 +1019,37 @@ select.form-control {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Sleek custom scrollbars for modal-body */
+.modal-body::-webkit-scrollbar,
+.modal-overlay::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track,
+.modal-overlay::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb,
+.modal-overlay::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover,
+.modal-overlay::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+.modal-body,
+.modal-overlay {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 #F1F5F9;
 }
 
 /* Toast Notifications */

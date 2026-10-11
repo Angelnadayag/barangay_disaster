@@ -37,7 +37,7 @@ if (!$actId || empty($residentName)) {
 }
 
 // Fetch activity
-$stmt = $db->prepare("SELECT * FROM preparedness_activities WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $stmt->execute([$actId]);
 $act = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -71,23 +71,23 @@ if (empty($phone)) {
 }
 
 // Self-heal table schema if necessary
-$colsAtt = $db->query("SHOW COLUMNS FROM activity_attendees LIKE 'attended'")->fetchAll();
+$colsAtt = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'attended'")->fetchAll();
 if (empty($colsAtt)) {
-    $db->exec("ALTER TABLE activity_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
+    $db->exec("ALTER TABLE event_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
 }
 
 // Check for duplicate / double submission within recent window
 if ($userId) {
-    $dupCheck = $db->prepare("SELECT * FROM activity_attendees WHERE activity_id = ? AND user_id = ? AND registered_at >= (NOW() - INTERVAL 10 SECOND)");
+    $dupCheck = $db->prepare("SELECT * FROM event_attendees WHERE activity_id = ? AND user_id = ? AND registered_at >= (NOW() - INTERVAL 10 SECOND)");
     $dupCheck->execute([$actId, $userId]);
 } else {
-    $dupCheck = $db->prepare("SELECT * FROM activity_attendees WHERE activity_id = ? AND LOWER(TRIM(resident_name)) = LOWER(TRIM(?)) AND registered_at >= (NOW() - INTERVAL 10 SECOND)");
+    $dupCheck = $db->prepare("SELECT * FROM event_attendees WHERE activity_id = ? AND LOWER(TRIM(resident_name)) = LOWER(TRIM(?)) AND registered_at >= (NOW() - INTERVAL 10 SECOND)");
     $dupCheck->execute([$actId, $residentName]);
 }
 $existingAttendee = $dupCheck->fetch(PDO::FETCH_ASSOC);
 if ($existingAttendee) {
     // Already inserted within last 10 seconds - return existing record gracefully
-    $cntStmt = $db->prepare("SELECT COUNT(*) AS total_reg, SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END) AS total_att FROM activity_attendees WHERE activity_id = ?");
+    $cntStmt = $db->prepare("SELECT COUNT(*) AS total_reg, SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END) AS total_att FROM event_attendees WHERE activity_id = ?");
     $cntStmt->execute([$actId]);
     $counts = $cntStmt->fetch(PDO::FETCH_ASSOC);
     $totalReg = (int)($counts['total_reg'] ?? 1);
@@ -109,7 +109,7 @@ if ($existingAttendee) {
 
 // Insert attendee
 $ins = $db->prepare("
-    INSERT INTO activity_attendees (
+    INSERT INTO event_attendees (
         activity_id, user_id, resident_name, attended, phone, registered_at, sms_status
     ) VALUES (?, ?, ?, ?, ?, NOW(), 'sent')
 ");
@@ -117,7 +117,7 @@ $ins->execute([$actId, $userId, $residentName, $attended, $phone]);
 $attendeeId = $db->lastInsertId();
 
 // Count updated attendees
-$cntStmt = $db->prepare("SELECT COUNT(*) AS total_reg, SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END) AS total_att FROM activity_attendees WHERE activity_id = ?");
+$cntStmt = $db->prepare("SELECT COUNT(*) AS total_reg, SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END) AS total_att FROM event_attendees WHERE activity_id = ?");
 $cntStmt->execute([$actId]);
 $counts = $cntStmt->fetch(PDO::FETCH_ASSOC);
 $totalReg = (int)($counts['total_reg'] ?? 1);
@@ -127,7 +127,7 @@ $totalAtt = (int)($counts['total_att'] ?? 1);
 $currentActual = (int)($act['actual_participants'] ?? 0);
 $newActual = max($currentActual, $totalAtt);
 if ($newActual > $currentActual) {
-    $updAct = $db->prepare("UPDATE preparedness_activities SET actual_participants = ? WHERE id = ?");
+    $updAct = $db->prepare("UPDATE events SET actual_participants = ? WHERE id = ?");
     $updAct->execute([$newActual, $actId]);
 }
 

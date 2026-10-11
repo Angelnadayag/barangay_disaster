@@ -34,6 +34,15 @@ $unreadCount = (int)$notifCountStmt->fetchColumn();
 // Role-based profile link
 $userFolder = getRoleFolder($currentUser['role']);
 $profileLink = BASE_URL . "/views/{$userFolder}/profile.php";
+
+// Role-based office subtitle for navbar
+if (($currentUser['role'] ?? '') === 'barangay_head') {
+    $officeSubtitle = 'Barangay Disaster Risk Reduction and Management Committee • Local Government of Iligan';
+} elseif (($currentUser['role'] ?? '') === 'icdrrmo') {
+    $officeSubtitle = 'Iligan City Disaster Risk Reduction and Management Office • Local Government of Iligan';
+} else {
+    $officeSubtitle = 'Iligan City Disaster Risk Reduction and Management Office • Local Government of Iligan';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -63,7 +72,7 @@ $profileLink = BASE_URL . "/views/{$userFolder}/profile.php";
 
       <div class="brand-title-wrap">
         <span class="brand-title">Disaster Resource Allocation Recommender</span>
-        <span class="brand-subtitle">City Disaster Risk Reduction & Management Office • Local Government of Iligan</span>
+        <span class="brand-subtitle"><?= clean($officeSubtitle) ?></span>
       </div>
     </div>
 

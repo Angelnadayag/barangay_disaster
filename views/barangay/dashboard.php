@@ -73,7 +73,7 @@ foreach ($allPuroks as $p) {
 // 2. Fetch Disaster Incidents & Assistance Requests
 $reqStmt = $db->prepare("
     SELECT dr.*, r.id AS recommendation_id, r.status AS rec_status, r.confidence_score, r.recommendation_code
-    FROM disaster_requests dr
+    FROM disaster_reports dr
     LEFT JOIN recommendations r ON dr.id = r.disaster_request_id
     WHERE dr.barangay_id = ?
     ORDER BY dr.created_at DESC
@@ -106,7 +106,7 @@ $allocStmt = $db->prepare("
            COALESCE(r.reviewed_at, r.created_at) AS allocated_at
     FROM recommended_items ri
     JOIN recommendations r ON ri.recommendation_id = r.id
-    JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+    JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     JOIN resources res ON ri.resource_id = res.id
     WHERE dr.barangay_id = ?
     ORDER BY ri.id DESC
@@ -143,7 +143,7 @@ $activeResidentsCount = count(array_filter($residentsList, fn($u) => $u['status'
 
 // 6. Fetch Upcoming Preparedness Activities
 $actStmt = $db->prepare("
-    SELECT * FROM preparedness_activities 
+    SELECT * FROM events 
     WHERE (barangay_id = ? OR barangay_id IS NULL)
     ORDER BY start_datetime DESC 
     LIMIT 6

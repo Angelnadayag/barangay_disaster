@@ -24,7 +24,7 @@ $sql = "
            (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS puroks_count,
            (SELECT COUNT(*) FROM evacuation_areas ea WHERE ea.barangay_id = b.id) AS evac_count,
            (SELECT COUNT(*) FROM users u WHERE u.barangay_id = b.id AND u.role = 'barangay_head') AS captains_count,
-           (SELECT COUNT(*) FROM disaster_requests dr WHERE dr.barangay_id = b.id AND dr.status NOT IN ('Completed', 'Rejected')) AS active_requests_count
+           (SELECT COUNT(*) FROM disaster_reports dr WHERE dr.barangay_id = b.id AND dr.status NOT IN ('Completed', 'Rejected')) AS active_requests_count
     FROM barangays b
     WHERE b.status = ?
 ";

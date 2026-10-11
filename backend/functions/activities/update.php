@@ -31,7 +31,7 @@ if (!$id) {
 }
 
 // Fetch existing record
-$stmt = $db->prepare("SELECT * FROM preparedness_activities WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $stmt->execute([$id]);
 $act = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -89,15 +89,15 @@ if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
 
 try {
     // Self-heal expected_activities column if missing
-    $colsEa = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'expected_activities'")->fetchAll();
+    $colsEa = $db->query("SHOW COLUMNS FROM events LIKE 'expected_activities'")->fetchAll();
     if (empty($colsEa)) {
-        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
+        $db->exec("ALTER TABLE events ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
     }
 
     if ($contentExecutionJson !== null) {
         if ($act['status'] === 'Completed') {
             $updateStmt = $db->prepare("
-                UPDATE preparedness_activities SET
+                UPDATE events SET
                     title = ?,
                     activity_type = ?,
                     venue = ?,
@@ -115,7 +115,7 @@ try {
             ]);
         } else {
             $updateStmt = $db->prepare("
-                UPDATE preparedness_activities SET
+                UPDATE events SET
                     title = ?,
                     activity_type = ?,
                     venue = ?,
@@ -135,7 +135,7 @@ try {
         }
     } else {
         $updateStmt = $db->prepare("
-            UPDATE preparedness_activities SET
+            UPDATE events SET
                 title = ?,
                 activity_type = ?,
                 venue = ?,

@@ -31,7 +31,7 @@ if (!$id) {
 }
 
 // Fetch record
-$stmt = $db->prepare("SELECT * FROM preparedness_activities WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $stmt->execute([$id]);
 $act = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -66,12 +66,12 @@ if (!empty($reasonDetails)) {
 
 try {
     // Ensure cancellation_reason column exists
-    $colCheck = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'cancellation_reason'")->fetchAll();
+    $colCheck = $db->query("SHOW COLUMNS FROM events LIKE 'cancellation_reason'")->fetchAll();
     if (empty($colCheck)) {
-        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN cancellation_reason TEXT NULL AFTER status");
+        $db->exec("ALTER TABLE events ADD COLUMN cancellation_reason TEXT NULL AFTER status");
     }
 
-    $cancelStmt = $db->prepare("UPDATE preparedness_activities SET status = 'Cancelled', cancellation_reason = ? WHERE id = ?");
+    $cancelStmt = $db->prepare("UPDATE events SET status = 'Cancelled', cancellation_reason = ? WHERE id = ?");
     $cancelStmt->execute([$fullReason, $id]);
 
     logSystemEvent('CANCEL_ACTIVITY', 'Preparedness', "Cancelled event #$id: {$act['title']} (Reason: $fullReason)");

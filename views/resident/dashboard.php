@@ -61,7 +61,7 @@ $recentAdvisories = $notifStmt->fetchAll();
 // Upcoming Community Drills
 $actStmt = $db->prepare("
     SELECT pa.*, pa.start_datetime AS scheduled_date, pa.venue AS location
-    FROM preparedness_activities pa 
+    FROM events pa 
     WHERE (pa.barangay_id = ? OR pa.barangay_id IS NULL)
       AND pa.start_datetime >= CURDATE()
     ORDER BY pa.start_datetime ASC 

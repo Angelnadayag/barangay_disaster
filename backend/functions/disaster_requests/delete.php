@@ -30,7 +30,7 @@ if (!$id) {
     redirectWithFlash($returnUrl, 'error', 'Invalid report ID.');
 }
 
-$stmt = $db->prepare("SELECT * FROM disaster_requests WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM disaster_reports WHERE id = ?");
 $stmt->execute([$id]);
 $req = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -45,7 +45,7 @@ if ($role === 'barangay_head' && (int)$req['barangay_id'] !== (int)$user['barang
 }
 
 try {
-    $delStmt = $db->prepare("DELETE FROM disaster_requests WHERE id = ?");
+    $delStmt = $db->prepare("DELETE FROM disaster_reports WHERE id = ?");
     $delStmt->execute([$id]);
 
     logSystemEvent('DELETE_DISASTER_REQUEST', 'Disaster Reports', "Deleted incident report {$req['tracking_code']} (#$id)");

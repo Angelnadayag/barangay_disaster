@@ -15,7 +15,7 @@ $db = getDBConnection();
 $incidents = $db->query("
     SELECT dr.*, dr.disaster_type AS calamity_type, dr.situation_overview AS details,
            b.name AS barangay_name, b.coordinates_lat AS latitude, b.coordinates_lng AS longitude, b.risk_level AS brgy_risk
-    FROM disaster_requests dr
+    FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     WHERE dr.status IN ('Under Review', 'Verified', 'Recommended', 'Allocated', 'Dispatched')
     ORDER BY dr.urgency = 'Immediate' DESC, dr.created_at DESC

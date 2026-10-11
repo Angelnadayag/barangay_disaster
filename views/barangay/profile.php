@@ -57,9 +57,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['change_pas
 
   <div class="page-header">
     <div class="page-header-title-wrap">
-      <h1>Barangay Official Profile & Emergency Checklist</h1>
+      <h1>Barangay Official Profile</h1>
       <p class="page-header-desc">
-        Manage your barangay leadership credentials and review standard community readiness protocols.
+        Manage your barangay leadership credentials and account security settings.
       </p>
     </div>
     <div class="page-header-actions">
@@ -105,7 +105,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['change_pas
       </div>
 
       <!-- Connected Emergency Agency Card -->
-      <div class="card" style="margin-bottom:var(--space-4);border-left:4px solid var(--color-secondary);">
+      <div class="card" style="margin-bottom:0;border-left:4px solid var(--color-secondary);">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
           <h3 class="card-title" style="margin:0;font-size:12px;">Connected Emergency Agency</h3>
           <a href="<?= BASE_URL ?>/views/barangay/agency.php" style="font-size:10px;font-weight:700;color:var(--color-secondary);text-decoration:none;">View Station &rarr;</a>
@@ -129,7 +129,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['change_pas
           </div>
         </div>
       </div>
+    </div>
 
+    <div>
       <div class="card" style="margin-bottom:0;">
         <div class="card-header">
           <h3 class="card-title">Change Password</h3>
@@ -161,33 +163,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['change_pas
             </div>
             <button type="submit" class="btn btn-primary" style="margin-top:6px;">Update Password</button>
           </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right: 72-Hour Go Bag Guide -->
-    <div class="card" style="margin-bottom:0;">
-      <div class="card-header">
-        <h3 class="card-title">Barangay Emergency Preparedness Guidelines</h3>
-      </div>
-      <div class="card-body">
-        <div style="font-size:10px;color:var(--color-text-secondary);margin-bottom:12px;line-height:1.4;">
-          Barangay Disaster Risk Reduction and Management Committee (BDRRMC) Minimum Compliance Checklist:
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:8px;font-size:10px;">
-          <div style="padding:8px 10px;background:var(--color-surface-subtle);border-radius:6px;">
-            <strong>1. Early Warning Sirens:</strong> Ensure manual sirens and flood bells are tested weekly along riverbanks.
-          </div>
-          <div style="padding:8px 10px;background:var(--color-surface-subtle);border-radius:6px;">
-            <strong>2. Evacuation Center Readiness:</strong> Inspect water tanks, power generator fuel, and sanitation restrooms.
-          </div>
-          <div style="padding:8px 10px;background:var(--color-surface-subtle);border-radius:6px;">
-            <strong>3. Pre-Emptive Evacuation Triggers:</strong> At River Warning Level 2 (Orange), begin orderly transfer of vulnerable households.
-          </div>
-          <div style="padding:8px 10px;background:var(--color-surface-subtle);border-radius:6px;">
-            <strong>4. Relief Goods Receiving Protocol:</strong> Verify package seals and distribute immediately with signature registry.
-          </div>
         </div>
       </div>
     </div>

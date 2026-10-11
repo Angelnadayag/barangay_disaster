@@ -35,15 +35,15 @@ $filterStatus = trim($_GET['status'] ?? '');
 $search = trim($_GET['search'] ?? '');
 
 // Counts for navigation tabs & KPI cards
-$countAllStmt = $db->prepare("SELECT COUNT(*) FROM disaster_requests WHERE barangay_id = ?");
+$countAllStmt = $db->prepare("SELECT COUNT(*) FROM disaster_reports WHERE barangay_id = ?");
 $countAllStmt->execute([$barangayId]);
 $countAll = (int)$countAllStmt->fetchColumn();
 
-$countOngoingStmt = $db->prepare("SELECT COUNT(*) FROM disaster_requests WHERE barangay_id = ? AND status = 'Ongoing'");
+$countOngoingStmt = $db->prepare("SELECT COUNT(*) FROM disaster_reports WHERE barangay_id = ? AND status = 'Ongoing'");
 $countOngoingStmt->execute([$barangayId]);
 $countOngoing = (int)$countOngoingStmt->fetchColumn();
 
-$countCompletedStmt = $db->prepare("SELECT COUNT(*) FROM disaster_requests WHERE barangay_id = ? AND status = 'Completed'");
+$countCompletedStmt = $db->prepare("SELECT COUNT(*) FROM disaster_reports WHERE barangay_id = ? AND status = 'Completed'");
 $countCompletedStmt->execute([$barangayId]);
 $countCompleted = (int)$countCompletedStmt->fetchColumn();
 
@@ -56,7 +56,7 @@ $statsStmt = $db->prepare("
         COALESCE(SUM(casualties_count), 0) AS total_casualties,
         COALESCE(SUM(injuries_count), 0) AS total_injuries,
         COALESCE(SUM(missing_count), 0) AS total_missing
-    FROM disaster_requests 
+    FROM disaster_reports 
     WHERE barangay_id = ?
 ");
 $statsStmt->execute([$barangayId]);
@@ -66,7 +66,7 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
 $sql = "
     SELECT dr.*, b.name AS barangay_name, u.full_name AS submitted_by_name,
            r.id AS recommendation_id, r.status AS recommendation_status, r.confidence_score
-    FROM disaster_requests dr
+    FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     LEFT JOIN users u ON dr.submitted_by = u.id
     LEFT JOIN recommendations r ON dr.id = r.disaster_request_id

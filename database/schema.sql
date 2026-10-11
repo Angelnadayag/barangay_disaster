@@ -9,10 +9,10 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-DROP TABLE IF EXISTS `activity_attendees`;
+DROP TABLE IF EXISTS `event_attendees`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `activity_attendees` (
+CREATE TABLE `event_attendees` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `activity_id` int(11) NOT NULL,
   `user_id` int(11) DEFAULT NULL,
@@ -104,10 +104,10 @@ CREATE TABLE `barangays` (
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `disaster_requests`;
+DROP TABLE IF EXISTS `disaster_reports`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `disaster_requests` (
+CREATE TABLE `disaster_reports` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `tracking_code` varchar(50) NOT NULL,
   `barangay_id` int(11) NOT NULL,
@@ -133,8 +133,8 @@ CREATE TABLE `disaster_requests` (
   UNIQUE KEY `tracking_code` (`tracking_code`),
   KEY `barangay_id` (`barangay_id`),
   KEY `submitted_by` (`submitted_by`),
-  CONSTRAINT `disaster_requests_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `disaster_requests_ibfk_2` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `disaster_reports_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `disaster_reports_ibfk_2` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `evacuation_areas`;
@@ -232,10 +232,10 @@ CREATE TABLE `notifications` (
   CONSTRAINT `notifications_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `preparedness_activities`;
+DROP TABLE IF EXISTS `events`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `preparedness_activities` (
+CREATE TABLE `events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(150) NOT NULL,
   `activity_type` enum('Disaster Drill','First Aid / Rescuer Training','Community Seminar','IEC Campaign','Contingency Planning','Hazard Mapping Workshop') NOT NULL,
@@ -258,8 +258,8 @@ CREATE TABLE `preparedness_activities` (
   PRIMARY KEY (`id`),
   KEY `barangay_id` (`barangay_id`),
   KEY `created_by` (`created_by`),
-  CONSTRAINT `preparedness_activities_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `preparedness_activities_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `events_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `events_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `purok_cluster_options`;
@@ -313,7 +313,7 @@ CREATE TABLE `recommendations` (
   UNIQUE KEY `recommendation_code` (`recommendation_code`),
   KEY `disaster_request_id` (`disaster_request_id`),
   KEY `reviewed_by` (`reviewed_by`),
-  CONSTRAINT `recommendations_ibfk_1` FOREIGN KEY (`disaster_request_id`) REFERENCES `disaster_requests` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `recommendations_ibfk_1` FOREIGN KEY (`disaster_request_id`) REFERENCES `disaster_reports` (`id`) ON DELETE CASCADE,
   CONSTRAINT `recommendations_ibfk_2` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -438,7 +438,7 @@ CREATE TABLE `responder_field_updates` (
   KEY `disaster_request_id` (`disaster_request_id`),
   KEY `barangay_id` (`barangay_id`),
   CONSTRAINT `responder_field_updates_ibfk_1` FOREIGN KEY (`responder_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `responder_field_updates_ibfk_2` FOREIGN KEY (`disaster_request_id`) REFERENCES `disaster_requests` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `responder_field_updates_ibfk_2` FOREIGN KEY (`disaster_request_id`) REFERENCES `disaster_reports` (`id`) ON DELETE SET NULL,
   CONSTRAINT `responder_field_updates_ibfk_3` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

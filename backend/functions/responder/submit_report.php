@@ -50,7 +50,7 @@ try {
     // If request ID provided, update request casualty / injury counts if higher
     if ($requestId) {
         $updReq = $db->prepare("
-            UPDATE disaster_requests SET
+            UPDATE disaster_reports SET
                 casualties_count = GREATEST(casualties_count, ?),
                 injuries_count = GREATEST(injuries_count, ?)
             WHERE id = ?

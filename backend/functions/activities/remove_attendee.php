@@ -34,7 +34,7 @@ if (!$attendeeId) {
 }
 
 // Fetch attendee record
-$stmt = $db->prepare("SELECT * FROM activity_attendees WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM event_attendees WHERE id = ?");
 $stmt->execute([$attendeeId]);
 $attendee = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -46,7 +46,7 @@ if (!$attendee) {
 $resolvedActId = $actId ?: (int)$attendee['activity_id'];
 
 // Fetch activity to check jurisdiction
-$actStmt = $db->prepare("SELECT * FROM preparedness_activities WHERE id = ?");
+$actStmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $actStmt->execute([$resolvedActId]);
 $act = $actStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -61,11 +61,11 @@ if ($role === 'barangay_head' && (int)$act['barangay_id'] !== (int)$user['barang
 }
 
 // Delete attendee record
-$delStmt = $db->prepare("DELETE FROM activity_attendees WHERE id = ?");
+$delStmt = $db->prepare("DELETE FROM event_attendees WHERE id = ?");
 $delStmt->execute([$attendeeId]);
 
 // Recalculate remaining attendees and attendance count
-$cntStmt = $db->prepare("SELECT COUNT(*) AS total_reg, COALESCE(SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END), 0) AS total_att FROM activity_attendees WHERE activity_id = ?");
+$cntStmt = $db->prepare("SELECT COUNT(*) AS total_reg, COALESCE(SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END), 0) AS total_att FROM event_attendees WHERE activity_id = ?");
 $cntStmt->execute([$resolvedActId]);
 $counts = $cntStmt->fetch(PDO::FETCH_ASSOC);
 $totalReg = (int)($counts['total_reg'] ?? 0);
@@ -75,7 +75,7 @@ $totalAtt = (int)($counts['total_att'] ?? 0);
 $currentActual = (int)($act['actual_participants'] ?? 0);
 // If actual_participants was based on attended, adjust it to match totalAtt or keep within reasonable limits
 $newActual = $totalAtt;
-$updAct = $db->prepare("UPDATE preparedness_activities SET actual_participants = ? WHERE id = ?");
+$updAct = $db->prepare("UPDATE events SET actual_participants = ? WHERE id = ?");
 $updAct->execute([$newActual, $resolvedActId]);
 
 if ($isAjax) {

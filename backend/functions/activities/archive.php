@@ -29,7 +29,7 @@ if (!$id) {
     redirectWithFlash($returnUrl, 'error', 'Invalid activity ID.');
 }
 
-$stmt = $db->prepare("SELECT * FROM preparedness_activities WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $stmt->execute([$id]);
 $act = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -46,12 +46,12 @@ if ($role === 'barangay_head' && (int)$act['barangay_id'] !== (int)$user['barang
 
 try {
     // Ensure column exists
-    $cols = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'is_archived'")->fetchAll();
+    $cols = $db->query("SHOW COLUMNS FROM events LIKE 'is_archived'")->fetchAll();
     if (empty($cols)) {
-        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
+        $db->exec("ALTER TABLE events ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
     }
 
-    $upd = $db->prepare("UPDATE preparedness_activities SET is_archived = 1 WHERE id = ?");
+    $upd = $db->prepare("UPDATE events SET is_archived = 1 WHERE id = ?");
     $upd->execute([$id]);
 
     logSystemEvent('ARCHIVE_ACTIVITY', 'Preparedness', "Archived event #$id: {$act['title']}");

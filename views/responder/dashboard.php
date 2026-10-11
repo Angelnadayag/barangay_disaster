@@ -21,7 +21,7 @@ $activeStatus = $currentStatus['operational_status'] ?? 'Available';
 // Active Incidents
 $incStmt = $db->query("
     SELECT dr.*, b.name AS barangay_name 
-    FROM disaster_requests dr 
+    FROM disaster_reports dr 
     JOIN barangays b ON dr.barangay_id = b.id 
     WHERE dr.status IN ('Submitted', 'Recommendation Ready', 'Allocated', 'Dispatched')
     ORDER BY FIELD(dr.severity, 'Critical', 'High', 'Moderate', 'Low'), dr.created_at DESC

@@ -105,7 +105,7 @@ $allocStmt = $db->prepare("
     FROM recommended_items ri
     JOIN resources res ON ri.resource_id = res.id
     JOIN recommendations r ON ri.recommendation_id = r.id
-    JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+    JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     WHERE dr.barangay_id = ? AND ri.status = 'Allocated'
     ORDER BY r.reviewed_at DESC
 ");

@@ -88,6 +88,21 @@ try {
         echo "Step 1: Checking database tables and schema version...\n";
         echo "Found " . count($existingTables) . " existing tables in database.\n";
 
+        // 0. Rename legacy tables if present
+        $legacyRenames = [
+            'disaster_requests' => 'disaster_reports',
+            'activity_attendees' => 'event_attendees',
+            'preparedness_activities' => 'events',
+        ];
+        foreach ($legacyRenames as $oldTable => $newTable) {
+            if (in_array($oldTable, $existingTables, true) && !in_array($newTable, $existingTables, true)) {
+                echo "  [+] Renaming table `{$oldTable}` to `{$newTable}`...\n";
+                $pdo->exec("RENAME TABLE `{$oldTable}` TO `{$newTable}`;");
+                $existingTables = array_values(array_diff($existingTables, [$oldTable]));
+                $existingTables[] = $newTable;
+            }
+        }
+
         // 1. Ensure all schema tables exist
         $schemaContent = file_get_contents($schemaFile);
         $createStatements = [];
@@ -114,35 +129,35 @@ try {
             }
         };
 
-        // Table: preparedness_activities
-        if (in_array('preparedness_activities', $existingTables, true)) {
-            if (!$hasColumn($pdo, 'preparedness_activities', 'is_archived')) {
-                echo "  [+] Adding column `is_archived` to `preparedness_activities`...\n";
-                $pdo->exec("ALTER TABLE `preparedness_activities` ADD COLUMN `is_archived` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`;");
+        // Table: events
+        if (in_array('events', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'events', 'is_archived')) {
+                echo "  [+] Adding column `is_archived` to `events`...\n";
+                $pdo->exec("ALTER TABLE `events` ADD COLUMN `is_archived` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`;");
             }
-            if (!$hasColumn($pdo, 'preparedness_activities', 'content_execution')) {
-                echo "  [+] Adding column `content_execution` to `preparedness_activities`...\n";
-                $pdo->exec("ALTER TABLE `preparedness_activities` ADD COLUMN `content_execution` text DEFAULT NULL AFTER `evaluation_summary`;");
+            if (!$hasColumn($pdo, 'events', 'content_execution')) {
+                echo "  [+] Adding column `content_execution` to `events`...\n";
+                $pdo->exec("ALTER TABLE `events` ADD COLUMN `content_execution` text DEFAULT NULL AFTER `evaluation_summary`;");
             }
-            if (!$hasColumn($pdo, 'preparedness_activities', 'expected_activities')) {
-                echo "  [+] Adding column `expected_activities` to `preparedness_activities`...\n";
-                $pdo->exec("ALTER TABLE `preparedness_activities` ADD COLUMN `expected_activities` text DEFAULT NULL AFTER `content_execution`;");
+            if (!$hasColumn($pdo, 'events', 'expected_activities')) {
+                echo "  [+] Adding column `expected_activities` to `events`...\n";
+                $pdo->exec("ALTER TABLE `events` ADD COLUMN `expected_activities` text DEFAULT NULL AFTER `content_execution`;");
             }
-            if (!$hasColumn($pdo, 'preparedness_activities', 'cancellation_reason')) {
-                echo "  [+] Adding column `cancellation_reason` to `preparedness_activities`...\n";
-                $pdo->exec("ALTER TABLE `preparedness_activities` ADD COLUMN `cancellation_reason` text DEFAULT NULL AFTER `expected_activities`;");
+            if (!$hasColumn($pdo, 'events', 'cancellation_reason')) {
+                echo "  [+] Adding column `cancellation_reason` to `events`...\n";
+                $pdo->exec("ALTER TABLE `events` ADD COLUMN `cancellation_reason` text DEFAULT NULL AFTER `expected_activities`;");
             }
             // Update status enum if needed to support Archived
             try {
-                $pdo->exec("ALTER TABLE `preparedness_activities` MODIFY COLUMN `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived') DEFAULT 'Scheduled';");
+                $pdo->exec("ALTER TABLE `events` MODIFY COLUMN `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived') DEFAULT 'Scheduled';");
             } catch (Throwable $e) {}
         }
 
-        // Table: activity_attendees
-        if (in_array('activity_attendees', $existingTables, true)) {
-            if (!$hasColumn($pdo, 'activity_attendees', 'attended')) {
-                echo "  [+] Adding column `attended` to `activity_attendees`...\n";
-                $pdo->exec("ALTER TABLE `activity_attendees` ADD COLUMN `attended` tinyint(1) NOT NULL DEFAULT 1 AFTER `resident_name`;");
+        // Table: event_attendees
+        if (in_array('event_attendees', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'event_attendees', 'attended')) {
+                echo "  [+] Adding column `attended` to `event_attendees`...\n";
+                $pdo->exec("ALTER TABLE `event_attendees` ADD COLUMN `attended` tinyint(1) NOT NULL DEFAULT 1 AFTER `resident_name`;");
             }
         }
 

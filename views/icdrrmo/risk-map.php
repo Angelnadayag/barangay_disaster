@@ -30,7 +30,7 @@ $puroks = $db->query("
 // Fetch active incidents
 $activeIncidents = $db->query("
     SELECT dr.*, b.name AS barangay_name, b.coordinates_lat, b.coordinates_lng 
-    FROM disaster_requests dr 
+    FROM disaster_reports dr 
     JOIN barangays b ON dr.barangay_id = b.id 
     WHERE dr.status NOT IN ('Completed', 'Rejected')
 ")->fetchAll();
@@ -281,8 +281,8 @@ $evacCenters = $db->query("
         </div>
 
         <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--color-border-light);" id="inspectorActions">
-          <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-requests.php?barangay=1" class="btn btn-outline btn-sm" style="width:100%;">
-            View Barangay Requests
+          <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-reports.php?barangay=1" class="btn btn-outline btn-sm" style="width:100%;">
+            View Barangay Reports
           </a>
         </div>
       </div>
@@ -328,8 +328,8 @@ function selectBarangayOnMap(id) {
   }
 
   document.getElementById('inspectorActions').innerHTML = `
-    <a href="${BASE_URL}/views/icdrrmo/disaster-requests.php?barangay=${id}" class="btn btn-outline btn-sm" style="width:100%;">
-      View Requests for Brgy. ${escapeHtml(brgy.name)}
+    <a href="${BASE_URL}/views/icdrrmo/disaster-reports.php?barangay=${id}" class="btn btn-outline btn-sm" style="width:100%;">
+      View Reports for Brgy. ${escapeHtml(brgy.name)}
     </a>
   `;
 

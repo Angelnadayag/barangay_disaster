@@ -29,7 +29,7 @@ if (!$id) {
     redirectWithFlash($returnUrl, 'error', 'Invalid activity ID.');
 }
 
-$stmt = $db->prepare("SELECT * FROM preparedness_activities WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $stmt->execute([$id]);
 $act = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -44,7 +44,7 @@ if ($role === 'barangay_head' && (int)$act['barangay_id'] !== (int)$user['barang
 }
 
 try {
-    $upd = $db->prepare("UPDATE preparedness_activities SET is_archived = 0 WHERE id = ?");
+    $upd = $db->prepare("UPDATE events SET is_archived = 0 WHERE id = ?");
     $upd->execute([$id]);
 
     logSystemEvent('RESTORE_ACTIVITY', 'Preparedness', "Restored event #$id: {$act['title']}");
