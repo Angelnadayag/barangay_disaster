@@ -125,12 +125,14 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
             Manage Event
           </a>
         </li>
+        <?php /* Temporarily hidden - Manage Evacuation Areas
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/barangay/evacuation.php" class="nav-link <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></span>
             Manage Evacuation Areas
           </a>
         </li>
+        */ ?>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/barangay/puroks.php" class="nav-link <?= $currentPage === 'puroks.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
