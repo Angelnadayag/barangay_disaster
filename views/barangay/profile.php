@@ -62,6 +62,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['change_pas
         Manage your barangay leadership credentials and review standard community readiness protocols.
       </p>
     </div>
+    <div class="page-header-actions">
+      <a href="<?= BASE_URL ?>/views/barangay/agency.php" class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-3"></path><path d="M9 9v.01"></path><path d="M9 12v.01"></path><path d="M9 15v.01"></path><path d="M9 18v.01"></path></svg>
+        Agency Information
+      </a>
+    </div>
   </div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
