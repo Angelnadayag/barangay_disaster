@@ -167,6 +167,26 @@ $profileLink = BASE_URL . "/views/{$userFolder}/profile.php";
             <span>Profile Settings</span>
           </a>
 
+          <?php if ($currentUser['role'] === 'barangay_head'): ?>
+          <!-- Item 2: Agency Information -->
+          <a href="<?= BASE_URL ?>/views/barangay/agency.php" 
+             class="dropdown-item"
+             style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:11px;font-weight:500;color:#24313A;text-decoration:none;transition:background 0.15s ease;"
+             onmouseover="this.style.background='#F0F3F4';this.style.color='#2F6F73'"
+             onmouseout="this.style.background='transparent';this.style.color='#24313A'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#66737D;flex-shrink:0;">
+              <path d="M3 21h18"></path>
+              <path d="M5 21V7l8-4v18"></path>
+              <path d="M19 21V11l-6-3"></path>
+              <path d="M9 9v.01"></path>
+              <path d="M9 12v.01"></path>
+              <path d="M9 15v.01"></path>
+              <path d="M9 18v.01"></path>
+            </svg>
+            <span>Agency Information</span>
+          </a>
+          <?php endif; ?>
+
           <div style="height:1px;background:#E7EDF0;margin:4px 0;"></div>
 
           <!-- Item 2: Logout -->
