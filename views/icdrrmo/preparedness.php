@@ -22,7 +22,7 @@ $filterStatus = $_GET['status'] ?? '';
 
 $sql = "
     SELECT pa.*, b.name AS barangay_name, u.full_name AS creator_name 
-    FROM preparedness_activities pa 
+    FROM events pa 
     LEFT JOIN barangays b ON pa.barangay_id = b.id 
     JOIN users u ON pa.created_by = u.id 
     WHERE 1=1

@@ -12,7 +12,7 @@ header('Location: ' . BASE_URL . '/views/icdrrmo/users.php');
 exit;
 
 // Key Metrics
-$activeRequestsCount = (int)$db->query("SELECT COUNT(*) FROM disaster_requests WHERE status NOT IN ('Completed', 'Rejected')")->fetchColumn();
+$activeRequestsCount = (int)$db->query("SELECT COUNT(*) FROM disaster_reports WHERE status NOT IN ('Completed', 'Rejected')")->fetchColumn();
 $pendingRecsCount = (int)$db->query("SELECT COUNT(*) FROM recommendations WHERE status = 'Pending Review'")->fetchColumn();
 $totalStockPacks = (int)$db->query("SELECT SUM(available_quantity) FROM resources WHERE category = 'Relief Goods'")->fetchColumn();
 $lowStockItemsCount = (int)$db->query("SELECT COUNT(*) FROM resources WHERE available_quantity <= min_threshold")->fetchColumn();
@@ -22,7 +22,7 @@ $activeEvacueesCount = (int)$db->query("SELECT SUM(current_evacuees_count) FROM 
 $pendingRecs = $db->query("
     SELECT r.*, dr.tracking_code, dr.disaster_type, dr.severity, dr.urgency, b.name AS barangay_name, dr.affected_families
     FROM recommendations r
-    JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+    JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     JOIN barangays b ON dr.barangay_id = b.id
     WHERE r.status = 'Pending Review'
     ORDER BY FIELD(r.priority, 'Critical', 'High', 'Medium', 'Low'), r.created_at DESC
@@ -32,7 +32,7 @@ $pendingRecs = $db->query("
 // Urgent Requests
 $urgentRequests = $db->query("
     SELECT dr.*, b.name AS barangay_name
-    FROM disaster_requests dr
+    FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     WHERE dr.status NOT IN ('Completed', 'Rejected')
     ORDER BY FIELD(dr.severity, 'Critical', 'High', 'Moderate', 'Low'), dr.created_at DESC
@@ -163,7 +163,7 @@ $lowStockItems = $db->query("
   <div class="card" style="margin-bottom:0;">
     <div class="card-header">
       <h3 class="card-title">Recent Disaster Requests</h3>
-      <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-requests.php" class="btn btn-outline btn-sm">All Requests</a>
+      <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-reports.php" class="btn btn-outline btn-sm">All Reports</a>
     </div>
     <div class="table-responsive" style="border:none;">
       <table class="data-table">
@@ -180,7 +180,7 @@ $lowStockItems = $db->query("
           <?php foreach ($urgentRequests as $req): ?>
             <tr>
               <td style="font-family:var(--font-secondary);font-weight:600;">
-                <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-requests.php?id=<?= $req['id'] ?>"><?= clean($req['tracking_code']) ?></a>
+                <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-reports.php?search=<?= urlencode($req['tracking_code']) ?>"><?= clean($req['tracking_code']) ?></a>
               </td>
               <td><?= clean($req['barangay_name']) ?></td>
               <td><?= clean($req['disaster_type']) ?></td>

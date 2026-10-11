@@ -24,7 +24,7 @@ class DecisionTreeRecommender {
         // 1. Fetch disaster request with barangay & purok details
         $stmt = $this->db->prepare("
             SELECT r.*, b.name AS barangay_name, b.risk_level AS barangay_risk_level
-            FROM disaster_requests r
+            FROM disaster_reports r
             JOIN barangays b ON r.barangay_id = b.id
             WHERE r.id = ?
         ");
@@ -281,7 +281,7 @@ class DecisionTreeRecommender {
             }
 
             // Update Disaster Request status
-            $reqUpd = $this->db->prepare("UPDATE disaster_requests SET status = 'Recommendation Ready' WHERE id = ?");
+            $reqUpd = $this->db->prepare("UPDATE disaster_reports SET status = 'Recommendation Ready' WHERE id = ?");
             $reqUpd->execute([$requestId]);
 
             // Add notification for ICDRRMO personnel
@@ -318,7 +318,7 @@ class DecisionTreeRecommender {
         $stmt = $this->db->prepare("
             SELECT r.*, dr.id AS request_id, dr.barangay_id, dr.tracking_code, b.name AS barangay_name
             FROM recommendations r
-            JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+            JOIN disaster_reports dr ON r.disaster_request_id = dr.id
             JOIN barangays b ON dr.barangay_id = b.id
             WHERE r.id = ?
         ");
@@ -389,7 +389,7 @@ class DecisionTreeRecommender {
                 ");
                 $recUpd->execute([$status, $reviewerId, $remarks, $recommendationId]);
 
-                $reqUpd = $this->db->prepare("UPDATE disaster_requests SET status = 'Allocated' WHERE id = ?");
+                $reqUpd = $this->db->prepare("UPDATE disaster_reports SET status = 'Allocated' WHERE id = ?");
                 $reqUpd->execute([$rec['request_id']]);
 
                 $notifStmt = $this->db->prepare("
@@ -415,7 +415,7 @@ class DecisionTreeRecommender {
                 $updItem = $this->db->prepare("UPDATE recommended_items SET status = 'Rejected' WHERE recommendation_id = ?");
                 $updItem->execute([$recommendationId]);
 
-                $reqUpd = $this->db->prepare("UPDATE disaster_requests SET status = 'Under Review' WHERE id = ?");
+                $reqUpd = $this->db->prepare("UPDATE disaster_reports SET status = 'Under Review' WHERE id = ?");
                 $reqUpd->execute([$rec['request_id']]);
 
                 logSystemEvent('REJECT_RECOMMENDATION', 'Decision Tree Engine', "Rejected recommendation #$recommendationId. Remarks: $remarks", $reviewerId);

@@ -84,7 +84,7 @@ $allocStmt = $db->query("
     FROM recommended_items ri
     JOIN resources res ON ri.resource_id = res.id
     JOIN recommendations r ON ri.recommendation_id = r.id
-    JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+    JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     JOIN barangays b ON dr.barangay_id = b.id
     ORDER BY (ri.status = 'Pending') DESC, ri.id DESC
 ");
@@ -95,7 +95,7 @@ $pendingRecBatches = $db->query("
     SELECT r.id AS rec_id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity,
            b.name AS barangay_name, COUNT(ri.id) AS pending_items_count
     FROM recommendations r
-    JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+    JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     JOIN barangays b ON dr.barangay_id = b.id
     JOIN recommended_items ri ON ri.recommendation_id = r.id AND ri.status = 'Pending'
     GROUP BY r.id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity, b.name

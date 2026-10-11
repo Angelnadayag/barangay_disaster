@@ -36,7 +36,7 @@ if (!$requestId || !in_array($status, $allowed, true)) {
 }
 
 // Check ownership if Barangay Head
-$chk = $db->prepare("SELECT * FROM disaster_requests WHERE id = ?");
+$chk = $db->prepare("SELECT * FROM disaster_reports WHERE id = ?");
 $chk->execute([$requestId]);
 $req = $chk->fetch(PDO::FETCH_ASSOC);
 
@@ -53,7 +53,7 @@ if ($role === 'barangay_head' && (int)$req['barangay_id'] !== (int)$user['barang
 try {
     if ($status === 'Completed') {
         $stmt = $db->prepare("
-            UPDATE disaster_requests SET
+            UPDATE disaster_reports SET
                 status = 'Completed',
                 resolution_notes = COALESCE(?, resolution_notes),
                 completed_at = NOW(),
@@ -64,7 +64,7 @@ try {
         $msg = "Incident report {$req['tracking_code']} has been ended and marked as Completed.";
     } elseif ($status === 'Ongoing') {
         $stmt = $db->prepare("
-            UPDATE disaster_requests SET
+            UPDATE disaster_reports SET
                 status = 'Ongoing',
                 completed_at = NULL,
                 updated_at = NOW()
@@ -73,7 +73,7 @@ try {
         $stmt->execute([$requestId]);
         $msg = "Incident report {$req['tracking_code']} status set to Ongoing.";
     } else {
-        $stmt = $db->prepare("UPDATE disaster_requests SET status = ?, updated_at = NOW() WHERE id = ?");
+        $stmt = $db->prepare("UPDATE disaster_reports SET status = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$status, $requestId]);
         $msg = "Request status updated to '$status'.";
     }

@@ -31,7 +31,7 @@ if (!$id) {
 }
 
 // Fetch existing record
-$stmt = $db->prepare("SELECT * FROM disaster_requests WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM disaster_reports WHERE id = ?");
 $stmt->execute([$id]);
 $req = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -46,6 +46,7 @@ if ($role === 'barangay_head' && (int)$req['barangay_id'] !== (int)$user['barang
     redirectWithFlash($returnUrl, 'error', 'Unauthorized to modify reports outside your barangay.');
 }
 
+$barangayId = ($role === 'icdrrmo' && !empty($_POST['barangay_id'])) ? (int)$_POST['barangay_id'] : (int)$req['barangay_id'];
 $purokName = trim($_POST['purok_name'] ?? $req['purok_name']);
 $disasterType = trim($_POST['disaster_type'] ?? $req['disaster_type']);
 $severity = trim($_POST['severity'] ?? $req['severity']);
@@ -75,7 +76,8 @@ if ($status === 'Completed' && $req['status'] !== 'Completed') {
 
 try {
     $updateStmt = $db->prepare("
-        UPDATE disaster_requests SET
+        UPDATE disaster_reports SET
+            barangay_id = ?,
             purok_name = ?,
             disaster_type = ?,
             severity = ?,
@@ -95,6 +97,7 @@ try {
         WHERE id = ?
     ");
     $updateStmt->execute([
+        $barangayId,
         $purokName, $disasterType, $severity, $urgency,
         $affectedFamilies, $affectedIndividuals, $displacedFamilies,
         $casualties, $injuries, $missing,

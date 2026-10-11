@@ -29,7 +29,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         $q = $db->prepare("
             SELECT dr.tracking_code, b.name AS barangay_name, dr.purok_name, dr.disaster_type,
                    dr.severity, dr.urgency, dr.affected_families, dr.displaced_families, dr.status, dr.created_at
-            FROM disaster_requests dr JOIN barangays b ON dr.barangay_id = b.id
+            FROM disaster_reports dr JOIN barangays b ON dr.barangay_id = b.id
             WHERE DATE(dr.created_at) BETWEEN ? AND ?
         ");
         $q->execute([$startDate, $endDate]);
@@ -47,7 +47,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         $q = $db->query("
             SELECT r.recommendation_code, dr.tracking_code, b.name, dr.disaster_type, r.priority, r.confidence_score, r.status, rev.full_name, r.created_at
             FROM recommendations r
-            JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+            JOIN disaster_reports dr ON r.disaster_request_id = dr.id
             JOIN barangays b ON dr.barangay_id = b.id
             LEFT JOIN users rev ON r.reviewed_by = rev.id
         ");
@@ -158,7 +158,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     <?php
       $rSql = "
           SELECT dr.*, b.name AS barangay_name, u.full_name AS submitted_by_name
-          FROM disaster_requests dr
+          FROM disaster_reports dr
           JOIN barangays b ON dr.barangay_id = b.id
           JOIN users u ON dr.submitted_by = u.id
           WHERE DATE(dr.created_at) BETWEEN ? AND ?
@@ -262,7 +262,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
           SELECT r.*, dr.tracking_code, dr.disaster_type, dr.severity, dr.affected_families,
                  b.name AS barangay_name, rev.full_name AS reviewer_name
           FROM recommendations r
-          JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+          JOIN disaster_reports dr ON r.disaster_request_id = dr.id
           JOIN barangays b ON dr.barangay_id = b.id
           LEFT JOIN users rev ON r.reviewed_by = rev.id
           ORDER BY r.created_at DESC
@@ -348,7 +348,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     <?php
       $repAct = $db->query("
           SELECT pa.*, b.name AS barangay_name 
-          FROM preparedness_activities pa 
+          FROM events pa 
           LEFT JOIN barangays b ON pa.barangay_id = b.id
           ORDER BY pa.start_datetime DESC
       ")->fetchAll();

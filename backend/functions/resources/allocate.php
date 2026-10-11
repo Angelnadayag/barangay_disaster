@@ -139,14 +139,14 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
 
         // 5. Create Disaster Request & Recommendation Records
         $trackingCode = 'ALLOC-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
-        $chkTrack = $db->prepare("SELECT id FROM disaster_requests WHERE tracking_code = ?");
+        $chkTrack = $db->prepare("SELECT id FROM disaster_reports WHERE tracking_code = ?");
         $chkTrack->execute([$trackingCode]);
         if ($chkTrack->fetch()) {
             $trackingCode = 'ALLOC-' . date('Y') . '-' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
         }
 
         $insReq = $db->prepare("
-            INSERT INTO disaster_requests (
+            INSERT INTO disaster_reports (
                 tracking_code, barangay_id, purok_name, disaster_type, severity, urgency,
                 affected_families, affected_individuals, displaced_families, requested_assistance,
                 situation_overview, status, submitted_by, created_at, updated_at
@@ -291,7 +291,7 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
         $recStmt = $db->prepare("
             SELECT r.*, dr.id AS request_id, dr.tracking_code, dr.barangay_id, b.name AS barangay_name
             FROM recommendations r
-            JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+            JOIN disaster_reports dr ON r.disaster_request_id = dr.id
             JOIN barangays b ON dr.barangay_id = b.id
             WHERE r.id = ?
             FOR UPDATE
@@ -418,7 +418,7 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
         ")->execute([$user['id'], $remarks, $recId]);
 
         $db->prepare("
-            UPDATE disaster_requests SET status = 'Allocated', updated_at = NOW() WHERE id = ?
+            UPDATE disaster_reports SET status = 'Allocated', updated_at = NOW() WHERE id = ?
         ")->execute([$rec['request_id']]);
 
         // Send notification
@@ -497,7 +497,7 @@ else {
             FROM recommended_items ri
             JOIN resources res ON ri.resource_id = res.id
             JOIN recommendations r ON ri.recommendation_id = r.id
-            JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+            JOIN disaster_reports dr ON r.disaster_request_id = dr.id
             JOIN barangays b ON dr.barangay_id = b.id
             WHERE ri.id = ?
             FOR UPDATE
@@ -594,7 +594,7 @@ else {
                     WHERE id = ?
                 ")->execute([$user['id'], $remarks ?: 'All recommended items allocated', $item['rec_id']]);
 
-                $db->prepare("UPDATE disaster_requests SET status = 'Allocated', updated_at = NOW() WHERE id = ?")
+                $db->prepare("UPDATE disaster_reports SET status = 'Allocated', updated_at = NOW() WHERE id = ?")
                    ->execute([$item['request_id']]);
             }
 

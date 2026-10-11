@@ -20,7 +20,7 @@ $targetRequestId = isset($_GET['request_id']) ? (int)$_GET['request_id'] : 0;
 
 $activeIncidents = $db->query("
     SELECT dr.id, dr.tracking_code, dr.disaster_type, dr.purok_name, b.name AS barangay_name, dr.barangay_id
-    FROM disaster_requests dr
+    FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     WHERE dr.status NOT IN ('Completed', 'Rejected')
     ORDER BY dr.created_at DESC
@@ -31,7 +31,7 @@ $historyStmt = $db->query("
     FROM responder_field_updates rfu
     JOIN users u ON rfu.responder_id = u.id
     JOIN barangays b ON rfu.barangay_id = b.id
-    LEFT JOIN disaster_requests dr ON rfu.disaster_request_id = dr.id
+    LEFT JOIN disaster_reports dr ON rfu.disaster_request_id = dr.id
     ORDER BY rfu.created_at DESC
     LIMIT 25
 ");

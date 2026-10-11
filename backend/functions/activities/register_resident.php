@@ -35,7 +35,7 @@ if (!$actId || empty($phone)) {
 }
 
 // Fetch record
-$stmt = $db->prepare("SELECT * FROM preparedness_activities WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $stmt->execute([$actId]);
 $act = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -81,7 +81,7 @@ if (empty($residentName)) {
 }
 
 // Check for existing registration
-$dupCheck = $db->prepare("SELECT id FROM activity_attendees WHERE activity_id = ? AND phone = ?");
+$dupCheck = $db->prepare("SELECT id FROM event_attendees WHERE activity_id = ? AND phone = ?");
 $dupCheck->execute([$actId, $normalizedPhone]);
 $existingReg = $dupCheck->fetch(PDO::FETCH_ASSOC);
 
@@ -122,12 +122,12 @@ try {
     if ($existingReg) {
         // Update existing registration with new SMS status
         $regId = $existingReg['id'];
-        $upd = $db->prepare("UPDATE activity_attendees SET sms_status = ?, sms_message = ?, registered_at = NOW() WHERE id = ?");
+        $upd = $db->prepare("UPDATE event_attendees SET sms_status = ?, sms_message = ?, registered_at = NOW() WHERE id = ?");
         $upd->execute([$smsResult['status'], $smsMessage, $regId]);
     } else {
         // Insert new attendee record
         $ins = $db->prepare("
-            INSERT INTO activity_attendees (
+            INSERT INTO event_attendees (
                 activity_id, user_id, resident_name, phone, registered_at, sms_status, sms_message
             ) VALUES (?, ?, ?, ?, NOW(), ?, ?)
         ");
@@ -141,12 +141,12 @@ try {
         ]);
         $regId = $db->lastInsertId();
 
-        // Increment actual_participants count in preparedness_activities
-        $cntStmt = $db->prepare("SELECT COUNT(*) FROM activity_attendees WHERE activity_id = ?");
+        // Increment actual_participants count in events
+        $cntStmt = $db->prepare("SELECT COUNT(*) FROM event_attendees WHERE activity_id = ?");
         $cntStmt->execute([$actId]);
         $totalAttended = (int)$cntStmt->fetchColumn();
 
-        $updAct = $db->prepare("UPDATE preparedness_activities SET actual_participants = ? WHERE id = ?");
+        $updAct = $db->prepare("UPDATE events SET actual_participants = ? WHERE id = ?");
         $updAct->execute([$totalAttended, $actId]);
     }
 

@@ -32,7 +32,7 @@ if ($recId > 0) {
                u.full_name AS submitted_by_name,
                rev.full_name AS reviewer_name
         FROM recommendations r
-        JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+        JOIN disaster_reports dr ON r.disaster_request_id = dr.id
         JOIN barangays b ON dr.barangay_id = b.id
         JOIN users u ON dr.submitted_by = u.id
         LEFT JOIN users rev ON r.reviewed_by = rev.id
@@ -72,7 +72,7 @@ if ($recId > 0) {
                b.name AS barangay_name, rev.full_name AS reviewer_name,
                (SELECT COUNT(*) FROM recommended_items WHERE recommendation_id = r.id) AS total_items
         FROM recommendations r
-        JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+        JOIN disaster_reports dr ON r.disaster_request_id = dr.id
         JOIN barangays b ON dr.barangay_id = b.id
         LEFT JOIN users rev ON r.reviewed_by = rev.id
         WHERE 1=1

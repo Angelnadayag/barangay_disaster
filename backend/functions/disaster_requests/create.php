@@ -51,13 +51,13 @@ if (empty($barangayId) || empty($purokName) || empty($disasterType)) {
 }
 
 // Generate Tracking Code REQ-YYYY-XXX
-$countStmt = $db->query("SELECT COUNT(*) FROM disaster_requests");
+$countStmt = $db->query("SELECT COUNT(*) FROM disaster_reports");
 $nextId = ((int)$countStmt->fetchColumn()) + 1;
 $trackingCode = 'REQ-' . date('Y') . '-' . str_pad($nextId, 3, '0', STR_PAD_LEFT);
 
 try {
     $stmt = $db->prepare("
-        INSERT INTO disaster_requests (
+        INSERT INTO disaster_reports (
             tracking_code, barangay_id, purok_name, disaster_type, severity, urgency,
             affected_families, affected_individuals, displaced_families,
             casualties_count, injuries_count, missing_count,

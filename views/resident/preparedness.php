@@ -15,7 +15,7 @@ $db = getDBConnection();
 
 $drills = $db->query("
     SELECT pa.*, pa.start_datetime AS scheduled_date, pa.venue AS location, b.name AS barangay_name 
-    FROM preparedness_activities pa
+    FROM events pa
     LEFT JOIN barangays b ON pa.barangay_id = b.id
     WHERE pa.barangay_id = {$barangayId} OR pa.barangay_id IS NULL
     ORDER BY pa.start_datetime ASC

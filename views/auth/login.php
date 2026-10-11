@@ -59,7 +59,7 @@ $allocStmt = $db->query("
     FROM recommended_items ri
     JOIN resources res ON ri.resource_id = res.id
     JOIN recommendations r ON ri.recommendation_id = r.id
-    JOIN disaster_requests dr ON r.disaster_request_id = dr.id
+    JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     WHERE ri.status = 'Allocated' AND ri.allocated_quantity > 0
     GROUP BY dr.barangay_id, res.id, res.name, res.category, res.unit
 ");

@@ -49,17 +49,17 @@ if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
 
 try {
     // Self-heal content_execution & expected_activities columns if missing
-    $colsCe = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'content_execution'")->fetchAll();
+    $colsCe = $db->query("SHOW COLUMNS FROM events LIKE 'content_execution'")->fetchAll();
     if (empty($colsCe)) {
-        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
+        $db->exec("ALTER TABLE events ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
     }
-    $colsEa = $db->query("SHOW COLUMNS FROM preparedness_activities LIKE 'expected_activities'")->fetchAll();
+    $colsEa = $db->query("SHOW COLUMNS FROM events LIKE 'expected_activities'")->fetchAll();
     if (empty($colsEa)) {
-        $db->exec("ALTER TABLE preparedness_activities ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
+        $db->exec("ALTER TABLE events ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
     }
 
     $stmt = $db->prepare("
-        INSERT INTO preparedness_activities (
+        INSERT INTO events (
             title, activity_type, barangay_id, venue, start_datetime, end_datetime,
             assigned_personnel, target_participants, actual_participants, description,
             status, content_execution, expected_activities, created_by, created_at
