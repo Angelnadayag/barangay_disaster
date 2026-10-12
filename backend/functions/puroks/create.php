@@ -21,8 +21,8 @@ if (!in_array($role, ['barangay_head', 'icdrrmo'], true)) {
 
 $barangayId = ($role === 'barangay_head') ? (int)$user['barangay_id'] : (int)($_POST['barangay_id'] ?? 0);
 $name = trim($_POST['name'] ?? '');
-$hazardTypes = trim($_POST['hazard_types'] ?? 'Flood, Strong Winds');
-$riskLevel = trim($_POST['risk_level'] ?? 'Moderate');
+$hazardTypes = isset($_POST['hazard_types']) ? trim($_POST['hazard_types']) : null;
+$riskLevel = isset($_POST['risk_level']) && in_array($_POST['risk_level'], ['Low', 'Moderate', 'High', 'Critical'], true) ? $_POST['risk_level'] : 'Low';
 $households = max(0, (int)($_POST['households'] ?? 0));
 $population = max(0, (int)($_POST['population'] ?? ($households * 4.5)));
 $lat = isset($_POST['coordinates_lat']) && is_numeric($_POST['coordinates_lat']) ? (float)$_POST['coordinates_lat'] : null;

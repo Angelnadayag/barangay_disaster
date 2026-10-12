@@ -16,7 +16,7 @@ $db = getDBConnection();
 $pageTitle = "Manage Resources — ICDRRMO Admin";
 require_once __DIR__ . '/../layouts/header.php';
 
-$activeTab = in_array($_GET['tab'] ?? '', ['active', 'archived', 'allocations', 'movements', 'requests']) ? $_GET['tab'] : 'active';
+$activeTab = in_array($_GET['tab'] ?? '', ['active', 'archived', 'allocations', 'movements', 'requests', 'barangays']) ? $_GET['tab'] : ((isset($_GET['barangay_id']) && $_GET['barangay_id'] !== '') ? 'barangays' : 'active');
 
 // Filter parameters for resources
 $filterCategory = $_GET['category'] ?? '';
@@ -127,15 +127,104 @@ $reqStmt = $db->query("
 ");
 $barangayRequests = $reqStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$categories = [
-    'Relief Goods',
-    'Medical Supplies',
-    'Rescue Equipment',
-    'Emergency Supplies',
-    'Shelter & Sanitation'
-];
+// Dynamic Categories: strictly persisted in resource_categories table
+$categories = $db->query("SELECT name FROM resource_categories ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
+if (empty($categories)) {
+    $categories = ['Relief Goods', 'Medical Supplies', 'Rescue Equipment', 'Emergency Supplies', 'Shelter & Sanitation'];
+}
+
+// Dynamic Brands: strictly persisted in resource_brands table
+$brands = $db->query("SELECT name FROM resource_brands ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
+if (empty($brands)) {
+    $brands = ['Generic / Unbranded', 'DSWD Relief', 'Honda', 'Yamaha', 'Stihl', '3M', 'Johnson & Johnson', 'Standard LGU'];
+}
+
+// Dynamic Suppliers / Donors / Source: strictly persisted in resource_suppliers table
+$supplierDonorSources = $db->query("SELECT name FROM resource_suppliers ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
+if (empty($supplierDonorSources)) {
+    $supplierDonorSources = ['LGU General Procurement', 'DSWD Regional Office', 'DOH Central Depot', 'Office of Civil Defense', 'Philippine Red Cross', 'Private Donor', 'Barangay Disaster Fund'];
+}
 
 $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
+
+// Fetch all barangays for filter dropdown
+$allBarangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Barangay Stockroom & Inventory History tracking logic
+$selectedBarangayId = isset($_GET['barangay_id']) && is_numeric($_GET['barangay_id']) ? (int)$_GET['barangay_id'] : 0;
+$selectedBarangay = null;
+if ($selectedBarangayId > 0) {
+    $bStmt = $db->prepare("SELECT * FROM barangays WHERE id = ?");
+    $bStmt->execute([$selectedBarangayId]);
+    $selectedBarangay = $bStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$selectedBarangay) {
+        $selectedBarangayId = 0;
+    }
+}
+
+// 1. Current Barangay Resources Query (Column 1 Table)
+$bResSql = "SELECT r.*, b.name AS barangay_name 
+            FROM resources r 
+            LEFT JOIN barangays b ON r.barangay_id = b.id 
+            WHERE (r.status != 'archived' OR r.status IS NULL)";
+$bResParams = [];
+if ($selectedBarangayId > 0) {
+    $bResSql .= " AND r.barangay_id = ?";
+    $bResParams[] = $selectedBarangayId;
+} else {
+    $bResSql .= " AND r.barangay_id IS NOT NULL";
+}
+if (!empty($filterCategory)) {
+    $bResSql .= " AND r.category = ?";
+    $bResParams[] = $filterCategory;
+}
+if (!empty($search)) {
+    $bResSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR r.brand LIKE ?)";
+    $like = "%{$search}%";
+    $bResParams[] = $like;
+    $bResParams[] = $like;
+    $bResParams[] = $like;
+}
+$bResSql .= " ORDER BY b.name ASC, r.name ASC";
+$bResStmt = $db->prepare($bResSql);
+$bResStmt->execute($bResParams);
+$barangayCurrentResources = $bResStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 2. Inventory History & Movements Query (Column 2 Table)
+$bTrxSql = "SELECT rt.*, res.code, res.name AS resource_name, res.unit, res.category, 
+                   COALESCE(b.name, '') AS barangay_name, b.id AS barangay_id,
+                   u.full_name AS performed_by_name
+            FROM resource_transactions rt
+            JOIN resources res ON rt.resource_id = res.id
+            LEFT JOIN barangays b ON res.barangay_id = b.id
+            LEFT JOIN users u ON rt.performed_by = u.id";
+$bTrxParams = [];
+if ($selectedBarangayId > 0 && !empty($selectedBarangay)) {
+    $bTrxSql .= " WHERE (res.barangay_id = ? 
+                   OR (rt.reference_type = 'disaster_request' AND rt.reference_id IN (SELECT id FROM disaster_reports WHERE barangay_id = ?))
+                   OR (rt.reference_type = 'barangay_requisition' AND rt.reference_id IN (SELECT id FROM barangay_resource_requests WHERE barangay_id = ?))
+                   OR rt.remarks LIKE ?)";
+    $bTrxParams = [$selectedBarangayId, $selectedBarangayId, $selectedBarangayId, "%{$selectedBarangay['name']}%"];
+} else {
+    $bTrxSql .= " WHERE (res.barangay_id IS NOT NULL 
+                   OR rt.reference_type IN ('disaster_request', 'barangay_requisition', 'icdrrmo_allocation')
+                   OR rt.remarks LIKE '%Brgy%')";
+}
+if (!empty($filterCategory)) {
+    $bTrxSql .= " AND res.category = ?";
+    $bTrxParams[] = $filterCategory;
+}
+if (!empty($search)) {
+    $bTrxSql .= " AND (res.code LIKE ? OR res.name LIKE ? OR rt.remarks LIKE ?)";
+    $like = "%{$search}%";
+    $bTrxParams[] = $like;
+    $bTrxParams[] = $like;
+    $bTrxParams[] = $like;
+}
+$bTrxSql .= " ORDER BY rt.created_at DESC, rt.id DESC LIMIT 150";
+$bTrxStmt = $db->prepare($bTrxSql);
+$bTrxStmt->execute($bTrxParams);
+$barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <style>
@@ -262,6 +351,23 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
 .row-updated-highlight {
   animation: rowHighlightPulse 2.5s ease-out;
 }
+
+/* 2-Column Responsive Layout for Barangay Stock & History Tracker */
+.barangay-two-col-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .barangay-two-col-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+.two-col-table th, .two-col-table td {
+  padding: 8px 10px !important;
+  vertical-align: middle !important;
+}
 </style>
 
 <div class="page-header">
@@ -313,6 +419,10 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
   </a>
   <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=movements" class="btn btn-sm <?= $activeTab === 'movements' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:11px;<?= $activeTab === 'movements' ? '' : 'color:var(--color-text-muted);' ?>">
     Stock Movements & Audit Logs (<?= count($transactions) ?>)
+  </a>
+  <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays" class="btn btn-sm <?= $activeTab === 'barangays' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:11px;<?= $activeTab === 'barangays' ? '' : 'color:var(--color-text-muted);' ?>">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-1px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    Barangay Stock & History (2-Column Tracker)
   </a>
 </div>
 
@@ -390,6 +500,13 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
             <option value="">All Categories</option>
             <?php foreach ($categories as $cat): ?>
               <option value="<?= clean($cat) ?>" <?= $filterCategory === $cat ? 'selected' : '' ?>><?= clean($cat) ?></option>
+            <?php endforeach; ?>
+          </select>
+
+          <select onchange="if(this.value){ window.location.href='<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays&barangay_id=' + this.value; }" class="form-control" style="width:180px;background:#F8FAFC;" title="Monitor Barangay Local Inventory">
+            <option value="">Track Barangay Stock...</option>
+            <?php foreach ($allBarangays as $b): ?>
+              <option value="<?= $b['id'] ?>">Brgy. <?= clean($b['name']) ?></option>
             <?php endforeach; ?>
           </select>
 
@@ -697,6 +814,7 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
         </tbody>
       </table>
     </div>
+  </div>
 
 <?php elseif ($activeTab === 'requests'): ?>
   <!-- Barangay Resource Requisitions Tab -->
@@ -791,6 +909,287 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
       </table>
     </div>
   </div>
+
+<?php elseif ($activeTab === 'barangays'): ?>
+  <!-- Barangay Stock & Inventory History Filter Bar -->
+  <div class="card" style="margin-bottom:var(--space-4);">
+    <div class="card-body" style="padding:12px 16px;">
+      <form method="GET" class="filter-bar" style="margin-bottom:0;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <input type="hidden" name="tab" value="barangays">
+
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin:0;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            Barangay:
+          </label>
+          <select name="barangay_id" class="form-control" onchange="this.form.submit()" style="font-weight:600;min-width:220px;border-color:var(--color-primary);background:#F8FAFC;">
+            <option value="">-- All Barangays (Overview) --</option>
+            <?php foreach ($allBarangays as $b): ?>
+              <option value="<?= $b['id'] ?>" <?= $selectedBarangayId == $b['id'] ? 'selected' : '' ?>>
+                Brgy. <?= clean($b['name']) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <select name="category" class="form-control" onchange="this.form.submit()" style="width:160px;">
+          <option value="">All Categories</option>
+          <?php foreach ($categories as $cat): ?>
+            <option value="<?= clean($cat) ?>" <?= $filterCategory === $cat ? 'selected' : '' ?>><?= clean($cat) ?></option>
+          <?php endforeach; ?>
+        </select>
+
+        <div class="search-input-wrap" style="flex:1;min-width:180px;">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" name="search" class="form-control" placeholder="Search commodity, SKU, or remarks..." value="<?= clean($search) ?>">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 14px;">Apply Filter</button>
+        <?php if ($selectedBarangayId > 0 || !empty($filterCategory) || !empty($search)): ?>
+          <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays" class="btn btn-outline btn-sm" style="font-size:11px;color:var(--color-text-muted);">Reset</a>
+        <?php endif; ?>
+
+        <?php if ($selectedBarangayId > 0): ?>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="openDirectAllocationModalWithBarangay(<?= $selectedBarangayId ?>)" style="margin-left:auto;font-size:11px;display:inline-flex;align-items:center;gap:5px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            Allocate to Brgy. <?= clean($selectedBarangay['name']) ?>
+          </button>
+        <?php endif; ?>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scope KPI & Status Banner -->
+  <div style="background:linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);border:1px solid #DBEAFE;border-radius:var(--radius-md);padding:14px 18px;margin-bottom:var(--space-4);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:40px;height:40px;border-radius:50%;background:#DBEAFE;color:#1D4ED8;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;">
+        🏢
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:14px;color:#1E3A8A;display:flex;align-items:center;gap:8px;">
+          <?= $selectedBarangayId > 0 ? 'Barangay ' . clean($selectedBarangay['name']) . ' Stockroom' : 'All Barangays Inventory Overview' ?>
+          <?php if ($selectedBarangayId > 0): ?>
+            <span class="badge badge-primary" style="font-size:9.5px;">Barangay ID: <?= $selectedBarangayId ?></span>
+          <?php endif; ?>
+        </div>
+        <div style="font-size:11.5px;color:#3B82F6;margin-top:2px;">
+          Real-time tracking of on-hand local reserves and corresponding supply movement audit history.
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div style="text-align:right;">
+        <div style="font-size:10px;text-transform:uppercase;color:var(--color-text-muted);font-weight:700;">Commodity Types</div>
+        <div style="font-size:16px;font-weight:700;color:var(--color-text);font-family:var(--font-secondary);"><?= count($barangayCurrentResources) ?></div>
+      </div>
+      <div style="border-left:1px solid #CBD5E1;height:24px;"></div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;text-transform:uppercase;color:var(--color-text-muted);font-weight:700;">Total Stock Available</div>
+        <div style="font-size:16px;font-weight:700;color:var(--color-success);font-family:var(--font-secondary);"><?= number_format(array_sum(array_column($barangayCurrentResources, 'available_quantity'))) ?></div>
+      </div>
+      <div style="border-left:1px solid #CBD5E1;height:24px;"></div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;text-transform:uppercase;color:var(--color-text-muted);font-weight:700;">History Records</div>
+        <div style="font-size:16px;font-weight:700;color:var(--color-primary);font-family:var(--font-secondary);"><?= count($barangayInventoryHistory) ?></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 Tables in 2 Columns Layout -->
+  <div class="barangay-two-col-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;margin-bottom:var(--space-4);">
+
+    <!-- ========================================================================= -->
+    <!-- COLUMN 1: Current Barangay Resources Table                                -->
+    <!-- ========================================================================= -->
+    <div class="card" style="margin-bottom:0;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;background:#F8FAFC;border-bottom:1px solid var(--color-border);padding:12px 14px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px;">📦</span>
+          <div>
+            <h3 class="card-title" style="font-size:13px;margin:0;font-weight:700;color:var(--color-text);">Current Barangay Resources</h3>
+            <div class="card-subtitle" style="font-size:10.5px;color:var(--color-text-muted);">Current on-hand stockpiles & capacity</div>
+          </div>
+        </div>
+        <span class="badge badge-neutral" style="font-size:10px;font-weight:700;">
+          <?= count($barangayCurrentResources) ?> Item(s)
+        </span>
+      </div>
+      <div class="table-responsive" style="max-height:680px;overflow-y:auto;">
+        <table class="data-table two-col-table" style="font-size:11.5px;margin-bottom:0;">
+          <thead>
+            <tr>
+              <th style="width:36%;">Resource / SKU</th>
+              <th style="width:22%;">Category</th>
+              <th style="width:28%;">Stock (Avail/Total)</th>
+              <th style="width:14%;text-align:right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (empty($barangayCurrentResources)): ?>
+              <tr>
+                <td colspan="4" style="text-align:center;padding:40px 16px;color:var(--color-text-muted);">
+                  <div style="font-size:24px;margin-bottom:6px;">📦</div>
+                  <div style="font-weight:600;color:var(--color-text-secondary);font-size:12px;">No resources found in this stockroom.</div>
+                  <div style="font-size:11px;margin-top:2px;">Dispatches from ICDRRMO allocations will appear here.</div>
+                  <?php if ($selectedBarangayId > 0): ?>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openDirectAllocationModalWithBarangay(<?= $selectedBarangayId ?>)" style="margin-top:10px;font-size:10.5px;">
+                      Allocate Stock to Brgy. <?= clean($selectedBarangay['name']) ?>
+                    </button>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php else: ?>
+              <?php foreach ($barangayCurrentResources as $r): ?>
+                <?php
+                  $avail = (int)$r['available_quantity'];
+                  $total = (int)$r['total_quantity'];
+                  $min = (int)($r['min_threshold'] ?? 10);
+                  $healthClass = 'badge-success';
+                  $healthText = 'In Stock';
+                  if ($avail <= 0) {
+                    $healthClass = 'badge-danger';
+                    $healthText = 'Out of Stock';
+                  } elseif ($avail <= $min) {
+                    $healthClass = 'badge-warning';
+                    $healthText = 'Low Stock';
+                  }
+                ?>
+                <tr>
+                  <td>
+                    <div style="font-weight:700;color:var(--color-text);font-size:12px;line-height:1.3;">
+                      <?= clean($r['name']) ?>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+                      <span style="font-family:var(--font-secondary);font-size:9.5px;color:var(--color-text-muted);font-weight:600;">
+                        <?= clean($r['code']) ?>
+                      </span>
+                      <?php if ($selectedBarangayId === 0 && !empty($r['barangay_name'])): ?>
+                        <span class="badge badge-neutral" style="font-size:8.5px;padding:1px 5px;">
+                          Brgy. <?= clean($r['barangay_name']) ?>
+                        </span>
+                      <?php endif; ?>
+                    </div>
+                  </td>
+                  <td>
+                    <span style="font-size:10.5px;color:var(--color-text-secondary);font-weight:500;">
+                      <?= clean($r['category']) ?>
+                    </span>
+                  </td>
+                  <td>
+                    <div style="font-family:var(--font-secondary);font-weight:700;font-size:12px;">
+                      <span style="color:<?= $avail > 0 ? 'var(--color-text)' : 'var(--color-danger)' ?>;"><?= number_format($avail) ?></span>
+                      <span style="font-weight:400;color:var(--color-text-muted);font-size:10.5px;">/ <?= number_format($total) ?> <?= clean($r['unit']) ?></span>
+                    </div>
+                    <div style="margin-top:2px;">
+                      <span class="badge <?= $healthClass ?>" style="font-size:8.5px;padding:1px 5px;"><?= $healthText ?></span>
+                    </div>
+                  </td>
+                  <td style="text-align:right;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="openViewResourceModal(<?= htmlspecialchars(json_encode($r)) ?>)" title="View Specifications" style="padding:3px 8px;font-size:10.5px;display:inline-flex;align-items:center;gap:3px;">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- COLUMN 2: Inventory Movement & History Log Table                          -->
+    <!-- ========================================================================= -->
+    <div class="card" style="margin-bottom:0;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;background:#F8FAFC;border-bottom:1px solid var(--color-border);padding:12px 14px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px;">📜</span>
+          <div>
+            <h3 class="card-title" style="font-size:13px;margin:0;font-weight:700;color:var(--color-text);">Inventory History & Movements</h3>
+            <div class="card-subtitle" style="font-size:10.5px;color:var(--color-text-muted);">Audit log of inbound replenishments & outbound dispatches</div>
+          </div>
+        </div>
+        <span class="badge badge-neutral" style="font-size:10px;font-weight:700;">
+          <?= count($barangayInventoryHistory) ?> Log(s)
+        </span>
+      </div>
+      <div class="table-responsive" style="max-height:680px;overflow-y:auto;">
+        <table class="data-table two-col-table" style="font-size:11.5px;margin-bottom:0;">
+          <thead>
+            <tr>
+              <th style="width:20%;">Timestamp</th>
+              <th style="width:16%;">Type</th>
+              <th style="width:34%;">Commodity & Qty</th>
+              <th style="width:30%;">Remarks & Officer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (empty($barangayInventoryHistory)): ?>
+              <tr>
+                <td colspan="4" style="text-align:center;padding:40px 16px;color:var(--color-text-muted);">
+                  <div style="font-size:24px;margin-bottom:6px;">📜</div>
+                  <div style="font-weight:600;color:var(--color-text-secondary);font-size:12px;">No inventory transactions logged yet.</div>
+                  <div style="font-size:11px;margin-top:2px;">Dispatches and distributions will be recorded in this audit trail.</div>
+                </td>
+              </tr>
+            <?php else: ?>
+              <?php foreach ($barangayInventoryHistory as $t): ?>
+                <?php
+                  $isPositive = in_array($t['transaction_type'], ['Restock', 'New Product', 'Returned']);
+                  $qtyColor = $isPositive ? 'var(--color-success)' : ($t['transaction_type'] === 'Damaged' ? 'var(--color-danger)' : 'var(--color-secondary)');
+                  $typeClass = 'badge-neutral';
+                  if ($isPositive) $typeClass = 'badge-success';
+                  elseif ($t['transaction_type'] === 'Allocation') $typeClass = 'badge-primary';
+                  elseif ($t['transaction_type'] === 'Dispatched') $typeClass = 'badge-info';
+                  elseif ($t['transaction_type'] === 'Damaged') $typeClass = 'badge-danger';
+                ?>
+                <tr>
+                  <td>
+                    <div style="font-family:var(--font-secondary);font-size:10px;font-weight:600;color:var(--color-text);">
+                      <?= date('M d, Y', strtotime($t['created_at'])) ?>
+                    </div>
+                    <div style="font-family:var(--font-secondary);font-size:9.5px;color:var(--color-text-muted);">
+                      <?= date('h:i A', strtotime($t['created_at'])) ?>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge <?= $typeClass ?>" style="font-size:8.5px;font-weight:700;padding:2px 5px;">
+                      <?= clean($t['transaction_type']) ?>
+                    </span>
+                  </td>
+                  <td>
+                    <div style="font-weight:600;color:var(--color-text);font-size:11.5px;line-height:1.3;">
+                      <?= clean($t['resource_name']) ?>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+                      <span style="font-family:var(--font-secondary);font-weight:700;color:<?= $qtyColor ?>;font-size:11px;">
+                        <?= ($isPositive ? '+' : '-') . number_format($t['quantity']) ?> <?= clean($t['unit']) ?>
+                      </span>
+                      <?php if (!empty($t['barangay_name'])): ?>
+                        <span class="badge badge-neutral" style="font-size:8px;padding:0 4px;">
+                          Brgy. <?= clean($t['barangay_name']) ?>
+                        </span>
+                      <?php endif; ?>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="font-size:10.5px;color:var(--color-text-secondary);line-height:1.3;max-width:220px;word-break:break-word;">
+                      <?= clean($t['remarks'] ?: '—') ?>
+                    </div>
+                    <div style="font-size:9px;color:var(--color-text-muted);margin-top:2px;">
+                      by <?= clean($t['performed_by_name'] ?: 'System Operation') ?>
+                    </div>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 <?php endif; ?>
 
 <!-- ========================================================================= -->
@@ -809,7 +1208,7 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
     </div>
     <form id="createResourceForm" method="POST" action="<?= BASE_URL ?>/backend/functions/resources/create.php">
       <input type="hidden" name="action" value="create">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
 
         <div class="form-section-title">Basic Information</div>
@@ -819,12 +1218,22 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
             <input type="text" name="code" class="form-control" placeholder="e.g. RES-FOOD-008" required style="text-transform:uppercase;">
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Category <span style="color:var(--color-danger)">*</span></label>
-            <select name="category" class="form-control" required>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label class="form-label" style="margin-bottom:2px;">Category <span style="color:var(--color-danger)">*</span></label>
+              <button type="button" class="btn btn-outline btn-xs" id="btnAdd_category_create" onclick="toggleDynamicField('category', 'create')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;">+ Add</button>
+            </div>
+            <select name="category" id="create_res_category" class="form-control" required>
               <?php foreach ($categories as $cat): ?>
                 <option value="<?= clean($cat) ?>"><?= clean($cat) ?></option>
               <?php endforeach; ?>
             </select>
+            <div id="dynAddContainer_category_create" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="new_category_input_create" class="form-control" placeholder="New category name..." style="font-size:11px;padding:3px 6px;height:26px;">
+                <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicField('category', 'create')" style="white-space:nowrap;padding:2px 8px;font-size:10.5px;">Add</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicField('category', 'create')" style="padding:2px 6px;font-size:10.5px;">✕</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -835,8 +1244,23 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Brand / Manufacturer</label>
-            <input type="text" name="brand" class="form-control" placeholder="e.g. Lucky Me, Nescafe, Generic">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label class="form-label" style="margin-bottom:2px;">Brand / Manufacturer</label>
+              <button type="button" class="btn btn-outline btn-xs" id="btnAdd_brand_create" onclick="toggleDynamicField('brand', 'create')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;">+ Add</button>
+            </div>
+            <select name="brand" id="create_res_brand" class="form-control">
+              <option value="">— Select Brand / Manufacturer —</option>
+              <?php foreach ($brands as $b): ?>
+                <option value="<?= clean($b) ?>"><?= clean($b) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <div id="dynAddContainer_brand_create" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="new_brand_input_create" class="form-control" placeholder="New brand name..." style="font-size:11px;padding:3px 6px;height:26px;">
+                <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicField('brand', 'create')" style="white-space:nowrap;padding:2px 8px;font-size:10.5px;">Add</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicField('brand', 'create')" style="padding:2px 6px;font-size:10.5px;">✕</button>
+              </div>
+            </div>
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Item Condition <span style="color:var(--color-danger)">*</span></label>
@@ -859,8 +1283,11 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
             <input type="number" name="quantity" class="form-control" min="0" value="0" required>
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Min. Threshold <span style="color:var(--color-danger)">*</span></label>
-            <input type="number" name="min_threshold" class="form-control" min="1" value="50" required>
+            <label class="form-label">Low Stock Alert / Restock Threshold <span style="color:var(--color-danger)">*</span></label>
+            <input type="number" name="min_threshold" id="create_res_min_threshold" class="form-control" min="1" value="50" required>
+            <span style="font-size:10px;color:var(--color-text-muted);display:block;margin-top:3px;line-height:1.3;">
+              ⚠️ <strong>Restock Trigger Level:</strong> Alerts administrators to restock when depot inventory &le; threshold. <em>(NOT a distribution limit).</em>
+            </span>
           </div>
         </div>
 
@@ -896,8 +1323,23 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Supplier / Donor</label>
-            <input type="text" name="supplier_donor" class="form-control" placeholder="e.g. DSWD, OCD, Red Cross, LGU Procurement">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label class="form-label" style="margin-bottom:2px;">Supplier / Donor</label>
+              <button type="button" class="btn btn-outline btn-xs" id="btnAdd_supplier_create" onclick="toggleDynamicField('supplier', 'create')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;">+ Add</button>
+            </div>
+            <select name="supplier_donor" id="create_res_supplier" class="form-control">
+              <option value="">— Select Supplier / Donor —</option>
+              <?php foreach ($supplierDonorSources as $s): ?>
+                <option value="<?= clean($s) ?>"><?= clean($s) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <div id="dynAddContainer_supplier_create" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="new_supplier_input_create" class="form-control" placeholder="New supplier / donor name..." style="font-size:11px;padding:3px 6px;height:26px;">
+                <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicField('supplier', 'create')" style="white-space:nowrap;padding:2px 8px;font-size:10.5px;">Add</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicField('supplier', 'create')" style="padding:2px 6px;font-size:10.5px;">✕</button>
+              </div>
+            </div>
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Batch / Lot Number</label>
@@ -944,7 +1386,7 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
     </div>
     <form id="viewResourceForm" method="POST" action="<?= BASE_URL ?>/backend/functions/resources/update.php">
       <input type="hidden" name="action" value="update">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="id" id="view_res_id">
 
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
@@ -986,12 +1428,22 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
             <input type="text" name="code" id="view_res_code" class="form-control" required disabled style="text-transform:uppercase;">
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Category <span style="color:var(--color-danger)">*</span></label>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label class="form-label" style="margin-bottom:2px;">Category <span style="color:var(--color-danger)">*</span></label>
+              <button type="button" class="btn btn-outline btn-xs" id="btnAdd_category_view" onclick="toggleDynamicField('category', 'view')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;" disabled>+ Add</button>
+            </div>
             <select name="category" id="view_res_category" class="form-control" required disabled>
               <?php foreach ($categories as $cat): ?>
                 <option value="<?= clean($cat) ?>"><?= clean($cat) ?></option>
               <?php endforeach; ?>
             </select>
+            <div id="dynAddContainer_category_view" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="new_category_input_view" class="form-control" placeholder="New category name..." style="font-size:11px;padding:3px 6px;height:26px;">
+                <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicField('category', 'view')" style="white-space:nowrap;padding:2px 8px;font-size:10.5px;">Add</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicField('category', 'view')" style="padding:2px 6px;font-size:10.5px;">✕</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1002,8 +1454,23 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Brand / Manufacturer</label>
-            <input type="text" name="brand" id="view_res_brand" class="form-control" disabled>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label class="form-label" style="margin-bottom:2px;">Brand / Manufacturer</label>
+              <button type="button" class="btn btn-outline btn-xs" id="btnAdd_brand_view" onclick="toggleDynamicField('brand', 'view')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;" disabled>+ Add</button>
+            </div>
+            <select name="brand" id="view_res_brand" class="form-control" disabled>
+              <option value="">— Select Brand / Manufacturer —</option>
+              <?php foreach ($brands as $b): ?>
+                <option value="<?= clean($b) ?>"><?= clean($b) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <div id="dynAddContainer_brand_view" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="new_brand_input_view" class="form-control" placeholder="New brand name..." style="font-size:11px;padding:3px 6px;height:26px;">
+                <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicField('brand', 'view')" style="white-space:nowrap;padding:2px 8px;font-size:10.5px;">Add</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicField('brand', 'view')" style="padding:2px 6px;font-size:10.5px;">✕</button>
+              </div>
+            </div>
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Item Condition <span style="color:var(--color-danger)">*</span></label>
@@ -1022,8 +1489,11 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
             <input type="text" name="unit" id="view_res_unit" class="form-control" required disabled>
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Min. Safety Threshold <span style="color:var(--color-danger)">*</span></label>
+            <label class="form-label">Low Stock Alert / Restock Threshold <span style="color:var(--color-danger)">*</span></label>
             <input type="number" name="min_threshold" id="view_res_min_threshold" class="form-control" min="1" required disabled>
+            <span style="font-size:10px;color:var(--color-text-muted);display:block;margin-top:3px;line-height:1.3;">
+              ⚠️ <strong>Restock Trigger Level:</strong> Alerts administrators to restock when depot inventory &le; threshold. <em>(NOT a distribution limit).</em>
+            </span>
           </div>
         </div>
 
@@ -1074,8 +1544,23 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Supplier / Donor</label>
-            <input type="text" name="supplier_donor" id="view_res_supplier_donor" class="form-control" disabled>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label class="form-label" style="margin-bottom:2px;">Supplier / Donor</label>
+              <button type="button" class="btn btn-outline btn-xs" id="btnAdd_supplier_view" onclick="toggleDynamicField('supplier', 'view')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;" disabled>+ Add</button>
+            </div>
+            <select name="supplier_donor" id="view_res_supplier_donor" class="form-control" disabled>
+              <option value="">— Select Supplier / Donor —</option>
+              <?php foreach ($supplierDonorSources as $s): ?>
+                <option value="<?= clean($s) ?>"><?= clean($s) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <div id="dynAddContainer_supplier_view" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
+              <div style="display:flex;gap:4px;">
+                <input type="text" id="new_supplier_input_view" class="form-control" placeholder="New supplier / donor name..." style="font-size:11px;padding:3px 6px;height:26px;">
+                <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicField('supplier', 'view')" style="white-space:nowrap;padding:2px 8px;font-size:10.5px;">Add</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicField('supplier', 'view')" style="padding:2px 6px;font-size:10.5px;">✕</button>
+              </div>
+            </div>
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Batch / Lot Number</label>
@@ -1484,9 +1969,91 @@ function closeModal(id) {
   }
 }
 
+// Universal Dynamic Field (Category, Brand, Supplier) Handlers
+function toggleDynamicField(field, mode) {
+  const container = document.getElementById(`dynAddContainer_${field}_${mode}`);
+  const input = document.getElementById(`new_${field}_input_${mode}`);
+  if (!container) return;
+
+  if (container.style.display === 'none' || container.style.display === '') {
+    container.style.display = 'block';
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 60);
+    }
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+async function confirmDynamicField(field, mode) {
+  const input = document.getElementById(`new_${field}_input_${mode}`);
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    alert(`Please enter a ${field} name.`);
+    input.focus();
+    return;
+  }
+
+  // Persist permanently into dedicated database table so it survives page reloads and reboots
+  try {
+    const formData = new FormData();
+    formData.append('type', field);
+    formData.append('name', val);
+    const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/add_attribute_option.php', {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await res.json();
+    if (data.success && !data.already_exists && typeof showToast === 'function') {
+      showToast(data.message, 'success');
+    }
+  } catch (err) {
+    console.error('Failed to persist option to database table:', err);
+  }
+
+  const createSelectId = (field === 'supplier') ? 'create_res_supplier' : `create_res_${field}`;
+  const viewSelectId = (field === 'supplier') ? 'view_res_supplier_donor' : `view_res_${field}`;
+
+  ['create', 'view'].forEach(m => {
+    const select = document.getElementById((m === 'create') ? createSelectId : viewSelectId);
+    if (select) {
+      let foundIndex = -1;
+      for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].value.toLowerCase() === val.toLowerCase()) {
+          foundIndex = i;
+          break;
+        }
+      }
+      if (foundIndex >= 0) {
+        if (m === mode) select.selectedIndex = foundIndex;
+      } else {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = val;
+        select.appendChild(opt);
+        if (m === mode) select.value = val;
+      }
+    }
+  });
+
+  const activeSelect = document.getElementById((mode === 'create') ? createSelectId : viewSelectId);
+  if (activeSelect) activeSelect.value = val;
+
+  input.value = '';
+  const container = document.getElementById(`dynAddContainer_${field}_${mode}`);
+  if (container) container.style.display = 'none';
+}
+
 function openCreateResourceModal() {
   const form = document.getElementById('createResourceForm');
   if (form) form.reset();
+  ['category', 'brand', 'supplier'].forEach(f => {
+    const c = document.getElementById(`dynAddContainer_${f}_create`);
+    if (c) c.style.display = 'none';
+  });
   openModal('createResourceModal');
 }
 
@@ -1528,7 +2095,31 @@ function openViewResourceModal(r) {
   document.getElementById('view_res_id').value = r.id || '';
   document.getElementById('view_res_title').innerText = r.name || 'Resource Details';
   document.getElementById('view_res_code').value = r.code || '';
-  document.getElementById('view_res_category').value = r.category || 'Relief Goods';
+
+  // Set Category select (ensure option exists dynamically)
+  const catSelect = document.getElementById('view_res_category');
+  if (catSelect) {
+    if (r.category) {
+      let exists = false;
+      for (let i = 0; i < catSelect.options.length; i++) {
+        if (catSelect.options[i].value.toLowerCase() === r.category.toLowerCase()) {
+          exists = true;
+          catSelect.selectedIndex = i;
+          break;
+        }
+      }
+      if (!exists) {
+        const opt = document.createElement('option');
+        opt.value = r.category;
+        opt.textContent = r.category;
+        catSelect.appendChild(opt);
+        catSelect.value = r.category;
+      }
+    } else {
+      catSelect.value = '';
+    }
+  }
+
   document.getElementById('view_res_name').value = r.name || '';
   document.getElementById('view_res_unit').value = r.unit || '';
   document.getElementById('view_res_min_threshold').value = r.min_threshold || 50;
@@ -1538,15 +2129,61 @@ function openViewResourceModal(r) {
   document.getElementById('view_res_storage_location').value = r.storage_location || '';
   document.getElementById('view_res_description').value = r.description || '';
 
-  // New detailed fields
-  document.getElementById('view_res_brand').value = r.brand || '';
+  // Set Brand select (ensure option exists dynamically)
+  const brandSelect = document.getElementById('view_res_brand');
+  if (brandSelect) {
+    if (r.brand) {
+      let exists = false;
+      for (let i = 0; i < brandSelect.options.length; i++) {
+        if (brandSelect.options[i].value.toLowerCase() === r.brand.toLowerCase()) {
+          exists = true;
+          brandSelect.selectedIndex = i;
+          break;
+        }
+      }
+      if (!exists) {
+        const opt = document.createElement('option');
+        opt.value = r.brand;
+        opt.textContent = r.brand;
+        brandSelect.appendChild(opt);
+        brandSelect.value = r.brand;
+      }
+    } else {
+      brandSelect.value = '';
+    }
+  }
+
   document.getElementById('view_res_item_condition').value = r.item_condition || 'New';
   document.getElementById('view_res_weight_per_unit').value = r.weight_per_unit || '';
   document.getElementById('view_res_cost_per_unit').value = r.cost_per_unit || '';
   document.getElementById('view_res_date_acquired').value = r.date_acquired || '';
   document.getElementById('view_res_expiry_date').value = r.expiry_date || '';
   document.getElementById('view_res_is_perishable').checked = (r.is_perishable == 1);
-  document.getElementById('view_res_supplier_donor').value = r.supplier_donor || '';
+
+  // Set Supplier select (ensure option exists dynamically)
+  const suppSelect = document.getElementById('view_res_supplier_donor');
+  if (suppSelect) {
+    if (r.supplier_donor) {
+      let exists = false;
+      for (let i = 0; i < suppSelect.options.length; i++) {
+        if (suppSelect.options[i].value.toLowerCase() === r.supplier_donor.toLowerCase()) {
+          exists = true;
+          suppSelect.selectedIndex = i;
+          break;
+        }
+      }
+      if (!exists) {
+        const opt = document.createElement('option');
+        opt.value = r.supplier_donor;
+        opt.textContent = r.supplier_donor;
+        suppSelect.appendChild(opt);
+        suppSelect.value = r.supplier_donor;
+      }
+    } else {
+      suppSelect.value = '';
+    }
+  }
+
   document.getElementById('view_res_batch_number').value = r.batch_number || '';
 
   // Badges
@@ -1640,7 +2277,8 @@ function cancelResourceEditMode() {
   if (currentResource) {
     const r = currentResource;
     document.getElementById('view_res_code').value = r.code || '';
-    document.getElementById('view_res_category').value = r.category || 'Relief Goods';
+    const catSelect = document.getElementById('view_res_category');
+    if (catSelect) catSelect.value = r.category || 'Relief Goods';
     document.getElementById('view_res_name').value = r.name || '';
     document.getElementById('view_res_unit').value = r.unit || '';
     document.getElementById('view_res_min_threshold').value = r.min_threshold || 50;
@@ -1649,16 +2287,23 @@ function cancelResourceEditMode() {
     document.getElementById('view_res_damaged_quantity').value = r.damaged_quantity || 0;
     document.getElementById('view_res_storage_location').value = r.storage_location || '';
     document.getElementById('view_res_description').value = r.description || '';
-    document.getElementById('view_res_brand').value = r.brand || '';
+    const brandSelect = document.getElementById('view_res_brand');
+    if (brandSelect) brandSelect.value = r.brand || '';
     document.getElementById('view_res_item_condition').value = r.item_condition || 'New';
     document.getElementById('view_res_weight_per_unit').value = r.weight_per_unit || '';
     document.getElementById('view_res_cost_per_unit').value = r.cost_per_unit || '';
     document.getElementById('view_res_date_acquired').value = r.date_acquired || '';
     document.getElementById('view_res_expiry_date').value = r.expiry_date || '';
     document.getElementById('view_res_is_perishable').checked = (r.is_perishable == 1);
-    document.getElementById('view_res_supplier_donor').value = r.supplier_donor || '';
+    const suppSelect = document.getElementById('view_res_supplier_donor');
+    if (suppSelect) suppSelect.value = r.supplier_donor || '';
     document.getElementById('view_res_batch_number').value = r.batch_number || '';
   }
+
+  ['category', 'brand', 'supplier'].forEach(f => {
+    const c = document.getElementById(`dynAddContainer_${f}_view`);
+    if (c) c.style.display = 'none';
+  });
 
   setResourceFormInputsDisabled(true);
   document.getElementById('view_res_edit_banner').style.display = 'none';
@@ -1684,6 +2329,11 @@ function setResourceFormInputsDisabled(disabled) {
   fields.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = disabled;
+  });
+
+  ['category', 'brand', 'supplier'].forEach(f => {
+    const btn = document.getElementById(`btnAdd_${f}_view`);
+    if (btn) btn.disabled = disabled;
   });
 }
 
@@ -2546,6 +3196,17 @@ function openDirectAllocationModal() {
   openModal('directAllocationModal');
 }
 
+// Open Direct Allocation Modal with Pre-selected Barangay
+function openDirectAllocationModalWithBarangay(barangayId) {
+  openDirectAllocationModal();
+  if (barangayId) {
+    const bSel = document.querySelector('#directAllocationForm select[name="barangay_id"]');
+    if (bSel) {
+      bSel.value = barangayId;
+    }
+  }
+}
+
 // On Direct Resource Change
 function onDirectResourceChange() {
   const sel = document.getElementById('directAllocResource');
@@ -2827,7 +3488,7 @@ function updateAllocationRowInDOM(data) {
   }
 }
 
-// Close modal when clicking on backdrop
+// Close modal when clicking on backdrop + dynamic field keyboard support
 document.addEventListener('DOMContentLoaded', () => {
   ['createResourceModal', 'viewResourceModal', 'reviewRequisitionModal', 'processAllocationModal', 'directAllocationModal'].forEach(id => {
     const m = document.getElementById(id);
@@ -2838,6 +3499,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
+  });
+
+  // Enter/Escape keyboard handling for dynamic fields in Create and View modals
+  ['create', 'view'].forEach(mode => {
+    ['category', 'brand', 'supplier'].forEach(field => {
+      const fieldInput = document.getElementById(`new_${field}_input_${mode}`);
+      if (fieldInput) {
+        fieldInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmDynamicField(field, mode);
+          } else if (e.key === 'Escape') {
+            toggleDynamicField(field, mode);
+          }
+        });
+      }
+    });
   });
 });
 </script>

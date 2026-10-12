@@ -69,7 +69,6 @@ if (!in_array($viewTab, ['active', 'archived'], true)) {
 }
 
 $search = trim($_GET['search'] ?? '');
-$filterRisk = trim($_GET['risk_level'] ?? '');
 
 // Counts for navigation tabs
 $activeCountStmt = $db->prepare("SELECT COUNT(*) FROM puroks WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)");
@@ -91,18 +90,11 @@ if ($viewTab === 'archived') {
 }
 
 if (!empty($search)) {
-  $sql .= " AND (name LIKE ? OR hazard_types LIKE ?)";
-  $like = "%$search%";
-  $params[] = $like;
-  $params[] = $like;
+  $sql .= " AND name LIKE ?";
+  $params[] = "%$search%";
 }
 
-if (!empty($filterRisk)) {
-  $sql .= " AND risk_level = ?";
-  $params[] = $filterRisk;
-}
-
-$sql .= " ORDER BY (risk_level = 'Critical') DESC, (risk_level = 'High') DESC, name ASC";
+$sql .= " ORDER BY name ASC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $puroks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -112,8 +104,7 @@ $metricsStmt = $db->prepare("
     SELECT 
         COUNT(*) as total_puroks,
         COALESCE(SUM(households), 0) as total_households,
-        COALESCE(SUM(population), 0) as total_population,
-        COALESCE(SUM(CASE WHEN risk_level IN ('Critical', 'High') THEN 1 ELSE 0 END), 0) as critical_puroks
+        COALESCE(SUM(population), 0) as total_population
     FROM puroks 
     WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)
 ");
@@ -123,11 +114,20 @@ $metrics = $metricsStmt->fetch(PDO::FETCH_ASSOC);
 $totalPuroks = (int) ($metrics['total_puroks'] ?? 0);
 $totalHouseholds = (int) ($metrics['total_households'] ?? 0);
 $totalPopulation = (int) ($metrics['total_population'] ?? 0);
-$criticalPuroks = (int) ($metrics['critical_puroks'] ?? 0);
+
+$brgyLat = !empty($barangay['coordinates_lat']) ? (float) $barangay['coordinates_lat'] : 8.228000;
+$brgyLng = !empty($barangay['coordinates_lng']) ? (float) $barangay['coordinates_lng'] : 124.245200;
+$brgyName = $barangay['name'] ?? 'Barangay';
 
 $pageTitle = "Manage Puroks — Barangay " . ($barangay['name'] ?? '');
 require_once __DIR__ . '/../layouts/header.php';
 ?>
+
+<!-- Leaflet GIS Library -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <style>
   /* High-clarity disabled inputs for View Mode */
@@ -145,6 +145,7 @@ require_once __DIR__ . '/../layouts/header.php';
     text-decoration: none;
     display: block;
   }
+
   .table-user-link:hover div:first-child {
     color: var(--color-secondary, #2F6F73) !important;
     text-decoration: underline;
@@ -225,6 +226,7 @@ require_once __DIR__ . '/../layouts/header.php';
   #createPurokModal .modal-body::-webkit-scrollbar {
     width: 6px;
   }
+
   #viewPurokModal .modal-body::-webkit-scrollbar-thumb,
   #createPurokModal .modal-body::-webkit-scrollbar-thumb {
     background: #CBD5E1;
@@ -238,6 +240,7 @@ require_once __DIR__ . '/../layouts/header.php';
     border-bottom: 1px solid var(--color-border);
     margin-bottom: var(--space-4);
   }
+
   .nav-tab-item {
     display: inline-flex;
     align-items: center;
@@ -250,15 +253,18 @@ require_once __DIR__ . '/../layouts/header.php';
     border-bottom: 2px solid transparent;
     transition: all 0.15s ease;
   }
+
   .nav-tab-item:hover {
     color: var(--color-primary);
     background-color: var(--color-surface-subtle);
   }
+
   .nav-tab-item.active {
     color: var(--color-primary);
     border-bottom-color: var(--color-secondary);
     background-color: var(--color-surface);
   }
+
   .nav-tab-badge {
     display: inline-block;
     padding: 2px 6px;
@@ -268,6 +274,7 @@ require_once __DIR__ . '/../layouts/header.php';
     background-color: var(--color-surface-subtle);
     color: var(--color-text-muted);
   }
+
   .nav-tab-item.active .nav-tab-badge {
     background-color: var(--color-primary);
     color: #FFF;
@@ -367,6 +374,30 @@ require_once __DIR__ . '/../layouts/header.php';
     color: #DC2626 !important;
     background-color: #FEE2E2 !important;
   }
+
+  /* Leaflet Pinpointing Tool Styling */
+  .modal-map-picker {
+    width: 100%;
+    height: 230px;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--color-border, #CBD5E1);
+    margin-top: 6px;
+    z-index: 1;
+    background: #EBF1F5;
+  }
+
+  .map-pin-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    border-radius: var(--radius-md, 8px);
+    font-size: 11px;
+    color: #1D4ED8;
+    line-height: 1.4;
+  }
 </style>
 
 <div class="page-header">
@@ -379,7 +410,8 @@ require_once __DIR__ . '/../layouts/header.php';
   </div>
   <div class="page-header-actions">
     <button class="btn btn-primary" onclick="openCreatePurokModal()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        style="margin-right:4px;">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
       </svg>
@@ -389,7 +421,8 @@ require_once __DIR__ . '/../layouts/header.php';
 </div>
 
 <!-- Summary Metric Cards (Active Jurisdiction Data) -->
-<div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: var(--space-4);">
+<div class="metrics-grid"
+  style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: var(--space-4);">
   <div class="metric-card">
     <div class="metric-header">
       <span class="metric-label">Active Puroks</span>
@@ -426,149 +459,117 @@ require_once __DIR__ . '/../layouts/header.php';
     <div class="metric-value"><?= number_format($totalPopulation) ?></div>
     <div class="metric-meta">Active Resident Individuals</div>
   </div>
-
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-label">High / Critical Vulnerability</span>
-      <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-      </svg>
-    </div>
-    <div class="metric-value" style="color: <?= $criticalPuroks > 0 ? 'var(--color-danger)' : 'var(--color-success)' ?>;">
-      <?= number_format($criticalPuroks) ?>
-    </div>
-    <div class="metric-meta">Puroks Requiring Priority Monitoring</div>
-  </div>
 </div>
 
 <!-- Tabs Navigation: Active vs Archived -->
-<div class="nav-tabs">
-  <a href="?tab=active" class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-      <circle cx="12" cy="10" r="3"></circle>
-    </svg>
-    Active Puroks
-    <span class="nav-tab-badge"><?= $activeCount ?></span>
-  </a>
-  <a href="?tab=archived" class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="21 8 21 21 3 21 3 8"></polyline>
-      <rect x="1" y="3" width="22" height="5"></rect>
-      <line x1="10" y1="12" x2="14" y2="12"></line>
-    </svg>
-    Archived Puroks
-    <span class="nav-tab-badge"><?= $archivedCount ?></span>
-  </a>
-</div>
-
-<!-- Filter & Search Bar -->
-<div class="card" style="margin-bottom: var(--space-4);">
-  <div class="card-body" style="padding: 10px 14px;">
-    <form method="GET" action="<?= BASE_URL ?>/views/barangay/puroks.php" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:0;">
-      <input type="hidden" name="tab" value="<?= htmlspecialchars($viewTab) ?>">
-
-      <div class="search-input-wrap" style="min-width:240px;flex:1;max-width:320px;">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" name="search" class="form-control" placeholder="Search by purok name or hazard..." value="<?= clean($search) ?>">
-      </div>
-
-      <select name="risk_level" class="form-control" style="width:170px;">
-        <option value="">All Vulnerability Levels</option>
-        <option value="Critical" <?= $filterRisk === 'Critical' ? 'selected' : '' ?>>Critical</option>
-        <option value="High" <?= $filterRisk === 'High' ? 'selected' : '' ?>>High</option>
-        <option value="Moderate" <?= $filterRisk === 'Moderate' ? 'selected' : '' ?>>Moderate</option>
-        <option value="Low" <?= $filterRisk === 'Low' ? 'selected' : '' ?>>Low</option>
-      </select>
-
-      <button type="submit" class="btn btn-outline">Apply Filter</button>
-      <?php if (!empty($search) || !empty($filterRisk)): ?>
-        <a href="?tab=<?= $viewTab ?>" class="btn btn-outline" style="color:var(--color-text-muted);">Reset</a>
-      <?php endif; ?>
-
-      <div style="margin-left:auto;font-size:11px;color:var(--color-text-muted);font-weight:600;">
-        Showing: <?= count($puroks) ?> <?= $viewTab === 'archived' ? 'Archived ' : '' ?>Purok(s)
-      </div>
-    </form>
+  <div class="nav-tabs">
+    <a href="?tab=active" class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </svg>
+      Active Puroks
+      <span class="nav-tab-badge"><?= $activeCount ?></span>
+    </a>
+    <a href="?tab=archived" class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="21 8 21 21 3 21 3 8"></polyline>
+        <rect x="1" y="3" width="22" height="5"></rect>
+        <line x1="10" y1="12" x2="14" y2="12"></line>
+      </svg>
+      Archived Puroks
+      <span class="nav-tab-badge"><?= $archivedCount ?></span>
+    </a>
   </div>
-</div>
 
-<!-- Puroks Table (Action Column is VIEW ONLY) -->
-<div class="table-responsive">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Purok Name</th>
-        <th>Primary Hazard Types</th>
-        <th>Vulnerability Level</th>
-        <th>Households</th>
-        <th>Population</th>
-        <th>GPS Coordinates</th>
-        <?php if ($viewTab === 'archived'): ?>
-          <th>Status</th>
+  <!-- Filter & Search Bar -->
+  <div class="card" style="margin-bottom: var(--space-4);">
+    <div class="card-body" style="padding: 10px 14px;">
+      <form method="GET" action="<?= BASE_URL ?>/views/barangay/puroks.php"
+        style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:0;">
+        <input type="hidden" name="tab" value="<?= htmlspecialchars($viewTab) ?>">
+
+        <div class="search-input-wrap" style="min-width:240px;flex:1;max-width:320px;">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" name="search" class="form-control" placeholder="Search by purok name..."
+            value="<?= clean($search) ?>">
+        </div>
+
+        <button type="submit" class="btn btn-outline">Apply Filter</button>
+        <?php if (!empty($search)): ?>
+          <a href="?tab=<?= $viewTab ?>" class="btn btn-outline" style="color:var(--color-text-muted);">Reset</a>
         <?php endif; ?>
-        <th style="text-align:right;width:120px;">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if (empty($puroks)): ?>
+
+        <div style="margin-left:auto;font-size:11px;color:var(--color-text-muted);font-weight:600;">
+          Showing: <?= count($puroks) ?> <?= $viewTab === 'archived' ? 'Archived ' : '' ?>Purok(s)
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Puroks Table (Action Column is VIEW ONLY) -->
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
         <tr>
-          <td colspan="<?= $viewTab === 'archived' ? '8' : '7' ?>" style="text-align:center;padding:36px;color:var(--color-text-muted);">
-            No purok records found in <?= $viewTab === 'archived' ? 'Archived' : 'Active' ?> registry matching your filter criteria.
-          </td>
+          <th>Purok Name</th>
+          <th>Households</th>
+          <th>Population</th>
+          <?php if ($viewTab === 'archived'): ?>
+            <th>Status</th>
+          <?php endif; ?>
+          <th style="text-align:right;width:120px;">Actions</th>
         </tr>
-      <?php else: ?>
-        <?php foreach ($puroks as $p): ?>
-          <?php
-          $pRisk = $p['risk_level'] ?? 'Moderate';
-          $pColors = ['Critical' => 'badge-danger', 'High' => 'badge-warning', 'Moderate' => 'badge-info', 'Low' => 'badge-success'];
-          $pBadge = $pColors[$pRisk] ?? 'badge-neutral';
-          $isCritical = ($pRisk === 'Critical' || $pRisk === 'High');
-          ?>
-          <tr style="<?= $isCritical ? 'background-color: #FFFDF8;' : '' ?>">
-            <td>
-              <a href="javascript:void(0)" onclick="viewPurokDetails(<?= htmlspecialchars(json_encode($p)) ?>)" class="table-user-link">
-                <div style="font-weight:700;color:var(--color-primary);font-size:12.5px;"><?= clean($p['name']) ?></div>
-                <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:1px;">Barangay <?= clean($barangay['name']) ?></div>
-              </a>
-            </td>
-            <td>
-              <div style="font-size:10.5px;color:var(--color-text-secondary);max-width:240px;line-height:1.3;">
-                <?= clean($p['hazard_types'] ?: 'Standard Flood/Squall Risk') ?>
-              </div>
-            </td>
-            <td>
-              <span class="badge <?= $pBadge ?>" style="font-size:9.5px;"><?= clean($pRisk) ?></span>
-            </td>
-            <td style="font-family:var(--font-secondary);font-size:11.5px;">
-              <?= number_format($p['households']) ?>
-            </td>
-            <td style="font-family:var(--font-secondary);font-weight:700;font-size:12px;color:var(--color-primary);">
-              <?= number_format($p['population']) ?>
-            </td>
-            <td style="font-family:var(--font-secondary);font-size:10.5px;color:var(--color-text-secondary);white-space:nowrap;">
-              <?= clean($p['coordinates_lat']) ?>, <?= clean($p['coordinates_lng']) ?>
-            </td>
-            <?php if ($viewTab === 'archived'): ?>
-              <td>
-                <span class="badge badge-neutral" style="font-size:9.5px;">Archived</span>
-              </td>
-            <?php endif; ?>
-            <td style="text-align:right;">
-              <div style="display:inline-flex;gap:4px;justify-content:flex-end;">
-                <!-- View Only Action Button (Pops up modal with View details, Delete, Archive, and Edit) -->
-                <button type="button" class="btn btn-outline btn-sm" style="padding:3px 10px;font-size:10.5px;"
-                  onclick="viewPurokDetails(<?= htmlspecialchars(json_encode($p)) ?>)" title="View Purok Details">
-                  View
-                </button>
-              </div>
+      </thead>
+      <tbody>
+        <?php if (empty($puroks)): ?>
+          <tr>
+            <td colspan="<?= $viewTab === 'archived' ? '5' : '4' ?>"
+              style="text-align:center;padding:36px;color:var(--color-text-muted);">
+              No purok records found in <?= $viewTab === 'archived' ? 'Archived' : 'Active' ?> registry matching your filter
+              criteria.
             </td>
           </tr>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</div>
+        <?php else: ?>
+          <?php foreach ($puroks as $p): ?>
+            <tr>
+              <td>
+                <a href="javascript:void(0)" onclick="viewPurokDetails(<?= htmlspecialchars(json_encode($p)) ?>)"
+                  class="table-user-link">
+                  <div style="font-weight:700;color:var(--color-primary);font-size:12.5px;"><?= clean($p['name']) ?></div>
+                  <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:1px;">Barangay
+                    <?= clean($barangay['name']) ?>
+                  </div>
+                </a>
+              </td>
+              <td style="font-family:var(--font-secondary);font-size:11.5px;">
+                <?= number_format($p['households']) ?>
+              </td>
+              <td style="font-family:var(--font-secondary);font-weight:700;font-size:12px;color:var(--color-primary);">
+                <?= number_format($p['population']) ?>
+              </td>
+              <?php if ($viewTab === 'archived'): ?>
+                <td>
+                  <span class="badge badge-neutral" style="font-size:9.5px;">Archived</span>
+                </td>
+              <?php endif; ?>
+              <td style="text-align:right;">
+                <div style="display:inline-flex;gap:4px;justify-content:flex-end;">
+                  <button type="button" class="btn btn-outline btn-sm" style="padding:3px 10px;font-size:10.5px;"
+                    onclick="viewPurokDetails(<?= htmlspecialchars(json_encode($p)) ?>)" title="View Purok Details">
+                    View
+                  </button>
+                </div>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
 
 <!-- ========================================================================= -->
 <!-- Modal 1: Add New Purok Modal                                              -->
@@ -579,11 +580,13 @@ require_once __DIR__ . '/../layouts/header.php';
       <h3 class="modal-title">Add New Purok to <?= clean($barangay['name'] ?? '') ?></h3>
       <button type="button" class="modal-close-btn" onclick="closeModal('createPurokModal')">&times;</button>
     </div>
-    <form id="createPurokForm" method="POST" action="<?= BASE_URL ?>/backend/functions/puroks/create.php" onsubmit="handleCreatePurok(event)">
+    <form id="createPurokForm" method="POST" action="<?= BASE_URL ?>/backend/functions/puroks/create.php"
+      onsubmit="handleCreatePurok(event)">
       <input type="hidden" name="action" value="create">
       <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
-      <div class="modal-body" style="padding:18px 20px;display:flex;flex-direction:column;gap:12px;max-height:75vh;overflow-y:auto;">
-        
+      <div class="modal-body"
+        style="padding:18px 20px;display:flex;flex-direction:column;gap:12px;max-height:75vh;overflow-y:auto;">
+
         <!-- Purok Cluster Name: Custom Select with Delete Option -->
         <div class="form-group" style="margin-bottom:0;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
@@ -596,7 +599,8 @@ require_once __DIR__ . '/../layouts/header.php';
               onclick="toggleCustomDropdown('create_purok_menu')"
               style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:11px;background:#fff;padding:8px 12px;min-height:38px;">
               <span id="create_purok_text" style="color:var(--color-text-muted);">-- Select Purok Cluster Name --</span>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-text-muted);">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="color:var(--color-text-muted);">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </div>
@@ -605,7 +609,8 @@ require_once __DIR__ . '/../layouts/header.php';
             <!-- Dropdown Menu -->
             <div class="custom-select-menu" id="create_purok_menu"
               style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#ffffff;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,0.12);z-index:1050;max-height:220px;overflow-y:auto;">
-              <div style="padding:6px 8px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;background:#F8FAFC;z-index:2;">
+              <div
+                style="padding:6px 8px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;background:#F8FAFC;z-index:2;">
                 <input type="text" class="form-control form-control-sm" placeholder="Search purok cluster..."
                   style="font-size:11px;padding:4px 8px;" oninput="filterCustomDropdown(this, 'create_purok_options')">
               </div>
@@ -646,7 +651,9 @@ require_once __DIR__ . '/../layouts/header.php';
             <!-- Inline Dynamic Add Box -->
             <div id="dynamicPurokBox_create"
               style="display:none;margin-top:8px;padding:10px 12px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-              <label style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New Purok Cluster to Dropdown & Database</label>
+              <label
+                style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add
+                New Purok Cluster to Dropdown & Database</label>
               <div style="display:flex;gap:6px;">
                 <input type="text" id="dynamic_purok_input_create" class="form-control"
                   placeholder="Type purok name (e.g. Purok Riverside 3)" style="font-size:11px;padding:5px 9px;"
@@ -669,100 +676,7 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
         </div>
 
-        <!-- Primary Hazard Types: Custom Select with Delete Option -->
-        <div class="form-group" style="margin-bottom:0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <label class="form-label form-label-required" style="margin-bottom:0;">Primary Hazard Types</label>
-            <span style="font-size:10px;color:var(--color-text-muted);">Database options</span>
-          </div>
 
-          <div class="custom-select-wrapper" style="position:relative;">
-            <div class="form-control custom-select-trigger" id="create_hazard_trigger"
-              onclick="toggleCustomDropdown('create_hazard_menu')"
-              style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:11px;background:#fff;padding:8px 12px;min-height:38px;">
-              <span id="create_hazard_text" style="color:var(--color-text-muted);">-- Select Primary Hazard Type --</span>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-text-muted);">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-            <input type="hidden" name="hazard_types" id="create_purok_hazards">
-
-            <!-- Dropdown Menu -->
-            <div class="custom-select-menu" id="create_hazard_menu"
-              style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#ffffff;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,0.12);z-index:1050;max-height:220px;overflow-y:auto;">
-              <div style="padding:6px 8px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;background:#F8FAFC;z-index:2;">
-                <input type="text" class="form-control form-control-sm" placeholder="Search hazard type..."
-                  style="font-size:11px;padding:4px 8px;" oninput="filterCustomDropdown(this, 'create_hazard_options')">
-              </div>
-              <div class="custom-options-list" id="create_hazard_options">
-                <?php foreach ($hazardTypeRows as $h): ?>
-                  <div class="custom-option-hazard-item" data-id="<?= (int) $h['id'] ?>" data-value="<?= clean($h['name']) ?>"
-                    onclick="selectCustomHazardOption('create_hazard', this.getAttribute('data-value'))">
-                    <span class="option-label" style="color:var(--color-text-primary);"><?= clean($h['name']) ?></span>
-                    <button type="button" class="btn-trash-option"
-                      onclick="event.stopPropagation(); deleteHazardTypeOption(this.closest('.custom-option-hazard-item').getAttribute('data-id'), this.closest('.custom-option-hazard-item').getAttribute('data-value'))"
-                      title="Delete from database">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                    </button>
-                  </div>
-                <?php endforeach; ?>
-              </div>
-            </div>
-          </div>
-
-          <!-- Dynamic Action Area Below Hazard Select -->
-          <div style="margin-top:6px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span style="font-size:10px;color:var(--color-text-secondary);">Specific hazard not listed?</span>
-              <button type="button" class="btn btn-outline btn-sm" id="btnShowAddHazardCreate"
-                onclick="toggleDynamicHazardInput('create', true)"
-                style="display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 9px;font-weight:600;color:var(--color-primary);border-color:var(--color-primary);background:#F8FAFC;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                + Add Hazard Type
-              </button>
-            </div>
-
-            <!-- Inline Dynamic Add Box -->
-            <div id="dynamicHazardBox_create"
-              style="display:none;margin-top:8px;padding:10px 12px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-              <label style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New Hazard Type to Dropdown & Database</label>
-              <div style="display:flex;gap:6px;">
-                <input type="text" id="dynamic_hazard_input_create" class="form-control"
-                  placeholder="e.g. Flash Flood, Mountain Mudflow" style="font-size:11px;padding:5px 9px;"
-                  onkeydown="if(event.key === 'Enter'){event.preventDefault();addDynamicHazard('create');}">
-                <button type="button" class="btn btn-primary btn-sm" onclick="addDynamicHazard('create')"
-                  style="padding:4px 10px;white-space:nowrap;font-size:10px;display:inline-flex;align-items:center;gap:4px;">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  Add to Select
-                </button>
-                <button type="button" class="btn btn-outline btn-sm" onclick="toggleDynamicHazardInput('create', false)"
-                  style="padding:4px 8px;font-size:10px;">Cancel</button>
-              </div>
-              <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:4px;line-height:1.3;">
-                Entered hazard type will be saved in the database and automatically selected.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label form-label-required">Vulnerability / Risk Level</label>
-          <select name="risk_level" class="form-control" required>
-            <option value="Low">Low (Safe from common inundation)</option>
-            <option value="Moderate" selected>Moderate (Occasional localized pooling)</option>
-            <option value="High">High (Flood prone, swift water current)</option>
-            <option value="Critical">Critical (Riverbank proximity, red warning zone)</option>
-          </select>
-        </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
@@ -775,20 +689,50 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Latitude</label>
-            <input type="number" step="0.000001" name="coordinates_lat" class="form-control"
-              value="<?= clean($barangay['coordinates_lat']) ?>">
+        <!-- Leaflet Geolocation Pinpointing Tool -->
+        <div style="margin-top:2px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <label class="form-label form-label-required"
+              style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-weight:600;">
+              <span>Pinpoint Exact Location on Map</span>
+            </label>
+            <button type="button" class="btn btn-outline btn-sm"
+              style="font-size:10px;padding:2px 8px;border-radius:4px;" onclick="recenterCreatePurokMap()">
+              Center on Barangay
+            </button>
           </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Longitude</label>
-            <input type="number" step="0.000001" name="coordinates_lng" class="form-control"
-              value="<?= clean($barangay['coordinates_lng']) ?>">
+
+          <div class="map-pin-hint">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="flex-shrink:0;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span><strong>Click anywhere on the map or drag the pin marker</strong> to pinpoint the purok location.
+              Latitude and Longitude are captured automatically.</span>
+          </div>
+
+          <div id="createPurokMap" class="modal-map-picker"></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label form-label-required" style="font-size:11px;">Captured Latitude</label>
+              <input type="number" step="0.000001" name="coordinates_lat" id="create_purok_lat" class="form-control"
+                value="<?= clean($brgyLat) ?>" required onchange="manualCreatePurokCoordInput()"
+                style="background:#FAFBFB;font-family:monospace;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label form-label-required" style="font-size:11px;">Captured Longitude</label>
+              <input type="number" step="0.000001" name="coordinates_lng" id="create_purok_lng" class="form-control"
+                value="<?= clean($brgyLng) ?>" required onchange="manualCreatePurokCoordInput()"
+                style="background:#FAFBFB;font-family:monospace;">
+            </div>
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--color-border);background:#F8FAFC;display:flex;justify-content:flex-end;gap:8px;">
+      <div class="modal-footer"
+        style="padding:12px 20px;border-top:1px solid var(--color-border);background:#F8FAFC;display:flex;justify-content:flex-end;gap:8px;">
         <button type="button" class="btn btn-outline" onclick="closeModal('createPurokModal')">Cancel</button>
         <button type="submit" class="btn btn-primary" id="btnSubmitCreatePurok">Save Purok</button>
       </div>
@@ -801,7 +745,8 @@ require_once __DIR__ . '/../layouts/header.php';
 <!-- Opens on View Click: Shows View mode, with Delete, Archive, and Edit      -->
 <!-- ========================================================================= -->
 <div class="modal-overlay" id="viewPurokModal">
-  <form class="modal-dialog" id="viewPurokForm" method="POST" action="<?= BASE_URL ?>/backend/functions/puroks/update.php" onsubmit="handleViewPurokSave(event)">
+  <form class="modal-dialog" id="viewPurokForm" method="POST"
+    action="<?= BASE_URL ?>/backend/functions/puroks/update.php" onsubmit="handleViewPurokSave(event)">
     <input type="hidden" name="action" value="update">
     <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
     <input type="hidden" name="id" id="view_purok_id">
@@ -809,34 +754,41 @@ require_once __DIR__ . '/../layouts/header.php';
     <div class="modal-header">
       <div style="display:flex;align-items:center;gap:8px;">
         <span id="viewModalStatusBadge"></span>
-        <span id="viewModalRiskBadge"></span>
       </div>
-      <button type="button" class="modal-close-btn" onclick="closeModal('viewPurokModal')" title="Close">&times;</button>
+      <button type="button" class="modal-close-btn" onclick="closeModal('viewPurokModal')"
+        title="Close">&times;</button>
     </div>
 
     <div class="modal-body">
       <!-- Section 1: Purok Identity Banner -->
       <div style="padding-bottom:12px;border-bottom:1px solid var(--color-border-light);">
-        <div id="view_purok_display_name" style="font-weight:700;font-size:16px;color:var(--color-primary);line-height:1.2;"></div>
+        <div id="view_purok_display_name"
+          style="font-weight:700;font-size:16px;color:var(--color-primary);line-height:1.2;"></div>
         <div id="view_purok_meta_sub" style="font-size:10px;color:var(--color-text-muted);margin-top:4px;"></div>
       </div>
 
       <!-- Section 2: Heading "Purok Details" -->
-      <div style="margin:14px 0 10px 0;padding-bottom:6px;border-bottom:1px solid var(--color-border-light);display:flex;align-items:center;justify-content:space-between;">
-        <h4 id="viewPurokSectionHeading" style="margin:0;font-size:12px;font-weight:700;color:var(--color-primary);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+      <div
+        style="margin:14px 0 10px 0;padding-bottom:6px;border-bottom:1px solid var(--color-border-light);display:flex;align-items:center;justify-content:space-between;">
+        <h4 id="viewPurokSectionHeading"
+          style="margin:0;font-size:12px;font-weight:700;color:var(--color-primary);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
           Purok Details
         </h4>
-        <span id="viewPurokModeHintText" style="font-size:9.5px;color:var(--color-text-muted);font-weight:500;">(View Only Mode)</span>
+        <span id="viewPurokModeHintText" style="font-size:9.5px;color:var(--color-text-muted);font-weight:500;">(View
+          Only Mode)</span>
       </div>
 
       <!-- Form Inputs: Purok Cluster Name -->
       <div class="form-group" style="margin-bottom:10px;">
         <label class="form-label form-label-required">Purok Cluster Name</label>
-        
+
         <!-- View Mode: Readonly text input -->
         <input type="text" id="view_purok_name_readonly" class="form-control" disabled>
-        
+
         <!-- Edit Mode: Custom Select with Options and Dynamic Add -->
         <div id="edit_purok_name_wrapper" style="display:none;">
           <div class="custom-select-wrapper" style="position:relative;">
@@ -844,7 +796,8 @@ require_once __DIR__ . '/../layouts/header.php';
               onclick="toggleCustomDropdown('edit_purok_menu')"
               style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:11px;background:#fff;padding:8px 12px;min-height:38px;">
               <span id="edit_purok_text" style="color:var(--color-text-muted);">-- Select Purok Cluster Name --</span>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-text-muted);">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="color:var(--color-text-muted);">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </div>
@@ -853,7 +806,8 @@ require_once __DIR__ . '/../layouts/header.php';
             <!-- Dropdown Menu -->
             <div class="custom-select-menu" id="edit_purok_menu"
               style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#ffffff;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,0.12);z-index:1050;max-height:220px;overflow-y:auto;">
-              <div style="padding:6px 8px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;background:#F8FAFC;z-index:2;">
+              <div
+                style="padding:6px 8px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;background:#F8FAFC;z-index:2;">
                 <input type="text" class="form-control form-control-sm" placeholder="Search purok cluster..."
                   style="font-size:11px;padding:4px 8px;" oninput="filterCustomDropdown(this, 'edit_purok_options')">
               </div>
@@ -894,7 +848,9 @@ require_once __DIR__ . '/../layouts/header.php';
             <!-- Inline Dynamic Add Box -->
             <div id="dynamicPurokBox_edit"
               style="display:none;margin-top:8px;padding:10px 12px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-              <label style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New Purok Cluster to Dropdown & Database</label>
+              <label
+                style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add
+                New Purok Cluster to Dropdown & Database</label>
               <div style="display:flex;gap:6px;">
                 <input type="text" id="dynamic_purok_input_edit" class="form-control"
                   placeholder="Type purok name (e.g. Purok Riverside 3)" style="font-size:11px;padding:5px 9px;"
@@ -918,104 +874,7 @@ require_once __DIR__ . '/../layouts/header.php';
         </div>
       </div>
 
-      <!-- Form Inputs: Primary Hazard Types -->
-      <div class="form-group" style="margin-bottom:10px;">
-        <label class="form-label form-label-required">Primary Hazard Types</label>
-        
-        <!-- View Mode: Readonly text input -->
-        <input type="text" id="view_purok_hazards_readonly" class="form-control" disabled>
 
-        <!-- Edit Mode: Custom Select with Options and Dynamic Add -->
-        <div id="edit_purok_hazards_wrapper" style="display:none;">
-          <div class="custom-select-wrapper" style="position:relative;">
-            <div class="form-control custom-select-trigger" id="edit_hazard_trigger"
-              onclick="toggleCustomDropdown('edit_hazard_menu')"
-              style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:11px;background:#fff;padding:8px 12px;min-height:38px;">
-              <span id="edit_hazard_text" style="color:var(--color-text-muted);">-- Select Primary Hazard Type --</span>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-text-muted);">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-            <input type="hidden" name="hazard_types" id="edit_purok_hazards">
-
-            <!-- Dropdown Menu -->
-            <div class="custom-select-menu" id="edit_hazard_menu"
-              style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#ffffff;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,0.12);z-index:1050;max-height:220px;overflow-y:auto;">
-              <div style="padding:6px 8px;border-bottom:1px solid #E2E8F0;position:sticky;top:0;background:#F8FAFC;z-index:2;">
-                <input type="text" class="form-control form-control-sm" placeholder="Search hazard type..."
-                  style="font-size:11px;padding:4px 8px;" oninput="filterCustomDropdown(this, 'edit_hazard_options')">
-              </div>
-              <div class="custom-options-list" id="edit_hazard_options">
-                <?php foreach ($hazardTypeRows as $h): ?>
-                  <div class="custom-option-hazard-item" data-id="<?= (int) $h['id'] ?>" data-value="<?= clean($h['name']) ?>"
-                    onclick="selectCustomHazardOption('edit_hazard', this.getAttribute('data-value'))">
-                    <span class="option-label" style="color:var(--color-text-primary);"><?= clean($h['name']) ?></span>
-                    <button type="button" class="btn-trash-option"
-                      onclick="event.stopPropagation(); deleteHazardTypeOption(this.closest('.custom-option-hazard-item').getAttribute('data-id'), this.closest('.custom-option-hazard-item').getAttribute('data-value'))"
-                      title="Delete from database">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                    </button>
-                  </div>
-                <?php endforeach; ?>
-              </div>
-            </div>
-          </div>
-
-          <!-- Dynamic Action Area Below Select -->
-          <div style="margin-top:6px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-              <span style="font-size:10px;color:var(--color-text-secondary);">Specific hazard not listed?</span>
-              <button type="button" class="btn btn-outline btn-sm" id="btnShowAddHazardEdit"
-                onclick="toggleDynamicHazardInput('edit', true)"
-                style="display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 9px;font-weight:600;color:var(--color-primary);border-color:var(--color-primary);background:#F8FAFC;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                + Add Hazard Type
-              </button>
-            </div>
-
-            <!-- Inline Dynamic Add Box -->
-            <div id="dynamicHazardBox_edit"
-              style="display:none;margin-top:8px;padding:10px 12px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-              <label style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New Hazard Type to Dropdown & Database</label>
-              <div style="display:flex;gap:6px;">
-                <input type="text" id="dynamic_hazard_input_edit" class="form-control"
-                  placeholder="e.g. Flash Flood, Mountain Mudflow" style="font-size:11px;padding:5px 9px;"
-                  onkeydown="if(event.key === 'Enter'){event.preventDefault();addDynamicHazard('edit');}">
-                <button type="button" class="btn btn-primary btn-sm" onclick="addDynamicHazard('edit')"
-                  style="padding:4px 10px;white-space:nowrap;font-size:10px;display:inline-flex;align-items:center;gap:4px;">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  Add to Select
-                </button>
-                <button type="button" class="btn btn-outline btn-sm" onclick="toggleDynamicHazardInput('edit', false)"
-                  style="padding:4px 8px;font-size:10px;">Cancel</button>
-              </div>
-              <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:4px;line-height:1.3;">
-                Entered hazard type will be saved in the database and automatically selected.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Vulnerability / Risk Level -->
-      <div class="form-group" style="margin-bottom:10px;">
-        <label class="form-label form-label-required">Vulnerability / Risk Level</label>
-        <select name="risk_level" id="view_purok_risk" class="form-control" disabled required>
-          <option value="Low">Low (Safe from common inundation)</option>
-          <option value="Moderate">Moderate (Occasional localized pooling)</option>
-          <option value="High">High (Flood prone, swift water current)</option>
-          <option value="Critical">Critical (Riverbank proximity, red warning zone)</option>
-        </select>
-      </div>
 
       <!-- Households & Population -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -1029,26 +888,67 @@ require_once __DIR__ . '/../layouts/header.php';
         </div>
       </div>
 
-      <!-- GPS Coordinates -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Latitude</label>
-          <input type="number" step="0.000001" name="coordinates_lat" id="view_purok_lat" class="form-control" disabled>
+      <!-- Leaflet Geolocation Pinpointing & Coordinates -->
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--color-border-light);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <label class="form-label" style="margin-bottom:0;display:flex;align-items:center;gap:6px;font-weight:600;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            <span>Purok Geolocation Pinpoint</span>
+          </label>
+          <div id="viewPurokMapControls" style="display:none;align-items:center;gap:6px;">
+            <button type="button" class="btn btn-outline btn-sm"
+              style="font-size:10px;padding:2px 8px;border-radius:4px;" onclick="recenterEditPurokMap()">
+              🎯 Center on Barangay
+            </button>
+            <button type="button" class="btn btn-outline btn-sm"
+              style="font-size:10px;padding:2px 8px;border-radius:4px;" onclick="resetEditPurokPinToOriginal()">
+              ↺ Reset Pin
+            </button>
+          </div>
         </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Longitude</label>
-          <input type="number" step="0.000001" name="coordinates_lng" id="view_purok_lng" class="form-control" disabled>
+
+        <div id="viewPurokMapHint" class="map-pin-hint" style="display:none;margin-bottom:6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="flex-shrink:0;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span><strong>Click anywhere on the map or drag the pin marker</strong> to change the purok location.
+            Coordinates update automatically.</span>
+        </div>
+
+        <div id="viewPurokMap" class="modal-map-picker"></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px;">Captured Latitude</label>
+            <input type="number" step="0.000001" name="coordinates_lat" id="view_purok_lat" class="form-control"
+              disabled onchange="manualEditPurokCoordInput()" style="background:#FAFBFB;font-family:monospace;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px;">Captured Longitude</label>
+            <input type="number" step="0.000001" name="coordinates_lng" id="view_purok_lng" class="form-control"
+              disabled onchange="manualEditPurokCoordInput()" style="background:#FAFBFB;font-family:monospace;">
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Modal Footer: Delete, Archive, Restore on Left; Cancel, Edit, Save, Close on Right -->
-    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div class="modal-footer"
+      style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <!-- Left Actions: Delete, Archive, Restore -->
       <div style="display:flex;gap:6px;align-items:center;">
         <!-- Delete Button (Triggers confirmation dialog) -->
-        <button type="button" class="btn btn-outline btn-sm" id="modalPurokDeleteBtn" style="color:var(--color-danger);border-color:var(--color-danger);" onclick="onModalPurokDelete()" title="Permanently delete purok">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;">
+        <button type="button" class="btn btn-outline btn-sm" id="modalPurokDeleteBtn"
+          style="color:var(--color-danger);border-color:var(--color-danger);" onclick="onModalPurokDelete()"
+          title="Permanently delete purok">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="margin-right:3px;vertical-align:-1px;">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
@@ -1056,8 +956,11 @@ require_once __DIR__ . '/../layouts/header.php';
         </button>
 
         <!-- Archive Button (visible when active) -->
-        <button type="button" class="btn btn-outline btn-sm" id="modalPurokArchiveBtn" style="color:var(--color-warning, #D97706);border-color:var(--color-warning, #D97706);" onclick="onModalPurokArchive()" title="Archive purok (moves to Archived Puroks tab)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;">
+        <button type="button" class="btn btn-outline btn-sm" id="modalPurokArchiveBtn"
+          style="color:var(--color-warning, #D97706);border-color:var(--color-warning, #D97706);"
+          onclick="onModalPurokArchive()" title="Archive purok (moves to Archived Puroks tab)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="margin-right:3px;vertical-align:-1px;">
             <polyline points="21 8 21 21 3 21 3 8"></polyline>
             <rect x="1" y="3" width="22" height="5"></rect>
             <line x1="10" y1="12" x2="14" y2="12"></line>
@@ -1066,8 +969,11 @@ require_once __DIR__ . '/../layouts/header.php';
         </button>
 
         <!-- Restore Button (visible when viewing archived purok) -->
-        <button type="button" class="btn btn-outline btn-sm" id="modalPurokRestoreBtn" style="color:var(--color-success);border-color:var(--color-success);display:none;" onclick="onModalPurokRestore()" title="Restore purok back to active list">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;">
+        <button type="button" class="btn btn-outline btn-sm" id="modalPurokRestoreBtn"
+          style="color:var(--color-success);border-color:var(--color-success);display:none;"
+          onclick="onModalPurokRestore()" title="Restore purok back to active list">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="margin-right:3px;vertical-align:-1px;">
             <polyline points="1 4 1 10 7 10"></polyline>
             <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
           </svg>
@@ -1078,13 +984,15 @@ require_once __DIR__ . '/../layouts/header.php';
       <!-- Right Actions: Cancel, Edit, Save Changes, Close -->
       <div style="display:flex;gap:6px;align-items:center;">
         <!-- Cancel Edit Button (visible only in edit mode) -->
-        <button type="button" class="btn btn-outline btn-sm" id="modalPurokCancelEditBtn" onclick="cancelPurokEditMode()" style="display:none;">
+        <button type="button" class="btn btn-outline btn-sm" id="modalPurokCancelEditBtn"
+          onclick="cancelPurokEditMode()" style="display:none;">
           Cancel
         </button>
 
         <!-- Edit Button (visible in view mode) -->
         <button type="button" class="btn btn-primary btn-sm" id="modalPurokEditBtn" onclick="enablePurokEditMode()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="margin-right:3px;vertical-align:-1px;">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
           </svg>
@@ -1115,7 +1023,8 @@ require_once __DIR__ . '/../layouts/header.php';
       <button type="button" class="modal-close-btn" onclick="closeModal('confirmationModal')">&times;</button>
     </div>
     <div class="modal-body">
-      <p id="confirmModalMessage" style="font-size:12px;color:var(--color-text);line-height:1.5;">Are you sure you want to proceed with this operation?</p>
+      <p id="confirmModalMessage" style="font-size:12px;color:var(--color-text);line-height:1.5;">Are you sure you want
+        to proceed with this operation?</p>
     </div>
     <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;">
       <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('confirmationModal')">Cancel</button>
@@ -1125,9 +1034,29 @@ require_once __DIR__ . '/../layouts/header.php';
 </div>
 
 <script>
+  const BRGY_CENTER_LAT = <?= (float) $brgyLat ?>;
+  const BRGY_CENTER_LNG = <?= (float) $brgyLng ?>;
+  const BRGY_NAME = <?= json_encode($brgyName) ?>;
+
   let currentPurokInModal = null;
   let isEditMode = false;
   let confirmCallback = null;
+
+  // Leaflet map instances
+  let createPurokMap = null;
+  let createPurokMarker = null;
+  let viewPurokMap = null;
+  let viewPurokMarker = null;
+
+  const leafletPinIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
 
   // --- Confirmation Modal Helper ---
   function showConfirmModal(title, message, onConfirm, confirmBtnClass = 'btn-primary', confirmBtnText = 'Confirm') {
@@ -1140,7 +1069,7 @@ require_once __DIR__ . '/../layouts/header.php';
     openModal('confirmationModal');
   }
 
-  document.getElementById('confirmModalSubmitBtn').addEventListener('click', function() {
+  document.getElementById('confirmModalSubmitBtn').addEventListener('click', function () {
     closeModal('confirmationModal');
     if (typeof confirmCallback === 'function') {
       confirmCallback();
@@ -1581,15 +1510,190 @@ require_once __DIR__ . '/../layouts/header.php';
     }
   }
 
+  // --- Create Modal Leaflet Map Tool ---
+  function initCreatePurokMap(lat, lng) {
+    const container = document.getElementById('createPurokMap');
+    if (!container) return;
+
+    if (!createPurokMap) {
+      createPurokMap = L.map('createPurokMap', {
+        center: [lat, lng],
+        zoom: 15,
+        zoomControl: true
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(createPurokMap);
+
+      createPurokMarker = L.marker([lat, lng], {
+        draggable: true,
+        icon: leafletPinIcon
+      }).addTo(createPurokMap);
+
+      createPurokMarker.bindPopup(`<strong>Pinpoint Purok Location</strong><br><span style="font-size:10px;color:#64748B;">Drag marker or click anywhere</span>`).openPopup();
+
+      createPurokMarker.on('drag', function (e) {
+        const pos = e.target.getLatLng();
+        updateCreatePurokCoords(pos.lat, pos.lng, false);
+      });
+
+      createPurokMarker.on('dragend', function (e) {
+        const pos = e.target.getLatLng();
+        updateCreatePurokCoords(pos.lat, pos.lng, true);
+      });
+
+      createPurokMap.on('click', function (e) {
+        const pos = e.latlng;
+        createPurokMarker.setLatLng(pos);
+        updateCreatePurokCoords(pos.lat, pos.lng, true);
+      });
+    } else {
+      createPurokMarker.setLatLng([lat, lng]);
+      createPurokMap.setView([lat, lng], 15);
+      createPurokMap.invalidateSize();
+      createPurokMarker.getPopup().setContent(`<strong>Pinpoint Purok Location</strong><br><span style="font-size:10px;color:#64748B;">Drag marker or click anywhere</span>`);
+      createPurokMarker.openPopup();
+    }
+  }
+
+  function updateCreatePurokCoords(lat, lng, updatePopup = true) {
+    document.getElementById('create_purok_lat').value = parseFloat(lat).toFixed(6);
+    document.getElementById('create_purok_lng').value = parseFloat(lng).toFixed(6);
+    if (updatePopup && createPurokMarker) {
+      createPurokMarker.getPopup().setContent(`<strong>Target Purok Pinpoint</strong><br><span style="font-size:10px;color:#64748B;">${parseFloat(lat).toFixed(6)}, ${parseFloat(lng).toFixed(6)}</span>`);
+      createPurokMarker.openPopup();
+    }
+  }
+
+  function manualCreatePurokCoordInput() {
+    const lat = parseFloat(document.getElementById('create_purok_lat').value);
+    const lng = parseFloat(document.getElementById('create_purok_lng').value);
+    if (!isNaN(lat) && !isNaN(lng) && createPurokMap && createPurokMarker) {
+      createPurokMarker.setLatLng([lat, lng]);
+      createPurokMap.panTo([lat, lng]);
+      createPurokMarker.getPopup().setContent(`<strong>Target Purok Pinpoint</strong><br><span style="font-size:10px;color:#64748B;">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>`);
+    }
+  }
+
+  function recenterCreatePurokMap() {
+    if (createPurokMap && createPurokMarker) {
+      createPurokMarker.setLatLng([BRGY_CENTER_LAT, BRGY_CENTER_LNG]);
+      createPurokMap.setView([BRGY_CENTER_LAT, BRGY_CENTER_LNG], 15);
+      updateCreatePurokCoords(BRGY_CENTER_LAT, BRGY_CENTER_LNG, true);
+    }
+  }
+
+  // --- View/Edit Modal Leaflet Map Tool ---
+  function initViewPurokMap(lat, lng, purokName, isDraggable) {
+    const container = document.getElementById('viewPurokMap');
+    if (!container) return;
+
+    if (!viewPurokMap) {
+      viewPurokMap = L.map('viewPurokMap', {
+        center: [lat, lng],
+        zoom: 15,
+        zoomControl: true
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(viewPurokMap);
+
+      viewPurokMarker = L.marker([lat, lng], {
+        draggable: isDraggable,
+        icon: leafletPinIcon
+      }).addTo(viewPurokMap);
+
+      viewPurokMarker.bindPopup(`<strong>${escapeHtml(purokName)}</strong><br><span style="font-size:10px;color:#64748B;">GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}</span>`).openPopup();
+
+      viewPurokMarker.on('drag', function (e) {
+        if (!isEditMode) return;
+        const pos = e.target.getLatLng();
+        updateEditPurokCoords(pos.lat, pos.lng, false);
+      });
+
+      viewPurokMarker.on('dragend', function (e) {
+        if (!isEditMode) return;
+        const pos = e.target.getLatLng();
+        updateEditPurokCoords(pos.lat, pos.lng, true);
+      });
+
+      viewPurokMap.on('click', function (e) {
+        if (!isEditMode) return;
+        const pos = e.latlng;
+        viewPurokMarker.setLatLng(pos);
+        updateEditPurokCoords(pos.lat, pos.lng, true);
+      });
+    } else {
+      viewPurokMarker.setLatLng([lat, lng]);
+      if (isDraggable) {
+        viewPurokMarker.dragging.enable();
+      } else {
+        viewPurokMarker.dragging.disable();
+      }
+      viewPurokMap.setView([lat, lng], 15);
+      viewPurokMap.invalidateSize();
+      viewPurokMarker.getPopup().setContent(`<strong>${escapeHtml(purokName)}</strong><br><span style="font-size:10px;color:#64748B;">GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}</span>`);
+      viewPurokMarker.openPopup();
+    }
+  }
+
+  function updateEditPurokCoords(lat, lng, updatePopup = true) {
+    document.getElementById('view_purok_lat').value = parseFloat(lat).toFixed(6);
+    document.getElementById('view_purok_lng').value = parseFloat(lng).toFixed(6);
+    if (updatePopup && viewPurokMarker) {
+      viewPurokMarker.getPopup().setContent(`<strong>Target Purok Pinpoint</strong><br><span style="font-size:10px;color:#64748B;">${parseFloat(lat).toFixed(6)}, ${parseFloat(lng).toFixed(6)}</span>`);
+      viewPurokMarker.openPopup();
+    }
+  }
+
+  function manualEditPurokCoordInput() {
+    const lat = parseFloat(document.getElementById('view_purok_lat').value);
+    const lng = parseFloat(document.getElementById('view_purok_lng').value);
+    if (!isNaN(lat) && !isNaN(lng) && viewPurokMap && viewPurokMarker) {
+      viewPurokMarker.setLatLng([lat, lng]);
+      viewPurokMap.panTo([lat, lng]);
+      viewPurokMarker.getPopup().setContent(`<strong>Target Purok Pinpoint</strong><br><span style="font-size:10px;color:#64748B;">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>`);
+    }
+  }
+
+  function recenterEditPurokMap() {
+    if (viewPurokMap && viewPurokMarker) {
+      viewPurokMarker.setLatLng([BRGY_CENTER_LAT, BRGY_CENTER_LNG]);
+      viewPurokMap.setView([BRGY_CENTER_LAT, BRGY_CENTER_LNG], 15);
+      updateEditPurokCoords(BRGY_CENTER_LAT, BRGY_CENTER_LNG, true);
+    }
+  }
+
+  function resetEditPurokPinToOriginal() {
+    if (!currentPurokInModal) return;
+    const origLat = parseFloat(currentPurokInModal.coordinates_lat) || BRGY_CENTER_LAT;
+    const origLng = parseFloat(currentPurokInModal.coordinates_lng) || BRGY_CENTER_LNG;
+    if (viewPurokMap && viewPurokMarker) {
+      viewPurokMarker.setLatLng([origLat, origLng]);
+      viewPurokMap.setView([origLat, origLng], 15);
+      updateEditPurokCoords(origLat, origLng, true);
+    }
+  }
+
   // --- Open Create Modal ---
   function openCreatePurokModal() {
     const f = document.getElementById('createPurokForm');
     if (f) f.reset();
     selectCustomOption('create_purok', '');
-    selectCustomHazardOption('create_hazard', '');
     toggleDynamicPurokInput('create', false);
-    toggleDynamicHazardInput('create', false);
+
+    document.getElementById('create_purok_lat').value = BRGY_CENTER_LAT.toFixed(6);
+    document.getElementById('create_purok_lng').value = BRGY_CENTER_LNG.toFixed(6);
+
     openModal('createPurokModal');
+
+    setTimeout(() => {
+      initCreatePurokMap(BRGY_CENTER_LAT, BRGY_CENTER_LNG);
+    }, 220);
   }
 
   // --- Open View Purok Details Modal (View Only Default) ---
@@ -1603,15 +1707,6 @@ require_once __DIR__ . '/../layouts/header.php';
       ? `<span class="badge badge-neutral">Archived</span>`
       : `<span class="badge badge-success">Active</span>`;
     document.getElementById('viewModalStatusBadge').innerHTML = statusBadgeHtml;
-
-    const riskBadges = {
-      'Critical': 'badge-danger',
-      'High': 'badge-warning',
-      'Moderate': 'badge-info',
-      'Low': 'badge-success'
-    };
-    const riskBadgeClass = riskBadges[p.risk_level] || 'badge-neutral';
-    document.getElementById('viewModalRiskBadge').innerHTML = `<span class="badge ${riskBadgeClass}">${escapeHtml(p.risk_level || 'Moderate')} Risk</span>`;
 
     // Identity Banner
     document.getElementById('view_purok_display_name').innerText = p.name;
@@ -1631,32 +1726,31 @@ require_once __DIR__ . '/../layouts/header.php';
     document.getElementById('view_purok_name_readonly').value = p.name || '';
     selectCustomOption('edit_purok', p.name || '');
 
-    // Hazard values
-    document.getElementById('view_purok_hazards_readonly').value = p.hazard_types || 'None listed';
-    selectCustomHazardOption('edit_hazard', p.hazard_types || '');
-
     // Numeric & Select values
-    document.getElementById('view_purok_risk').value = p.risk_level || 'Moderate';
     document.getElementById('view_purok_households').value = p.households || 0;
     document.getElementById('view_purok_population').value = p.population || 0;
-    document.getElementById('view_purok_lat').value = p.coordinates_lat || '';
-    document.getElementById('view_purok_lng').value = p.coordinates_lng || '';
+
+    const lat = parseFloat(p.coordinates_lat) || BRGY_CENTER_LAT;
+    const lng = parseFloat(p.coordinates_lng) || BRGY_CENTER_LNG;
+    document.getElementById('view_purok_lat').value = lat.toFixed(6);
+    document.getElementById('view_purok_lng').value = lng.toFixed(6);
 
     // Set View Mode (Readonly displays visible, custom edit dropdowns hidden, inputs disabled)
     document.getElementById('view_purok_name_readonly').style.display = 'block';
     document.getElementById('edit_purok_name_wrapper').style.display = 'none';
 
-    document.getElementById('view_purok_hazards_readonly').style.display = 'block';
-    document.getElementById('edit_purok_hazards_wrapper').style.display = 'none';
-
-    document.getElementById('view_purok_risk').disabled = true;
     document.getElementById('view_purok_households').disabled = true;
     document.getElementById('view_purok_population').disabled = true;
     document.getElementById('view_purok_lat').disabled = true;
     document.getElementById('view_purok_lng').disabled = true;
 
+    // Hide edit map controls & hint in view mode
+    const mapControls = document.getElementById('viewPurokMapControls');
+    if (mapControls) mapControls.style.display = 'none';
+    const mapHint = document.getElementById('viewPurokMapHint');
+    if (mapHint) mapHint.style.display = 'none';
+
     toggleDynamicPurokInput('edit', false);
-    toggleDynamicHazardInput('edit', false);
 
     // Button states
     document.getElementById('modalPurokDeleteBtn').style.display = 'inline-flex';
@@ -1670,6 +1764,10 @@ require_once __DIR__ . '/../layouts/header.php';
     openModal('viewPurokModal');
     const vBody = document.querySelector('#viewPurokModal .modal-body');
     if (vBody) vBody.scrollTop = 0;
+
+    setTimeout(() => {
+      initViewPurokMap(lat, lng, p.name, false);
+    }, 220);
   }
 
   // Alias for backward compatibility if any legacy code calls openEditPurokModal
@@ -1693,15 +1791,26 @@ require_once __DIR__ . '/../layouts/header.php';
     document.getElementById('view_purok_name_readonly').style.display = 'none';
     document.getElementById('edit_purok_name_wrapper').style.display = 'block';
 
-    document.getElementById('view_purok_hazards_readonly').style.display = 'none';
-    document.getElementById('edit_purok_hazards_wrapper').style.display = 'block';
-
     // Enable other inputs
-    document.getElementById('view_purok_risk').disabled = false;
     document.getElementById('view_purok_households').disabled = false;
     document.getElementById('view_purok_population').disabled = false;
     document.getElementById('view_purok_lat').disabled = false;
     document.getElementById('view_purok_lng').disabled = false;
+
+    // Show edit map controls & hint
+    const mapControls = document.getElementById('viewPurokMapControls');
+    if (mapControls) mapControls.style.display = 'inline-flex';
+    const mapHint = document.getElementById('viewPurokMapHint');
+    if (mapHint) mapHint.style.display = 'flex';
+
+    if (viewPurokMarker) {
+      viewPurokMarker.dragging.enable();
+      viewPurokMarker.getPopup().setContent(`<strong>Pinpoint Location for ${escapeHtml(currentPurokInModal.name)}</strong><br><span style="font-size:10px;color:#1E40AF;">Drag marker or click map to move</span>`);
+      viewPurokMarker.openPopup();
+    }
+    if (viewPurokMap) {
+      setTimeout(() => { viewPurokMap.invalidateSize(); }, 100);
+    }
 
     // Toggle button visibility
     document.getElementById('modalPurokEditBtn').style.display = 'none';
@@ -1834,7 +1943,6 @@ require_once __DIR__ . '/../layouts/header.php';
     e.preventDefault();
     const form = e.target;
     const purokName = (document.getElementById('edit_purok_name')?.value || '').trim();
-    const hazardType = (document.getElementById('edit_purok_hazards')?.value || '').trim();
 
     if (!purokName) {
       if (typeof showToast === 'function') {
@@ -1846,24 +1954,18 @@ require_once __DIR__ . '/../layouts/header.php';
       return;
     }
 
-    if (!hazardType) {
-      if (typeof showToast === 'function') {
-        showToast('Please select or add a Primary Hazard Type.', 'danger');
-      } else {
-        alert('Please select or add a Primary Hazard Type.');
-      }
-      toggleCustomDropdown('edit_hazard_menu');
-      return;
-    }
-
     const btn = document.getElementById('modalPurokSaveBtn');
     btn.disabled = true;
     btn.innerText = 'Saving...';
 
+    const formData = new FormData(form);
+    formData.set('coordinates_lat', document.getElementById('view_purok_lat').value);
+    formData.set('coordinates_lng', document.getElementById('view_purok_lng').value);
+
     try {
       const res = await fetch('<?= BASE_URL ?>/backend/functions/puroks/update.php', {
         method: 'POST',
-        body: new FormData(form),
+        body: formData,
         headers: {
           'Accept': 'application/json',
           'X-Requested-With': 'XMLHttpRequest'
@@ -1891,7 +1993,6 @@ require_once __DIR__ . '/../layouts/header.php';
     e.preventDefault();
     const form = e.target;
     const purokName = (document.getElementById('create_purok_name')?.value || '').trim();
-    const hazardType = (document.getElementById('create_purok_hazards')?.value || '').trim();
 
     if (!purokName) {
       if (typeof showToast === 'function') {
@@ -1903,24 +2004,18 @@ require_once __DIR__ . '/../layouts/header.php';
       return;
     }
 
-    if (!hazardType) {
-      if (typeof showToast === 'function') {
-        showToast('Please select or add a Primary Hazard Type.', 'danger');
-      } else {
-        alert('Please select or add a Primary Hazard Type.');
-      }
-      toggleCustomDropdown('create_hazard_menu');
-      return;
-    }
-
     const btn = document.getElementById('btnSubmitCreatePurok');
     btn.disabled = true;
     btn.innerText = 'Saving...';
 
+    const formData = new FormData(form);
+    formData.set('coordinates_lat', document.getElementById('create_purok_lat').value);
+    formData.set('coordinates_lng', document.getElementById('create_purok_lng').value);
+
     try {
       const res = await fetch('<?= BASE_URL ?>/backend/functions/puroks/create.php', {
         method: 'POST',
-        body: new FormData(form),
+        body: formData,
         headers: {
           'Accept': 'application/json',
           'X-Requested-With': 'XMLHttpRequest'

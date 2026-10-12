@@ -112,6 +112,9 @@ CREATE TABLE `disaster_reports` (
   `tracking_code` varchar(50) NOT NULL,
   `barangay_id` int(11) NOT NULL,
   `purok_name` varchar(100) NOT NULL,
+  `coordinates_lat` decimal(10,6) DEFAULT NULL,
+  `coordinates_lng` decimal(10,6) DEFAULT NULL,
+  `incident_location` varchar(255) DEFAULT NULL,
   `disaster_type` enum('Flood','Typhoon','Landslide','Earthquake','Fire','Storm Surge','Flash Flood') NOT NULL,
   `severity` enum('Low','Moderate','High','Critical') NOT NULL,
   `urgency` enum('Immediate','High','Medium','Low') NOT NULL,
@@ -388,7 +391,7 @@ CREATE TABLE `resources` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `code` varchar(30) NOT NULL,
   `name` varchar(150) NOT NULL,
-  `category` enum('Relief Goods','Medical Supplies','Rescue Equipment','Emergency Supplies','Shelter & Sanitation') NOT NULL,
+  `category` varchar(150) NOT NULL,
   `status` enum('active','archived') NOT NULL DEFAULT 'active',
   `description` text DEFAULT NULL,
   `unit` varchar(30) NOT NULL,
@@ -415,6 +418,42 @@ CREATE TABLE `resources` (
   KEY `barangay_id` (`barangay_id`),
   CONSTRAINT `resources_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `resource_categories`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `resource_categories` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `resource_brands`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `resource_brands` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `resource_suppliers`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `resource_suppliers` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `responder_field_updates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

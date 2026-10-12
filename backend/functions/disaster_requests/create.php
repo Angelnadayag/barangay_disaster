@@ -38,6 +38,20 @@ $injuries = max(0, (int)($_POST['injuries_count'] ?? 0));
 $missing = max(0, (int)($_POST['missing_count'] ?? 0));
 $requestedAssistance = trim($_POST['requested_assistance'] ?? '');
 $situationOverview = trim($_POST['situation_overview'] ?? '');
+$incidentLocation = trim($_POST['incident_location'] ?? '');
+$coordinatesLat = (isset($_POST['coordinates_lat']) && $_POST['coordinates_lat'] !== '') ? (float)$_POST['coordinates_lat'] : null;
+$coordinatesLng = (isset($_POST['coordinates_lng']) && $_POST['coordinates_lng'] !== '') ? (float)$_POST['coordinates_lng'] : null;
+
+// Fallback to barangay default coordinates if not explicitly pinned
+if (($coordinatesLat === null || $coordinatesLng === null) && !empty($barangayId)) {
+    $bCoordsStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM barangays WHERE id = ?");
+    $bCoordsStmt->execute([$barangayId]);
+    $bCoords = $bCoordsStmt->fetch(PDO::FETCH_ASSOC);
+    if ($bCoords && !empty($bCoords['coordinates_lat'])) {
+        $coordinatesLat = (float)$bCoords['coordinates_lat'];
+        $coordinatesLng = (float)$bCoords['coordinates_lng'];
+    }
+}
 
 // Auto-default to Ongoing status
 $status = 'Ongoing';
@@ -58,14 +72,16 @@ $trackingCode = 'REQ-' . date('Y') . '-' . str_pad($nextId, 3, '0', STR_PAD_LEFT
 try {
     $stmt = $db->prepare("
         INSERT INTO disaster_reports (
-            tracking_code, barangay_id, purok_name, disaster_type, severity, urgency,
+            tracking_code, barangay_id, purok_name, coordinates_lat, coordinates_lng, incident_location,
+            disaster_type, severity, urgency,
             affected_families, affected_individuals, displaced_families,
             casualties_count, injuries_count, missing_count,
             requested_assistance, situation_overview, status, submitted_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
     $stmt->execute([
-        $trackingCode, $barangayId, $purokName, $disasterType, $severity, $urgency,
+        $trackingCode, $barangayId, $purokName, $coordinatesLat, $coordinatesLng, $incidentLocation,
+        $disasterType, $severity, $urgency,
         $affectedFamilies, $affectedIndividuals, $displacedFamilies,
         $casualties, $injuries, $missing,
         $requestedAssistance, $situationOverview, $status, $user['id']

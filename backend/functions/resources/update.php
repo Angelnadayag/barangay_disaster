@@ -103,6 +103,17 @@ try {
         $id
     ]);
 
+    // Ensure category, brand, and supplier persist into dedicated lookup tables
+    if (!empty($category)) {
+        $db->prepare("INSERT IGNORE INTO resource_categories (name) VALUES (?)")->execute([$category]);
+    }
+    if (!empty($brand)) {
+        $db->prepare("INSERT IGNORE INTO resource_brands (name) VALUES (?)")->execute([$brand]);
+    }
+    if (!empty($supplierDonor)) {
+        $db->prepare("INSERT IGNORE INTO resource_suppliers (name) VALUES (?)")->execute([$supplierDonor]);
+    }
+
     logSystemEvent('UPDATE_RESOURCE', 'Resources', "Updated resource '$name' ($code)");
 
     if ($isAjax) {

@@ -173,7 +173,65 @@ try {
             }
         }
 
-        // Optional seeding if requested
+        // Table: disaster_reports (Geolocation & Street View Pinpoint)
+        if (in_array('disaster_reports', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'disaster_reports', 'coordinates_lat')) {
+                echo "  [+] Adding column `coordinates_lat` to `disaster_reports`...\n";
+                $pdo->exec("ALTER TABLE `disaster_reports` ADD COLUMN `coordinates_lat` decimal(10,6) DEFAULT NULL AFTER `purok_name`;");
+            }
+            if (!$hasColumn($pdo, 'disaster_reports', 'coordinates_lng')) {
+                echo "  [+] Adding column `coordinates_lng` to `disaster_reports`...\n";
+                $pdo->exec("ALTER TABLE `disaster_reports` ADD COLUMN `coordinates_lng` decimal(10,6) DEFAULT NULL AFTER `coordinates_lat`;");
+            }
+            if (!$hasColumn($pdo, 'disaster_reports', 'incident_location')) {
+                echo "  [+] Adding column `incident_location` to `disaster_reports`...\n";
+                $pdo->exec("ALTER TABLE `disaster_reports` ADD COLUMN `incident_location` varchar(255) DEFAULT NULL AFTER `coordinates_lng`;");
+            }
+        }
+
+        // Table: resources (Support custom dynamic categories)
+        if (in_array('resources', $existingTables, true)) {
+            try {
+                $pdo->exec("ALTER TABLE `resources` MODIFY COLUMN `category` varchar(150) NOT NULL;");
+            } catch (Throwable $e) {}
+        }
+
+        // Seed resource options tables if they were just created
+        if (in_array('resource_categories', $existingTables, true)) {
+            $catCount = (int)$pdo->query("SELECT COUNT(*) FROM `resource_categories`")->fetchColumn();
+            if ($catCount === 0) {
+                echo "  [+] Seeding default resource categories...\n";
+                $catStmt = $pdo->prepare("INSERT IGNORE INTO `resource_categories` (`name`) VALUES (?)");
+                foreach (['Relief Goods', 'Medical Supplies', 'Rescue Equipment', 'Emergency Supplies', 'Shelter & Sanitation'] as $c) {
+                    $catStmt->execute([$c]);
+                }
+                $pdo->exec("INSERT IGNORE INTO `resource_categories` (`name`) SELECT DISTINCT TRIM(`category`) FROM `resources` WHERE `category` IS NOT NULL AND TRIM(`category`) != '';");
+            }
+        }
+
+        if (in_array('resource_brands', $existingTables, true)) {
+            $brandCount = (int)$pdo->query("SELECT COUNT(*) FROM `resource_brands`")->fetchColumn();
+            if ($brandCount === 0) {
+                echo "  [+] Seeding default resource brands...\n";
+                $brandStmt = $pdo->prepare("INSERT IGNORE INTO `resource_brands` (`name`) VALUES (?)");
+                foreach (['Generic / Unbranded', 'DSWD Relief', 'Honda', 'Yamaha', 'Stihl', '3M', 'Johnson & Johnson', 'Standard LGU', 'Lucky Me', 'Nescafe', 'Red Cross', 'NDRRMC', 'DOH', 'Local Supplier'] as $b) {
+                    $brandStmt->execute([$b]);
+                }
+                $pdo->exec("INSERT IGNORE INTO `resource_brands` (`name`) SELECT DISTINCT TRIM(`brand`) FROM `resources` WHERE `brand` IS NOT NULL AND TRIM(`brand`) != '';");
+            }
+        }
+
+        if (in_array('resource_suppliers', $existingTables, true)) {
+            $suppCount = (int)$pdo->query("SELECT COUNT(*) FROM `resource_suppliers`")->fetchColumn();
+            if ($suppCount === 0) {
+                echo "  [+] Seeding default resource suppliers...\n";
+                $suppStmt = $pdo->prepare("INSERT IGNORE INTO `resource_suppliers` (`name`) VALUES (?)");
+                foreach (['LGU General Procurement', 'DSWD Regional Office', 'DOH Central Depot', 'Office of Civil Defense', 'Philippine Red Cross', 'Private Donor', 'Barangay Disaster Fund', 'City Disaster Risk Reduction and Management Office'] as $s) {
+                    $suppStmt->execute([$s]);
+                }
+                $pdo->exec("INSERT IGNORE INTO `resource_suppliers` (`name`) SELECT DISTINCT TRIM(`supplier_donor`) FROM `resources` WHERE `supplier_donor` IS NOT NULL AND TRIM(`supplier_donor`) != '';");
+            }
+        }
         if ($seedOnly && file_exists($seedsFile)) {
             echo "Step 3: Re-seeding database from seeds.sql (--seed)...\n";
             $seedsContent = file_get_contents($seedsFile);

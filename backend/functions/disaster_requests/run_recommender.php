@@ -37,15 +37,17 @@ try {
     $recommender = new DecisionTreeRecommender();
     $result = $recommender->evaluateRequest($requestId);
     
-    $msg = "Decision Tree recommendation generated successfully for Request #" . $requestId;
+    $msg = "Decision Support recommendation generated successfully for Request #" . $requestId;
     if ($isAjax) {
         jsonResponse([
             'success' => true,
             'message' => $msg,
             'recommendation_id' => $result['recommendation_id'] ?? null,
+            'recommendation_code' => $result['recommendation_code'] ?? null,
             'confidence' => $result['confidence'] ?? 0,
             'priority' => $result['priority'] ?? 'Moderate',
             'items_count' => $result['items_count'] ?? 0,
+            'financial_aid' => $result['financial_aid'] ?? null,
             'result' => $result
         ]);
     }
