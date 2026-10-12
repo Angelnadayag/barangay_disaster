@@ -60,6 +60,13 @@ $missing = max(0, (int)($_POST['missing_count'] ?? $req['missing_count']));
 $requestedAssistance = trim($_POST['requested_assistance'] ?? $req['requested_assistance']);
 $situationOverview = trim($_POST['situation_overview'] ?? $req['situation_overview']);
 $resolutionNotes = isset($_POST['resolution_notes']) ? trim($_POST['resolution_notes']) : $req['resolution_notes'];
+$incidentLocation = isset($_POST['incident_location']) ? trim($_POST['incident_location']) : ($req['incident_location'] ?? '');
+$coordinatesLat = (isset($_POST['coordinates_lat']) && $_POST['coordinates_lat'] !== '') 
+    ? (float)$_POST['coordinates_lat'] 
+    : (isset($req['coordinates_lat']) && $req['coordinates_lat'] !== null ? (float)$req['coordinates_lat'] : null);
+$coordinatesLng = (isset($_POST['coordinates_lng']) && $_POST['coordinates_lng'] !== '') 
+    ? (float)$_POST['coordinates_lng'] 
+    : (isset($req['coordinates_lng']) && $req['coordinates_lng'] !== null ? (float)$req['coordinates_lng'] : null);
 
 // Optional status transition
 $newStatus = trim($_POST['status'] ?? '');
@@ -79,6 +86,9 @@ try {
         UPDATE disaster_reports SET
             barangay_id = ?,
             purok_name = ?,
+            coordinates_lat = ?,
+            coordinates_lng = ?,
+            incident_location = ?,
             disaster_type = ?,
             severity = ?,
             urgency = ?,
@@ -98,7 +108,11 @@ try {
     ");
     $updateStmt->execute([
         $barangayId,
-        $purokName, $disasterType, $severity, $urgency,
+        $purokName,
+        $coordinatesLat,
+        $coordinatesLng,
+        $incidentLocation,
+        $disasterType, $severity, $urgency,
         $affectedFamilies, $affectedIndividuals, $displacedFamilies,
         $casualties, $injuries, $missing,
         $requestedAssistance, $situationOverview, $resolutionNotes,

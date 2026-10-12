@@ -92,6 +92,17 @@ try {
     ]);
     $resourceId = (int)$db->lastInsertId();
 
+    // Ensure category, brand, and supplier persist into dedicated lookup tables
+    if (!empty($category)) {
+        $db->prepare("INSERT IGNORE INTO resource_categories (name) VALUES (?)")->execute([$category]);
+    }
+    if (!empty($brand)) {
+        $db->prepare("INSERT IGNORE INTO resource_brands (name) VALUES (?)")->execute([$brand]);
+    }
+    if (!empty($supplierDonor)) {
+        $db->prepare("INSERT IGNORE INTO resource_suppliers (name) VALUES (?)")->execute([$supplierDonor]);
+    }
+
     // Log movement transaction
     if ($initialQuantity > 0) {
         $transStmt = $db->prepare("

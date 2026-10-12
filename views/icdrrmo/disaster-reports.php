@@ -151,7 +151,9 @@ $stats = $statStmt->fetch(PDO::FETCH_ASSOC);
 $sql = "
     SELECT dr.*, b.name AS barangay_name, u.full_name AS submitted_by_name,
            r.id AS recommendation_id, r.recommendation_code, r.status AS recommendation_status,
-           r.confidence_score, r.priority AS recommendation_priority
+           r.confidence_score, r.priority AS recommendation_priority,
+           r.financial_aid_recommended_budget, r.financial_aid_per_family, r.financial_aid_target_families,
+           r.financial_aid_allocation_id
     FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     LEFT JOIN users u ON dr.submitted_by = u.id
@@ -212,6 +214,10 @@ $pageTitle = "Disaster Reports of Barangays — ICDRRMO";
 require_once __DIR__ . '/../layouts/header.php';
 require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
+
+<!-- Leaflet GIS Assets -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <style>
 /* High-clarity disabled inputs for View Mode (matching manage users & residents) */
@@ -537,6 +543,16 @@ textarea.form-control:disabled {
                 <div style="font-size:9.5px;color:var(--color-text-secondary);margin-top:1px;">
                   <?= clean($r['purok_name']) ?>
                 </div>
+                <?php if (!empty($r['incident_location'])): ?>
+                  <div style="font-size:9px;color:var(--color-text);margin-top:2px;">
+                    📍 <?= clean($r['incident_location']) ?>
+                  </div>
+                <?php endif; ?>
+                <?php if (!empty($r['coordinates_lat']) && !empty($r['coordinates_lng'])): ?>
+                  <div style="font-size:8.5px;color:var(--color-text-muted);font-family:var(--font-secondary);margin-top:1px;">
+                    🎯 <?= number_format($r['coordinates_lat'], 4) ?>, <?= number_format($r['coordinates_lng'], 4) ?>
+                  </div>
+                <?php endif; ?>
                 <div style="font-size:8.5px;color:var(--color-text-muted);margin-top:1px;">
                   Filed by: <?= clean($r['submitted_by_name'] ?: 'Barangay Unit') ?>
                 </div>
@@ -581,15 +597,15 @@ textarea.form-control:disabled {
                 <?php endif; ?>
               </td>
 
-              <!-- Decision Tree Recommender Support -->
+              <!-- Decision Support System (DSS) Recommender Support -->
               <td>
                 <?php if (!empty($r['recommendation_id'])): ?>
-                  <a href="<?= BASE_URL ?>/views/icdrrmo/recommendations.php?id=<?= $r['recommendation_id'] ?>" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:9.5px;color:var(--color-secondary);border-color:var(--color-secondary);">
+                  <a href="<?= BASE_URL ?>/views/icdrrmo/recommendations.php?id=<?= $r['recommendation_id'] ?>" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:9.5px;color:var(--color-secondary);border-color:var(--color-secondary);display:inline-flex;align-items:center;gap:3px;">
                     Rec Ready (<?= number_format($r['confidence_score'] ?? 0, 0) ?>%)
                   </a>
                 <?php else: ?>
-                  <button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:9.5px;" onclick="triggerRecommender(<?= $r['id'] ?>, '<?= clean($r['tracking_code']) ?>')">
-                    Run Decision Tree
+                  <button type="button" class="btn btn-primary btn-sm" style="padding:3px 9px;font-size:9.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px;" onclick="triggerRecommender(<?= $r['id'] ?>, '<?= clean($r['tracking_code']) ?>')">
+                    ⚡ Run Recommendation
                   </button>
                 <?php endif; ?>
               </td>
@@ -600,11 +616,17 @@ textarea.form-control:disabled {
                 <div style="font-size:8.5px;"><?= formatDate($r['created_at'], 'h:i A') ?></div>
               </td>
 
-              <!-- Action: View Button -->
+              <!-- Action: View & Street View -->
               <td style="text-align:right;">
-                <button type="button" class="btn btn-outline btn-sm" style="padding:3px 10px;font-size:10px;font-weight:600;" onclick="viewReportDetails(<?= htmlspecialchars(json_encode($r), ENT_QUOTES, 'UTF-8') ?>)">
-                  View
-                </button>
+                <div style="display:inline-flex;gap:4px;align-items:center;">
+                  <button type="button" class="btn btn-outline btn-sm" style="padding:3px 9px;font-size:10px;font-weight:600;" onclick="viewReportDetails(<?= htmlspecialchars(json_encode($r), ENT_QUOTES, 'UTF-8') ?>)">
+                    View
+                  </button>
+                  <button type="button" class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:#2563EB;color:#FFF;border-color:#2563EB;display:inline-flex;align-items:center;gap:3px;" onclick="openStreetViewForReport(<?= htmlspecialchars(json_encode($r), ENT_QUOTES, 'UTF-8') ?>)" title="Inspect 360° Street View">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"></circle><path d="M12 8v8"></path><path d="M9 21l3-5 3 5"></path><path d="M6 11l6-2 6 2"></path></svg>
+                    Street View
+                  </button>
+                </div>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -749,7 +771,10 @@ textarea.form-control:disabled {
         <span id="viewModalStatusBadge"></span>
         <span style="font-size:11px;color:var(--color-text-muted);font-family:var(--font-secondary);" id="viewModalTrackingHeader"></span>
       </div>
-      <button type="button" class="modal-close-btn" onclick="closeModal('viewReportModal')">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div id="viewModalHeaderRecommenderAction"></div>
+        <button type="button" class="modal-close-btn" onclick="closeModal('viewReportModal')">&times;</button>
+      </div>
     </div>
 
     <div class="modal-body">
@@ -866,15 +891,25 @@ textarea.form-control:disabled {
         <textarea name="requested_assistance" id="view_requested_assistance" class="form-control" rows="2" disabled></textarea>
       </div>
 
-      <!-- Decision Tree Status Box -->
-      <div id="viewDecisionTreeSection" style="margin-top:10px;padding:10px 12px;background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:6px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--color-primary);text-transform:uppercase;">Decision Tree Allocation Recommender</div>
-            <div id="view_recommender_status_text" style="font-size:9.5px;color:var(--color-text-secondary);margin-top:2px;"></div>
+      <!-- Decision Support System (DSS) Recommender Section -->
+      <div id="viewDecisionTreeSection" style="margin-top:12px;padding:12px 14px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #E2E8F0;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:13px;">⚡</span>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--color-primary);text-transform:uppercase;letter-spacing:0.4px;">
+                Decision Support System (DSS) — Intervention Engine
+              </div>
+              <div style="font-size:9.5px;color:var(--color-text-muted);">
+                Dual-track algorithmic assessment: Evaluates <strong>Physical Relief Supplies</strong> and <strong>Emergency Financial Aid (Ayuda)</strong>.
+              </div>
+            </div>
           </div>
-          <div id="view_recommender_action_wrap"></div>
+          <div id="view_recommender_badge_wrap"></div>
         </div>
+
+        <!-- Dynamic Content injected by JS -->
+        <div id="view_recommender_content_wrap"></div>
       </div>
 
       <!-- Resolution Section -->
@@ -897,6 +932,7 @@ textarea.form-control:disabled {
     <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <!-- Left side: Status Transition & Delete -->
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <div id="viewModalFooterRecommenderWrap"></div>
         <button type="button" class="btn btn-sm" id="btnFinishIncident" style="background:var(--color-success);color:#FFF;border-color:var(--color-success);font-weight:600;" onclick="handleFinishIncidentClick()">
           Finish / End Incident
         </button>
@@ -922,9 +958,92 @@ textarea.form-control:disabled {
   </form>
 </div>
 
+<!-- ========================================================================= -->
+<!-- Modal 3: Dedicated 360° Street View & Ground Imagery Inspector             -->
+<!-- ========================================================================= -->
+<div class="modal-overlay" id="streetViewModal" style="z-index:10001;">
+  <div class="modal-dialog modal-dialog-lg" style="max-width:860px;width:95%;">
+    <div class="modal-header" style="background:#0F172A;color:#FFFFFF;border-bottom:1px solid #1E293B;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="background:#2563EB;color:#FFF;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+          🚶 Street View 360°
+        </span>
+        <h3 class="modal-title" id="streetViewModalTitle" style="margin:0;font-size:14px;color:#FFF;">Incident Street Level Imagery</h3>
+      </div>
+      <button type="button" class="modal-close-btn" style="color:#FFF;" onclick="closeModal('streetViewModal')">&times;</button>
+    </div>
+
+    <div class="modal-body" style="padding:0;background:#0F172A;">
+      <!-- Street View Sub-header / Telemetry Bar -->
+      <div style="padding:10px 16px;background:#1E293B;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:11px;color:#E2E8F0;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span id="streetViewIncidentBadge"></span>
+          <span id="streetViewPurokText" style="font-weight:600;color:#F8FAFC;"></span>
+          <span style="color:#94A3B8;">•</span>
+          <span id="streetViewCoordsText" style="font-family:var(--font-secondary);color:#38BDF8;"></span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button type="button" class="btn btn-sm" id="btnLaunchExternalStreetView" style="background:#2563EB;color:#FFF;border-color:#2563EB;font-size:10.5px;padding:3px 10px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            Open in Google Street View (360°)
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" id="btnLaunchExternalNavigation" style="color:#FFF;border-color:#475569;font-size:10.5px;padding:3px 10px;">
+            🧭 Responders Route
+          </button>
+        </div>
+      </div>
+
+      <!-- Street View Player / Embed Container -->
+      <div style="position:relative;width:100%;height:440px;background:#000000;overflow:hidden;">
+        <iframe id="streetViewIframe" src="" width="100%" height="100%" style="border:0;" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        
+        <!-- Fallback & Imagery Guidance Overlay -->
+        <div id="streetViewNoticeOverlay" style="position:absolute;bottom:8px;left:8px;right:8px;background:rgba(15, 23, 42, 0.88);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px 12px;font-size:10.5px;color:#CBD5E1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Google Street View 360° panorama player. If interior pathway is unmapped by vehicle camera, click <strong>Open in Google Street View</strong> or navigate to the area.</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline" style="font-size:9.5px;color:#FFF;border-color:rgba(255,255,255,0.3);padding:2px 8px;" onclick="document.getElementById('streetViewNoticeOverlay').style.display='none'">Dismiss</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="background:#1E293B;border-top:1px solid #334155;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:10px;color:#94A3B8;">ICDRRMO Command Center GIS & Ground Imagery System</span>
+      <button type="button" class="btn btn-outline btn-sm" style="color:#FFF;border-color:#475569;" onclick="closeModal('streetViewModal')">Close Street View</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let currentActiveReport = null;
 let isEditModeActive = false;
+
+function openStreetViewForReport(report) {
+  if (!report) return;
+  const lat = report.coordinates_lat ? parseFloat(report.coordinates_lat) : 8.2280;
+  const lng = report.coordinates_lng ? parseFloat(report.coordinates_lng) : 124.2452;
+
+  document.getElementById('streetViewModalTitle').innerText = `${report.disaster_type} Incident — ${report.tracking_code}`;
+  document.getElementById('streetViewIncidentBadge').innerHTML = `<span class="badge badge-info" style="font-size:10px;">${escapeHtml(report.disaster_type)}</span>`;
+  document.getElementById('streetViewPurokText').innerText = `${report.barangay_name || ''} (${report.purok_name})${report.incident_location ? ' — ' + report.incident_location : ''}`;
+  document.getElementById('streetViewCoordsText').innerText = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+  const iframe = document.getElementById('streetViewIframe');
+  iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&layer=c&cbll=${lat},${lng}&cbp=11,0,0,0,0&output=svembed`;
+
+  const btnExternal = document.getElementById('btnLaunchExternalStreetView');
+  btnExternal.onclick = () => {
+    window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`, '_blank');
+  };
+
+  const btnNav = document.getElementById('btnLaunchExternalNavigation');
+  btnNav.onclick = () => {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+  };
+
+  openModal('streetViewModal');
+}
 
 // 100% Dynamic data structures from PHP
 const puroksByBarangay = <?= json_encode($puroksByBarangay, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
@@ -935,7 +1054,7 @@ function handleBarangayChange(barangayId, targetType, selectedPurok = '') {
   const purokSelect = document.getElementById(targetType === 'create' ? 'create_purok_name' : 'view_purok_name');
   if (!purokSelect) return;
 
-  purokSelect.innerHTML = '<option value="">Select Purok Cluster</option>';
+  purokSelect.innerHTML = '<option value="">Select Purok Cluster</option><option value="All Puroks">All Puroks (Barangay-wide)</option>';
   const bId = parseInt(barangayId, 10);
   const puroks = puroksByBarangay[bId] || [];
 
@@ -949,20 +1068,27 @@ function handleBarangayChange(barangayId, targetType, selectedPurok = '') {
       const opt = document.createElement('option');
       opt.value = p.name;
       opt.textContent = p.name;
-      if (selectedPurok && selectedPurok.toLowerCase() === p.name.toLowerCase()) {
-        opt.selected = true;
-      }
       purokSelect.appendChild(opt);
     });
   }
 
-  // If selectedPurok wasn't in list, append it
-  if (selectedPurok && !Array.from(purokSelect.options).some(o => o.value.toLowerCase() === selectedPurok.toLowerCase())) {
-    const customOpt = document.createElement('option');
-    customOpt.value = selectedPurok;
-    customOpt.textContent = selectedPurok;
-    customOpt.selected = true;
-    purokSelect.appendChild(customOpt);
+  // Select matching option (including All Puroks) or append custom
+  if (selectedPurok) {
+    let matched = false;
+    for (let i = 0; i < purokSelect.options.length; i++) {
+      if (purokSelect.options[i].value.toLowerCase() === selectedPurok.toLowerCase()) {
+        purokSelect.selectedIndex = i;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      const customOpt = document.createElement('option');
+      customOpt.value = selectedPurok;
+      customOpt.textContent = selectedPurok;
+      customOpt.selected = true;
+      purokSelect.appendChild(customOpt);
+    }
   }
 }
 
@@ -1079,16 +1205,8 @@ function viewReportDetails(report) {
   document.getElementById('view_requested_assistance').value = report.requested_assistance || '';
   document.getElementById('view_resolution_notes').value = report.resolution_notes || '';
 
-  // Decision Tree Box
-  const dtText = document.getElementById('view_recommender_status_text');
-  const dtAction = document.getElementById('view_recommender_action_wrap');
-  if (report.recommendation_id) {
-    dtText.innerHTML = `Recommendation Code: <strong>${escapeHtml(report.recommendation_code || '#'+report.recommendation_id)}</strong> • Confidence: <strong>${Math.round(report.confidence_score || 0)}%</strong> • Status: <strong>${escapeHtml(report.recommendation_status || 'Generated')}</strong>`;
-    dtAction.innerHTML = `<a href="${BASE_URL}/views/icdrrmo/recommendations.php?id=${report.recommendation_id}" class="btn btn-outline btn-sm" style="color:var(--color-secondary);border-color:var(--color-secondary);padding:3px 10px;">View Recommendation</a>`;
-  } else {
-    dtText.textContent = 'No Decision Tree resource allocation has been executed for this incident yet.';
-    dtAction.innerHTML = `<button type="button" class="btn btn-outline btn-sm" style="padding:3px 10px;" onclick="triggerRecommender(${report.id}, '${escapeHtml(report.tracking_code)}')">Run Decision Tree</button>`;
-  }
+  // Update Decision Support System (DSS) UI inside modal
+  updateRecommenderModalUI(report);
 
   // Completed timestamp
   const completedTs = document.getElementById('view_completed_at_timestamp');
@@ -1333,10 +1451,143 @@ async function handleDeleteReportClick() {
   }
 }
 
-// Trigger Decision Tree Recommender
+// Dynamic Recommender UI Handler for Incident View Modal
+function updateRecommenderModalUI(report) {
+  const headerAction = document.getElementById('viewModalHeaderRecommenderAction');
+  const footerWrap = document.getElementById('viewModalFooterRecommenderWrap');
+  const badgeWrap = document.getElementById('view_recommender_badge_wrap');
+  const contentWrap = document.getElementById('view_recommender_content_wrap');
+
+  const recId = report.recommendation_id;
+  const isGenerated = !!recId;
+
+  if (!isGenerated) {
+    if (headerAction) {
+      headerAction.innerHTML = `
+        <button type="button" class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 10px;font-weight:600;display:inline-flex;align-items:center;gap:4px;" onclick="triggerRecommender(${report.id}, '${escapeHtml(report.tracking_code)}')">
+          ⚡ Run Recommendation
+        </button>
+      `;
+    }
+    if (footerWrap) {
+      footerWrap.innerHTML = `
+        <button type="button" class="btn btn-primary btn-sm" style="font-size:10.5px;padding:5px 12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;" onclick="triggerRecommender(${report.id}, '${escapeHtml(report.tracking_code)}')">
+          ⚡ Run Recommendation
+        </button>
+      `;
+    }
+    if (badgeWrap) {
+      badgeWrap.innerHTML = `<span class="badge badge-neutral" style="font-size:9.5px;">Pending Evaluation</span>`;
+    }
+    if (contentWrap) {
+      contentWrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#FFFFFF;border:1px dashed #CBD5E1;border-radius:6px;padding:10px 12px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--color-primary);">Decision Support Engine Ready</div>
+            <div style="font-size:10px;color:var(--color-text-secondary);margin-top:2px;line-height:1.4;">
+              Run the recommendation to evaluate this incident: <strong>1) Physical Relief Resources</strong> (food packs, water, tents, medical kits, rescue gear vs. inventory) and <strong>2) Emergency Financial Aid (Ayuda)</strong> (calamity cash grants for affected families).
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" style="font-size:10.5px;padding:5px 12px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;" onclick="triggerRecommender(${report.id}, '${escapeHtml(report.tracking_code)}')">
+            ⚡ Run Recommendation
+          </button>
+        </div>
+      `;
+    }
+  } else {
+    const confidence = Math.round(report.confidence_score || 85);
+    const code = report.recommendation_code || ('REC-' + recId);
+    const recStatus = report.recommendation_status || 'Pending Review';
+    const prio = report.recommendation_priority || report.severity || 'High';
+    
+    // Financial aid metrics
+    const aidBudget = parseFloat(report.financial_aid_recommended_budget) || 0;
+    const aidPerFam = parseFloat(report.financial_aid_per_family) || 0;
+    const aidFamilies = parseInt(report.financial_aid_target_families, 10) || parseInt(report.affected_families, 10) || 0;
+
+    if (headerAction) {
+      headerAction.innerHTML = `
+        <div style="display:inline-flex;align-items:center;gap:4px;">
+          <a href="${BASE_URL}/views/icdrrmo/recommendations.php?id=${recId}" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 9px;color:var(--color-secondary);border-color:var(--color-secondary);font-weight:600;">
+            📊 Rec Ready (${confidence}%)
+          </a>
+          <button type="button" class="btn btn-outline btn-sm" style="font-size:9.5px;padding:3px 7px;" onclick="triggerRecommender(${report.id}, '${escapeHtml(report.tracking_code)}')" title="Re-run recommendation engine">
+            ↻ Re-run
+          </button>
+        </div>
+      `;
+    }
+
+    if (footerWrap) {
+      footerWrap.innerHTML = `
+        <a href="${BASE_URL}/views/icdrrmo/recommendations.php?id=${recId}" class="btn btn-outline btn-sm" style="font-size:10.5px;padding:5px 12px;color:var(--color-secondary);border-color:var(--color-secondary);font-weight:600;">
+          View Full Recommendation
+        </a>
+      `;
+    }
+
+    if (badgeWrap) {
+      badgeWrap.innerHTML = `
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="badge badge-info" style="font-size:9.5px;">Confidence: ${confidence}%</span>
+          <span class="badge badge-warning" style="font-size:9.5px;">${escapeHtml(recStatus)}</span>
+        </div>
+      `;
+    }
+
+    const aidAllocUrl = `${BASE_URL}/views/icdrrmo/financial-aid-allocation.php?action=new&barangay_id=${report.barangay_id}&disaster_type=${encodeURIComponent(report.disaster_type)}&budget=${aidBudget}&per_family=${aidPerFam}&program_name=${encodeURIComponent('Emergency Calamity Cash Relief — ' + (report.barangay_name || 'Barangay') + ' (' + report.disaster_type + ')')}`;
+
+    if (contentWrap) {
+      contentWrap.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;">
+          <!-- Track A: Physical Relief Resources -->
+          <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:10px;font-weight:700;color:var(--color-primary);text-transform:uppercase;">1. Physical Relief Allocation</span>
+                <span class="badge badge-neutral" style="font-size:8.5px;">Code: ${escapeHtml(code)}</span>
+              </div>
+              <div style="font-size:10px;color:var(--color-text-secondary);line-height:1.4;">
+                Evaluated against central warehouse: Food packs, hygiene kits, potable water, family tents, and specialized rescue gear.
+              </div>
+            </div>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9.5px;font-weight:600;color:var(--color-text-muted);">Priority: <strong>${escapeHtml(prio)}</strong></span>
+              <a href="${BASE_URL}/views/icdrrmo/recommendations.php?id=${recId}" class="btn btn-outline btn-sm" style="font-size:9.5px;padding:2px 8px;font-weight:600;color:var(--color-secondary);border-color:var(--color-secondary);">
+                Inspect Supplies &rarr;
+              </a>
+            </div>
+          </div>
+
+          <!-- Track B: Emergency Financial Aid (Ayuda) -->
+          <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:10px;font-weight:700;color:#047857;text-transform:uppercase;">2. Emergency Financial Aid (Ayuda)</span>
+                <span class="badge badge-success" style="font-size:8.5px;">Calamity Cash</span>
+              </div>
+              <div style="font-size:10px;color:var(--color-text-secondary);line-height:1.4;">
+                Recommended Budget: <strong style="font-size:11px;color:var(--color-primary);">₱${Number(aidBudget).toLocaleString('en-US', {minimumFractionDigits: 2})}</strong><br>
+                Rate: <strong>₱${Number(aidPerFam).toLocaleString('en-US')}</strong>/family for <strong>${Number(aidFamilies).toLocaleString()}</strong> families.
+              </div>
+            </div>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:9.5px;color:var(--color-text-muted);">LGU Calamity Fund</span>
+              <a href="${aidAllocUrl}" class="btn btn-sm" style="font-size:9.5px;padding:2px 8px;background:#059669;color:#FFF;border-color:#059669;font-weight:600;">
+                Allocate Ayuda &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+}
+
+// Trigger Decision Support Recommender Engine
 async function triggerRecommender(requestId, trackingCode) {
   const runAction = async () => {
-    if (typeof showToast === 'function') showToast('Evaluating Decision Tree recommendation engine...', 'info', 2000);
+    if (typeof showToast === 'function') showToast('Evaluating Decision Support recommendation engine...', 'info', 2000);
     try {
       const fd = new FormData();
       fd.append('request_id', requestId);
@@ -1355,9 +1606,25 @@ async function triggerRecommender(requestId, trackingCode) {
         if (typeof showToast === 'function') {
           showToast(`Recommendation generated! Confidence: ${Math.round(data.confidence || 0)}%`, 'success');
         }
-        setTimeout(() => {
-          window.location.href = `<?= BASE_URL ?>/views/icdrrmo/recommendations.php?id=${data.recommendation_id}`;
-        }, 800);
+
+        // If modal is open for this report, update UI seamlessly
+        if (currentActiveReport && currentActiveReport.id == requestId) {
+          currentActiveReport.recommendation_id = data.recommendation_id;
+          currentActiveReport.recommendation_code = data.recommendation_code;
+          currentActiveReport.confidence_score = data.confidence;
+          currentActiveReport.recommendation_status = 'Pending Review';
+          currentActiveReport.recommendation_priority = data.priority;
+          if (data.financial_aid) {
+            currentActiveReport.financial_aid_recommended_budget = data.financial_aid.recommended_budget;
+            currentActiveReport.financial_aid_per_family = data.financial_aid.per_family;
+            currentActiveReport.financial_aid_target_families = data.financial_aid.target_families;
+          }
+          updateRecommenderModalUI(currentActiveReport);
+        } else {
+          setTimeout(() => {
+            window.location.href = `<?= BASE_URL ?>/views/icdrrmo/recommendations.php?id=${data.recommendation_id}`;
+          }, 800);
+        }
       } else {
         if (typeof showToast === 'function') showToast(data.message || 'Recommender failed.', 'danger');
       }
@@ -1368,11 +1635,11 @@ async function triggerRecommender(requestId, trackingCode) {
 
   if (typeof showConfirmModal === 'function') {
     showConfirmModal(
-      'Run Decision Tree Recommender',
-      `Execute Decision Tree resource allocation analysis for Request ${trackingCode}? This evaluates severity, displaced residents, and Central Warehouse stock sufficiency.`,
+      'Run Decision Support Recommendation',
+      `Execute DSS algorithm analysis for Request ${trackingCode}? This evaluates Relief Resources against Central Depot inventory and calculates Emergency Financial Aid (Ayuda) allocations.`,
       runAction
     );
-  } else if (confirm(`Execute Decision Tree analysis for Request ${trackingCode}?`)) {
+  } else if (confirm(`Execute DSS recommendation analysis for Request ${trackingCode}?`)) {
     runAction();
   }
 }

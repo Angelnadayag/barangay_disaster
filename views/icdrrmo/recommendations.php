@@ -28,7 +28,7 @@ if ($recId > 0) {
                dr.affected_families, dr.affected_individuals, dr.displaced_families,
                dr.casualties_count, dr.injuries_count, dr.purok_name, dr.requested_assistance,
                dr.situation_overview, dr.created_at AS request_date,
-               b.name AS barangay_name, b.risk_level AS barangay_risk_level,
+               b.id AS barangay_id, b.name AS barangay_name, b.risk_level AS barangay_risk_level,
                u.full_name AS submitted_by_name,
                rev.full_name AS reviewer_name
         FROM recommendations r
@@ -271,10 +271,61 @@ if ($recId > 0) {
     </div>
   </div>
 
-  <!-- Panel 4: Human Review & Official Decision Action -->
+  <!-- Panel 4: Emergency Financial Aid (Ayuda) DSS Recommendation & Calamity Budget -->
+  <div class="card" style="margin-bottom:var(--space-4);">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h3 class="card-title">4. Emergency Financial Aid (Ayuda) Recommendation & Calamity Cash Budget</h3>
+        <div class="card-subtitle">Algorithmic cash assistance estimation based on DSWD Emergency Cash Transfer (ECT) and LGU Calamity Fund guidelines.</div>
+      </div>
+      <span class="badge badge-success" style="font-size:9.5px;font-weight:700;">💰 Cash Assistance DSS</span>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:14px;">
+        <div style="background:var(--color-surface-subtle);padding:10px 12px;border-radius:6px;border:1px solid var(--color-border-light);">
+          <div style="font-size:9px;color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Recommended Calamity Budget</div>
+          <div style="font-size:16px;font-weight:700;color:var(--color-primary);font-family:var(--font-secondary);margin-top:2px;">
+            ₱<?= number_format((float)($rec['financial_aid_recommended_budget'] ?? 0), 2) ?>
+          </div>
+        </div>
+        <div style="background:var(--color-surface-subtle);padding:10px 12px;border-radius:6px;border:1px solid var(--color-border-light);">
+          <div style="font-size:9px;color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Rate per Beneficiary Family</div>
+          <div style="font-size:16px;font-weight:700;color:#047857;font-family:var(--font-secondary);margin-top:2px;">
+            ₱<?= number_format((float)($rec['financial_aid_per_family'] ?? 3000), 2) ?>
+          </div>
+        </div>
+        <div style="background:var(--color-surface-subtle);padding:10px 12px;border-radius:6px;border:1px solid var(--color-border-light);">
+          <div style="font-size:9px;color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Target Beneficiary Capacity</div>
+          <div style="font-size:16px;font-weight:700;color:var(--color-primary);font-family:var(--font-secondary);margin-top:2px;">
+            <?= number_format((int)($rec['financial_aid_target_families'] ?? $rec['affected_families'])) ?> Families
+          </div>
+        </div>
+        <div style="background:var(--color-surface-subtle);padding:10px 12px;border-radius:6px;border:1px solid var(--color-border-light);">
+          <div style="font-size:9px;color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Authorized Funding Source</div>
+          <div style="font-size:12.5px;font-weight:600;color:var(--color-text);margin-top:4px;">
+            LGU Calamity Fund (QRF)
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;flex-wrap:wrap;gap:10px;">
+        <div style="font-size:11px;color:#166534;line-height:1.4;">
+          <strong>Ready for Allocation:</strong> Create the official Financial Aid Program for <?= clean($rec['barangay_name']) ?> with these pre-computed calamity parameters. The Barangay Head will then disburse funds to registered residents with live auditing.
+        </div>
+        <?php 
+          $aidAllocUrl = BASE_URL . "/views/icdrrmo/financial-aid-allocation.php?action=new&barangay_id=" . $rec['barangay_id'] . "&disaster_type=" . urlencode($rec['disaster_type']) . "&budget=" . ((float)$rec['financial_aid_recommended_budget']) . "&per_family=" . ((float)$rec['financial_aid_per_family']) . "&program_name=" . urlencode("Emergency Calamity Cash Relief — " . $rec['barangay_name'] . " (" . $rec['disaster_type'] . ")");
+        ?>
+        <a href="<?= $aidAllocUrl ?>" class="btn btn-sm" style="background:#059669;color:#FFF;border-color:#059669;font-weight:600;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;">
+          <span>💰</span> Open & Allocate Financial Aid Program &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 5: Human Review & Official Decision Action -->
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title">4. Human Review & Administrative Validation</h3>
+      <h3 class="card-title">5. Human Review & Administrative Validation</h3>
       <span style="font-size:9px;color:var(--color-text-muted);">ICDRRMO Authorized Personnel Only</span>
     </div>
     <div class="card-body">

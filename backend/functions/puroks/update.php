@@ -21,8 +21,6 @@ if (!in_array($role, ['barangay_head', 'icdrrmo'], true)) {
 
 $id = (int)($_POST['id'] ?? 0);
 $name = trim($_POST['name'] ?? '');
-$hazardTypes = trim($_POST['hazard_types'] ?? 'Flood, Strong Winds');
-$riskLevel = trim($_POST['risk_level'] ?? 'Moderate');
 $households = max(0, (int)($_POST['households'] ?? 0));
 $population = max(0, (int)($_POST['population'] ?? ($households * 4.5)));
 $lat = isset($_POST['coordinates_lat']) && is_numeric($_POST['coordinates_lat']) ? (float)$_POST['coordinates_lat'] : null;
@@ -33,9 +31,12 @@ if (!$id || empty($name)) {
 }
 
 // Verify ownership
-$chk = $db->prepare("SELECT barangay_id FROM puroks WHERE id = ?");
+$chk = $db->prepare("SELECT * FROM puroks WHERE id = ?");
 $chk->execute([$id]);
 $purok = $chk->fetch();
+
+$hazardTypes = isset($_POST['hazard_types']) ? trim($_POST['hazard_types']) : ($purok['hazard_types'] ?? null);
+$riskLevel = isset($_POST['risk_level']) && in_array($_POST['risk_level'], ['Low', 'Moderate', 'High', 'Critical'], true) ? $_POST['risk_level'] : ($purok['risk_level'] ?? 'Low');
 if (!$purok) {
     redirectWithFlash($returnUrl, 'error', 'Purok not found.');
 }
