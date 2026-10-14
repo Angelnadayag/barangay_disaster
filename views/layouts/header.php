@@ -54,7 +54,10 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/frontend/css/app.css?v=<?= filemtime(__DIR__ . '/../../frontend/css/app.css') ?>">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2317324D'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="<?= BASE_URL ?>/frontend/images/favicon.png">
+  <link rel="shortcut icon" href="<?= BASE_URL ?>/favicon.ico">
+  <link rel="apple-touch-icon" href="<?= BASE_URL ?>/frontend/images/favicon.png">
   <script>var BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
 </head>
 <body>
@@ -69,6 +72,10 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
           <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </button>
+
+      <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-brand-link" title="Disaster Resource Allocation Recommender">
+        <img src="<?= BASE_URL ?>/frontend/images/logo-primary.png" alt="Disaster Resource Allocation Recommender" class="topbar-brand-logo">
+      </a>
 
       <div class="brand-title-wrap">
         <span class="brand-title">Disaster Resource Allocation Recommender</span>

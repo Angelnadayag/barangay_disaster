@@ -180,6 +180,80 @@ a:hover {
   color: #B5C6D4;
 }
 
+/* Topbar Brand Logo */
+.topbar-brand-link {
+  display: inline-flex;
+  align-items: center;
+  background: #FFFFFF;
+  padding: 3px 8px;
+  border-radius: var(--radius-primary, 6px);
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.topbar-brand-link:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.topbar-brand-logo {
+  height: 28px;
+  width: auto;
+  max-width: 190px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Sidebar Brand Header */
+.sidebar-brand-header {
+  padding: 14px 12px 12px 12px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid var(--color-border-light, #E7EDF0);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-link {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+}
+
+.sidebar-brand-logo {
+  max-width: 140px;
+  max-height: 80px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-brand-logo:hover {
+  transform: scale(1.02);
+}
+
+/* Login Brand Logo */
+.login-brand-logo {
+  margin-bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.login-brand-logo img {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;

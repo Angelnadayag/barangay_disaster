@@ -114,6 +114,11 @@ if (!defined('BASE_URL')) {
     define('BASE_URL', rtrim($baseUrl, '/'));
 }
 
+// Brand Visual Assets
+define('LOGO_PRIMARY', BASE_URL . '/frontend/images/logo-primary.png');
+define('LOGO_SECONDARY', BASE_URL . '/frontend/images/logo-secondary.png');
+define('APP_FAVICON', BASE_URL . '/frontend/images/favicon.png');
+
 // JSON Helper (Fallback & AJAX Support)
 function jsonResponse($data, $statusCode = 200) {
     http_response_code($statusCode);

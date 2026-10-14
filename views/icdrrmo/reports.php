@@ -82,6 +82,9 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
 <main class="main-content">
   <!-- Printable Government Header -->
   <div class="print-header">
+    <div style="margin-bottom:8px;">
+      <img src="<?= BASE_URL ?>/frontend/images/logo-primary.png" alt="Disaster Resource Allocation Recommender" style="height:48px;width:auto;object-fit:contain;">
+    </div>
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;">Republic of the Philippines</div>
     <div style="font-size:12px;font-weight:700;">City Government of Iligan</div>
     <div style="font-size:11px;font-weight:600;color:var(--color-primary);">City Disaster Risk Reduction & Management Office (ICDRRMO)</div>

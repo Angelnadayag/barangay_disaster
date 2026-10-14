@@ -49,6 +49,13 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
 ?>
 <aside class="sidebar" id="appSidebar">
 
+  <!-- Secondary Brand Logo Header -->
+  <div class="sidebar-brand-header">
+    <a href="<?= BASE_URL ?>/views/<?= getRoleFolder($role) ?>/dashboard.php" class="sidebar-brand-link" title="Disaster Resource Allocation Recommender">
+      <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender" class="sidebar-brand-logo">
+    </a>
+  </div>
+
   <?php if ($role === 'icdrrmo'): ?>
     <!-- ICDRRMO Admin Navigation -->
     <div class="sidebar-section">
