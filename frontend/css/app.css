@@ -180,10 +180,23 @@ a:hover {
   color: #B5C6D4;
 }
 
-/* Topbar Brand Logo */
-.topbar-brand-link {
+/* Topbar Brand Wrap (Secondary Logo displayed ONLY when sidebar is naka tiklop / collapsed) */
+.topbar-brand-wrap {
+  display: none;
+  align-items: center;
+  margin-left: 6px;
+  animation: fadeInLogo 0.2s ease-in-out;
+}
+
+@keyframes fadeInLogo {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.topbar-secondary-logo-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   background: #FFFFFF;
   padding: 3px 8px;
   border-radius: var(--radius-primary, 6px);
@@ -193,17 +206,41 @@ a:hover {
   flex-shrink: 0;
 }
 
-.topbar-brand-link:hover {
+.topbar-secondary-logo-link:hover {
   opacity: 0.95;
   transform: translateY(-1px);
 }
 
-.topbar-brand-logo {
-  height: 28px;
+.topbar-secondary-logo-img {
+  height: 30px;
+  max-width: 120px;
   width: auto;
-  max-width: 190px;
   object-fit: contain;
   display: block;
+}
+
+/* When desktop sidebar is collapsed (naka tiklop), show the secondary logo in navbar */
+body.sidebar-collapsed .topbar-brand-wrap,
+html.sidebar-collapsed body .topbar-brand-wrap {
+  display: inline-flex !important;
+}
+
+/* Sidebar transition and collapse rules */
+.sidebar {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.sidebar-collapsed .sidebar,
+html.sidebar-collapsed body .sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  margin-left: calc(-1 * var(--sidebar-width, 220px)) !important;
+  overflow: hidden !important;
+  border-right: none !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  padding: 0 !important;
 }
 
 /* Sidebar Brand Header */
@@ -247,7 +284,7 @@ a:hover {
 }
 
 .login-brand-logo img {
-  max-width: 280px;
+  max-width: 160px;
   width: 100%;
   height: auto;
   display: block;
@@ -1283,6 +1320,14 @@ select.form-control {
   .brand-subtitle {
     display: none;
   }
+  /* On mobile, sidebar is naka tiklop by default -> show secondary logo in topbar */
+  .topbar-brand-wrap {
+    display: inline-flex !important;
+  }
+  /* When drawer is open (sidebar visible on mobile) -> hide secondary logo in topbar */
+  body.mobile-sidebar-open .topbar-brand-wrap {
+    display: none !important;
+  }
   .sidebar {
     position: fixed !important;
     top: var(--topbar-height, 52px) !important;
@@ -1321,12 +1366,20 @@ select.form-control {
 }
 
 .mobile-menu-toggle {
-  display: none;
+  display: flex !important;
   background: transparent;
   border: none;
   color: #FFFFFF;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-primary, 6px);
+  transition: background 0.15s ease;
+}
+
+.mobile-menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* ==========================================================================

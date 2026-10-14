@@ -13,23 +13,58 @@ document.addEventListener('DOMContentLoaded', () => {
   initUserProfileDropdown();
 });
 
-// Mobile Drawer
+// Sidebar Toggle (Supports both Desktop Collapsing and Mobile Drawer)
 function initMobileMenu() {
   const toggleBtn = document.getElementById('mobileMenuToggle');
   const sidebar = document.getElementById('appSidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
 
-  if (toggleBtn && sidebar && backdrop) {
-    toggleBtn.addEventListener('click', () => {
-      sidebar.classList.toggle('open');
-      backdrop.classList.toggle('active');
-    });
+  if (!toggleBtn || !sidebar) return;
 
+  const isDesktop = () => window.innerWidth > 900;
+
+  // Restore desktop collapsed state on load
+  if (isDesktop() && localStorage.getItem('drrm_sidebar_collapsed') === 'true') {
+    document.body.classList.add('sidebar-collapsed');
+  }
+
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isDesktop()) {
+      // Desktop: collapse / fold sidebar
+      const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('drrm_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    } else {
+      // Mobile: open / close drawer
+      const isOpen = sidebar.classList.toggle('open');
+      if (backdrop) backdrop.classList.toggle('active', isOpen);
+      document.body.classList.toggle('mobile-sidebar-open', isOpen);
+    }
+  });
+
+  if (backdrop) {
     backdrop.addEventListener('click', () => {
       sidebar.classList.remove('open');
       backdrop.classList.remove('active');
+      document.body.classList.remove('mobile-sidebar-open');
     });
   }
+
+  // Handle window resize dynamically
+  window.addEventListener('resize', () => {
+    if (isDesktop()) {
+      sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('active');
+      document.body.classList.remove('mobile-sidebar-open');
+      if (localStorage.getItem('drrm_sidebar_collapsed') === 'true') {
+        document.body.classList.add('sidebar-collapsed');
+      } else {
+        document.body.classList.remove('sidebar-collapsed');
+      }
+    } else {
+      document.body.classList.remove('sidebar-collapsed');
+    }
+  });
 }
 
 // Fast Role Switcher (Instant seamless role switching for testing all 4 roles)

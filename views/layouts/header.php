@@ -60,14 +60,22 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
   <link rel="icon" type="image/png" href="<?= BASE_URL ?>/frontend/images/favicon.png">
   <link rel="shortcut icon" href="<?= BASE_URL ?>/favicon.ico">
   <link rel="apple-touch-icon" sizes="180x180" href="<?= BASE_URL ?>/frontend/images/apple-touch-icon.png">
-  <script>var BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
+  <script>
+    var BASE_URL = <?= json_encode(BASE_URL) ?>;
+    if (window.innerWidth > 900 && localStorage.getItem('drrm_sidebar_collapsed') === 'true') {
+      document.documentElement.classList.add('sidebar-collapsed');
+      document.addEventListener('DOMContentLoaded', function() {
+        document.body.classList.add('sidebar-collapsed');
+      });
+    }
+  </script>
 </head>
 <body>
 <div class="app-shell">
   <!-- Topbar -->
   <header class="topbar">
     <div class="topbar-left">
-      <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle Navigation">
+      <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle Navigation" title="Toggle Navigation Sidebar">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="3" y1="12" x2="21" y2="12"></line>
           <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -75,13 +83,11 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
         </svg>
       </button>
 
-      <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-brand-link" title="Disaster Resource Allocation Recommender">
-        <img src="<?= BASE_URL ?>/frontend/images/logo-primary.png" alt="Disaster Resource Allocation Recommender" class="topbar-brand-logo">
-      </a>
-
-      <div class="brand-title-wrap">
-        <span class="brand-title">Disaster Resource Allocation Recommender</span>
-        <span class="brand-subtitle"><?= clean($officeSubtitle) ?></span>
+      <!-- Secondary Logo: Displayed in Topbar ONLY when sidebar is naka tiklop (folded/collapsed) -->
+      <div class="topbar-brand-wrap" id="topbarBrandWrap">
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-secondary-logo-link" title="Disaster Resource Allocation Recommender">
+          <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender" class="topbar-secondary-logo-img">
+        </a>
       </div>
     </div>
 
@@ -118,10 +124,10 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
                 onclick="toggleUserDropdown(event)" 
                 aria-haspopup="true" 
                 aria-expanded="false" 
-                style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.28);border-radius:8px;padding:4px 10px;color:#FFFFFF;cursor:pointer;font-family:inherit;transition:all 0.15s ease;"
-                title="Account & Profile Settings">
-          <!-- Avatar -->
-          <div class="user-avatar-sm" style="width:26px;height:26px;border-radius:6px;background:var(--color-secondary,#2F6F73);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;overflow:hidden;flex-shrink:0;">
+                style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.28);border-radius:8px;padding:3px 6px;color:#FFFFFF;cursor:pointer;font-family:inherit;transition:all 0.15s ease;"
+                title="<?= clean($currentUser['full_name']) ?> — Account & Profile Settings">
+          <!-- Avatar Icon Only -->
+          <div class="user-avatar-sm" style="width:28px;height:28px;border-radius:6px;background:var(--color-secondary,#2F6F73);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;overflow:hidden;flex-shrink:0;">
             <?php if (!empty($currentUser['image'])): ?>
               <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
             <?php else: ?>
@@ -129,14 +135,8 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
             <?php endif; ?>
           </div>
 
-          <!-- User Details Text -->
-          <div style="display:flex;flex-direction:column;text-align:left;line-height:1.15;">
-            <span style="font-size:10px;font-weight:600;color:#FFFFFF;white-space:nowrap;"><?= clean($currentUser['full_name']) ?></span>
-            <span style="font-size:8.5px;color:#B5C6D4;white-space:nowrap;"><?= clean(formatRoleName($currentUser['role'])) ?><?= !empty($currentUser['barangay_id']) ? ' • Brgy. ' . clean($currentUser['barangay_name'] ?? 'Assigned') : '' ?></span>
-          </div>
-
           <!-- Caret / Dropdown Indicator -->
-          <div style="display:flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:2px;">
+          <div style="display:flex;align-items:center;justify-content:center;width:12px;height:12px;">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="color:rgba(255,255,255,0.8);transition:transform 0.2s ease;" id="userProfileCaret">
               <path d="M7 10l5 5 5-5z"/>
             </svg>

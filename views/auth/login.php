@@ -809,8 +809,8 @@ unset($_SESSION['login_error']);
   <div class="login-pane">
     <div>
       <div class="login-header-group">
-        <div class="login-brand-logo">
-          <img src="<?= BASE_URL ?>/frontend/images/logo-primary.png" alt="Disaster Resource Allocation Recommender">
+        <div class="login-brand-logo" style="margin-bottom: 16px;">
+          <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender" style="max-width: 150px; height: auto; display: block; object-fit: contain;">
         </div>
         <span class="login-badge">ICDRRMO &bull; City Government of Iligan</span>
         <h1 class="login-title" style="font-size: 16px; margin-top: 6px;">Portal Access Authentication</h1>
