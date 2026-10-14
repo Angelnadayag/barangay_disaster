@@ -154,6 +154,14 @@ $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
 // Fetch all barangays for filter dropdown
 $allBarangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
+// Static Master Resources Catalog for instant direct selection (Diretso nalang)
+$staticCatalog = getStaticResourcesCatalog();
+$catalogByCategory = [];
+foreach ($staticCatalog as $cItem) {
+    $cat = $cItem['category'] ?: 'Other';
+    $catalogByCategory[$cat][] = $cItem;
+}
+
 // Barangay Stockroom & Inventory History tracking logic
 $selectedBarangayId = isset($_GET['barangay_id']) && is_numeric($_GET['barangay_id']) ? (int)$_GET['barangay_id'] : 0;
 $selectedBarangay = null;
@@ -166,17 +174,17 @@ if ($selectedBarangayId > 0) {
     }
 }
 
-// 1. Current Barangay Resources Query (Column 1 Table)
-$bResSql = "SELECT r.*, b.name AS barangay_name 
-            FROM resources r 
-            LEFT JOIN barangays b ON r.barangay_id = b.id 
-            WHERE (r.status != 'archived' OR r.status IS NULL)";
+// 1. Current Barangay Resources Query (Column 1 Table via agency_resources junction table)
+$bResSql = "SELECT ar.*, r.code, r.name, r.category, r.unit, r.brand, r.is_perishable, b.name AS barangay_name, b.id AS barangay_id
+            FROM agency_resources ar 
+            JOIN resources r ON ar.resource_id = r.id
+            JOIN agencies a ON ar.agency_id = a.id
+            JOIN barangays b ON a.barangay_id = b.id
+            WHERE (ar.status != 'archived' OR ar.status IS NULL)";
 $bResParams = [];
 if ($selectedBarangayId > 0) {
-    $bResSql .= " AND r.barangay_id = ?";
+    $bResSql .= " AND b.id = ?";
     $bResParams[] = $selectedBarangayId;
-} else {
-    $bResSql .= " AND r.barangay_id IS NOT NULL";
 }
 if (!empty($filterCategory)) {
     $bResSql .= " AND r.category = ?";
@@ -1210,6 +1218,36 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
       <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
 
+        <!-- Static Master Catalog Fast Selector (Diretso nalang) -->
+        <div class="form-group" style="margin-bottom:10px; background: #EEF2FF; border: 1.5px solid #C7D2FE; border-radius: 8px; padding: 12px;">
+          <label class="form-label" style="color: #3730A3; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+            <span>⚡ Select from Static Master Catalog (Diretso nalang)</span>
+            <span class="badge" style="background:#4338CA;color:#fff;font-size:10px;">Catalog Types</span>
+          </label>
+          <select id="create_select_catalog_resource" name="resource_id" class="form-control" onchange="onCatalogResourceSelected(this)" style="background:#fff;border-color:#A5B4FC;font-weight:600;color:#1E1B4B;">
+            <option value="">— Select an existing resource type or define a custom item below —</option>
+            <?php foreach ($catalogByCategory as $catName => $catItems): ?>
+              <optgroup label="📂 <?= clean($catName) ?>">
+                <?php foreach ($catItems as $item): ?>
+                  <option value="<?= (int)$item['id'] ?>"
+                          data-code="<?= clean($item['code']) ?>"
+                          data-name="<?= clean($item['name']) ?>"
+                          data-category="<?= clean($item['category']) ?>"
+                          data-unit="<?= clean($item['unit']) ?>"
+                          data-brand="<?= clean($item['brand'] ?? '') ?>"
+                          data-description="<?= clean($item['description'] ?? '') ?>"
+                          data-is-perishable="<?= (int)($item['is_perishable'] ?? 0) ?>">
+                    [<?= clean($item['code']) ?>] <?= clean($item['name']) ?> (<?= clean($item['unit']) ?>)
+                  </option>
+                <?php endforeach; ?>
+              </optgroup>
+            <?php endforeach; ?>
+          </select>
+          <span style="font-size:11px;color:#4338CA;display:block;margin-top:4px;">
+            Selecting an item auto-fills its specifications and adds central inventory via the <code>agency_resources</code> junction.
+          </span>
+        </div>
+
         <div class="form-section-title">Basic Information</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
@@ -2037,9 +2075,41 @@ async function confirmDynamicField(field, mode) {
   if (container) container.style.display = 'none';
 }
 
+function onCatalogResourceSelected(selectElem) {
+  const opt = selectElem.options[selectElem.selectedIndex];
+  if (!opt || !opt.value) {
+    return;
+  }
+  const form = document.getElementById('createResourceForm');
+  if (!form) return;
+
+  const code = opt.getAttribute('data-code') || '';
+  const name = opt.getAttribute('data-name') || '';
+  const category = opt.getAttribute('data-category') || '';
+  const unit = opt.getAttribute('data-unit') || '';
+  const brand = opt.getAttribute('data-brand') || '';
+  const desc = opt.getAttribute('data-description') || '';
+  const isPerishable = opt.getAttribute('data-is-perishable') === '1';
+
+  if (form.elements['code']) form.elements['code'].value = code;
+  if (form.elements['name']) form.elements['name'].value = name;
+  if (form.elements['category']) form.elements['category'].value = category;
+  if (form.elements['unit']) form.elements['unit'].value = unit;
+  if (form.elements['brand'] && brand) form.elements['brand'].value = brand;
+  if (form.elements['description']) form.elements['description'].value = desc;
+  if (form.elements['is_perishable']) {
+    form.elements['is_perishable'].value = isPerishable ? '1' : '0';
+    if (typeof togglePerishableFields === 'function') {
+      togglePerishableFields('create');
+    }
+  }
+}
+
 function openCreateResourceModal() {
   const form = document.getElementById('createResourceForm');
   if (form) form.reset();
+  const catSel = document.getElementById('create_select_catalog_resource');
+  if (catSel) catSel.selectedIndex = 0;
   ['category', 'brand', 'supplier'].forEach(f => {
     const c = document.getElementById(`dynAddContainer_${f}_create`);
     if (c) c.style.display = 'none';

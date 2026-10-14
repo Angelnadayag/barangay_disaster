@@ -68,8 +68,24 @@ $weightPerUnit = trim($_POST['weight_per_unit'] ?? '') ?: null;
 $costPerUnit = !empty($_POST['cost_per_unit']) ? (float)$_POST['cost_per_unit'] : null;
 $itemCondition = in_array($_POST['item_condition'] ?? '', ['New', 'Good', 'Fair', 'Poor', 'Expired']) ? $_POST['item_condition'] : 'New';
 
-// Generate or sanitize SKU code
-$code = strtoupper(trim($_POST['code'] ?? ''));
+$selectedResourceId = !empty($_POST['resource_id']) && is_numeric($_POST['resource_id']) ? (int)$_POST['resource_id'] : null;
+
+if ($selectedResourceId) {
+    // Direct selection from static resources catalog
+    $catStmt = $db->prepare("SELECT * FROM resources WHERE id = ?");
+    $catStmt->execute([$selectedResourceId]);
+    $catRes = $catStmt->fetch(PDO::FETCH_ASSOC);
+    if ($catRes) {
+        $name = !empty($name) ? $name : $catRes['name'];
+        $code = !empty($code) ? $code : $catRes['code'];
+        $category = !empty($category) ? $category : $catRes['category'];
+        $unit = !empty($unit) ? $unit : $catRes['unit'];
+        $brand = !empty($brand) ? $brand : ($catRes['brand'] ?? null);
+        $description = !empty($description) ? $description : ($catRes['description'] ?? '');
+    }
+}
+
+// Generate or sanitize SKU code if still empty
 if (empty($code)) {
     $catPrefixMap = [
         'Relief Goods' => 'REL',
@@ -95,30 +111,77 @@ if (empty($name)) {
     redirectWithFlash($returnUrl, 'error', 'Resource Name is required.');
 }
 
-// Ensure unique code
-$check = $db->prepare("SELECT id FROM resources WHERE LOWER(code) = LOWER(?)");
-$check->execute([$code]);
-if ($check->fetch()) {
-    $code .= '-' . rand(10, 99);
-}
+// Determine target Agency ID for agency_resources junction table
+$targetAgency = getAgencyForUser($user);
+$agencyId = $targetAgency ? (int)$targetAgency['id'] : 1;
 
 try {
-    $stmt = $db->prepare("
-        INSERT INTO resources (
-            code, name, category, status, description, unit, total_quantity,
-            available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-            batch_number, supplier_id, date_acquired,
-            expiry_date, is_perishable, brand, weight_per_unit, cost_per_unit,
-            item_condition, barangay_id, updated_at, created_at
-        ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    $resourceId = $selectedResourceId;
+
+    if (!$resourceId) {
+        // Ensure unique code for new static resource definition
+        $check = $db->prepare("SELECT id FROM resources WHERE LOWER(code) = LOWER(?)");
+        $check->execute([$code]);
+        if ($check->fetch()) {
+            $code .= '-' . rand(10, 99);
+        }
+
+        // Insert new static catalog resource definition
+        $stmt = $db->prepare("
+            INSERT INTO resources (
+                code, name, category, status, description, unit, total_quantity,
+                available_quantity, in_use_quantity, damaged_quantity, min_threshold,
+                batch_number, supplier_id, date_acquired,
+                expiry_date, is_perishable, brand, weight_per_unit, cost_per_unit,
+                item_condition, barangay_id, updated_at, created_at
+            ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ");
+        $stmt->execute([
+            $code, $name, $category, $description, $unit, $initialQuantity,
+            $initialQuantity, $minThreshold, $batchNumber, $supplierId,
+            $dateAcquired, $expiryDate, $isPerishable, $brand, $weightPerUnit,
+            $costPerUnit, $itemCondition, $barangayId
+        ]);
+        $resourceId = (int)$db->lastInsertId();
+    } else {
+        // Update catalog aggregate quantity if needed
+        $db->prepare("
+            UPDATE resources SET 
+                total_quantity = total_quantity + ?,
+                available_quantity = available_quantity + ?,
+                updated_at = NOW()
+            WHERE id = ?
+        ")->execute([$initialQuantity, $initialQuantity, $resourceId]);
+    }
+
+    // Insert or update into agency_resources junction table
+    $arStmt = $db->prepare("
+        INSERT INTO agency_resources (
+            agency_id, resource_id, total_quantity, available_quantity, in_use_quantity,
+            damaged_quantity, min_threshold, batch_number, supplier_id, date_acquired,
+            expiry_date, cost_per_unit, item_condition, status, created_at, updated_at
+        ) VALUES (
+            ?, ?, ?, ?, 0,
+            0, ?, ?, ?, ?,
+            ?, ?, ?, 'active', NOW(), NOW()
+        )
+        ON DUPLICATE KEY UPDATE
+            total_quantity = total_quantity + VALUES(available_quantity),
+            available_quantity = available_quantity + VALUES(available_quantity),
+            min_threshold = VALUES(min_threshold),
+            batch_number = COALESCE(VALUES(batch_number), batch_number),
+            supplier_id = COALESCE(VALUES(supplier_id), supplier_id),
+            expiry_date = COALESCE(VALUES(expiry_date), expiry_date),
+            cost_per_unit = COALESCE(VALUES(cost_per_unit), cost_per_unit),
+            item_condition = VALUES(item_condition),
+            status = 'active',
+            updated_at = NOW()
     ");
-    $stmt->execute([
-        $code, $name, $category, $description, $unit, $initialQuantity,
-        $initialQuantity, $minThreshold, $batchNumber, $supplierId,
-        $dateAcquired, $expiryDate, $isPerishable, $brand, $weightPerUnit,
-        $costPerUnit, $itemCondition, $barangayId
+    $arStmt->execute([
+        $agencyId, $resourceId, $initialQuantity, $initialQuantity,
+        $minThreshold, $batchNumber, $supplierId, $dateAcquired,
+        $expiryDate, $costPerUnit, $itemCondition
     ]);
-    $resourceId = (int)$db->lastInsertId();
 
     // Ensure category and brand persist into dedicated lookup tables
     if (!empty($category)) {

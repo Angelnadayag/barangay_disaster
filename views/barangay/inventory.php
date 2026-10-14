@@ -40,31 +40,40 @@ $search = trim($_GET['search'] ?? '');
 $filterCategory = trim($_GET['category'] ?? '');
 $filterStockLevel = trim($_GET['stock'] ?? '');
 
-// Metrics for Local Barangay Hall Stockroom
-$totalLocalStock = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
-$foodPacksAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND (category = 'Relief Goods' OR name LIKE '%Food%' OR name LIKE '%Water%')")->fetchColumn();
-$medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND (category = 'Medical Supplies' OR name LIKE '%Medical%' OR name LIKE '%First Aid%')")->fetchColumn();
-$localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold")->fetchColumn();
+// Agency Resolution
+$bAgency = getAgencyForUser($user);
+$agencyId = $bAgency ? (int)$bAgency['id'] : 0;
 
-// Fetch Local Resources
-$invSql = "SELECT * FROM (SELECT r.*, rs.name AS supplier_donor FROM resources r LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id) resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)";
-$invParams = [$barangayId];
+// Metrics for Local Barangay Hall Stockroom (from agency_resources junction table)
+$totalLocalStock = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM agency_resources WHERE agency_id = {$agencyId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
+$foodPacksAvailable = (int)$db->query("SELECT COALESCE(SUM(ar.available_quantity), 0) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$agencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND (r.category = 'Relief Goods' OR r.name LIKE '%Food%' OR r.name LIKE '%Water%')")->fetchColumn();
+$medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(ar.available_quantity), 0) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$agencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND (r.category = 'Medical Supplies' OR r.name LIKE '%Medical%' OR r.name LIKE '%First Aid%')")->fetchColumn();
+$localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$agencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND ar.available_quantity <= ar.min_threshold")->fetchColumn();
+
+// Fetch Local Resources via agency_resources
+$invSql = "SELECT ar.*, ar.id AS id, ar.id AS agency_resource_id, r.id AS resource_id, r.code, r.name, r.category, r.unit, r.brand, r.weight_per_unit, r.cost_per_unit, r.description, r.is_perishable,
+                  rs.name AS supplier_donor
+           FROM agency_resources ar
+           JOIN resources r ON ar.resource_id = r.id
+           LEFT JOIN resource_suppliers rs ON ar.supplier_id = rs.id
+           WHERE ar.agency_id = ? AND (ar.status != 'archived' OR ar.status IS NULL)";
+$invParams = [$agencyId];
 
 if (!empty($filterCategory)) {
-    $invSql .= " AND category = ?";
+    $invSql .= " AND r.category = ?";
     $invParams[] = $filterCategory;
 }
 
 if ($filterStockLevel === 'low') {
-    $invSql .= " AND available_quantity <= min_threshold";
+    $invSql .= " AND ar.available_quantity <= ar.min_threshold";
 } elseif ($filterStockLevel === 'out') {
-    $invSql .= " AND available_quantity = 0";
+    $invSql .= " AND ar.available_quantity = 0";
 } elseif ($filterStockLevel === 'damaged') {
-    $invSql .= " AND damaged_quantity > 0";
+    $invSql .= " AND ar.damaged_quantity > 0";
 }
 
 if (!empty($search)) {
-    $invSql .= " AND (code LIKE ? OR name LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
+    $invSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR rs.name LIKE ? OR r.brand LIKE ?)";
     $like = "%$search%";
     $invParams[] = $like;
     $invParams[] = $like;
@@ -72,14 +81,20 @@ if (!empty($search)) {
     $invParams[] = $like;
 }
 
-$invSql .= " ORDER BY (available_quantity <= min_threshold) DESC, category ASC, name ASC";
+$invSql .= " ORDER BY (ar.available_quantity <= ar.min_threshold) DESC, r.category ASC, r.name ASC";
 $invStmt = $db->prepare($invSql);
 $invStmt->execute($invParams);
 $inventoryList = $invStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch All Local Resources for Dropdown selections in modals
-$localCatalogStmt = $db->prepare("SELECT id, code, name, category, unit, available_quantity, total_quantity, min_threshold FROM resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL) ORDER BY name ASC");
-$localCatalogStmt->execute([$barangayId]);
+$localCatalogStmt = $db->prepare("
+    SELECT ar.id, r.code, r.name, r.category, r.unit, ar.available_quantity, ar.total_quantity, ar.min_threshold 
+    FROM agency_resources ar 
+    JOIN resources r ON ar.resource_id = r.id 
+    WHERE ar.agency_id = ? AND (ar.status != 'archived' OR ar.status IS NULL) 
+    ORDER BY r.name ASC
+");
+$localCatalogStmt->execute([$agencyId]);
 $localCatalog = $localCatalogStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Stock Movements Log (Tab 2) for this Barangay
@@ -88,11 +103,12 @@ $trxStmt = $db->prepare("
     FROM resource_transactions rt
     JOIN resources res ON rt.resource_id = res.id
     LEFT JOIN users u ON rt.performed_by = u.id
-    WHERE res.barangay_id = ?
+    WHERE rt.performed_by = ? 
+       OR rt.remarks LIKE ?
     ORDER BY rt.created_at DESC
     LIMIT 100
 ");
-$trxStmt->execute([$barangayId]);
+$trxStmt->execute([$user['id'], "%" . $barangay['name'] . "%"]);
 $transactions = $trxStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $categories = [

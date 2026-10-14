@@ -280,3 +280,51 @@ function redirectWithFlash($url, $status, $message) {
     exit;
 }
 }
+
+// Get the agency for a given user or role
+if (!function_exists('getAgencyForUser')) {
+function getAgencyForUser(?array $user = null): ?array {
+    $db = getDBConnection();
+    if (!$user) {
+        if (!function_exists('getCurrentUser')) {
+            require_once __DIR__ . '/Auth.php';
+        }
+        $user = getCurrentUser();
+    }
+    if (!$user) return null;
+
+    $role = $user['role'] ?? '';
+    if ($role === 'icdrrmo') {
+        $stmt = $db->query("SELECT * FROM agencies WHERE agency_type = 'ICDRRMO' LIMIT 1");
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    if (!empty($user['barangay_id'])) {
+        $stmt = $db->prepare("SELECT * FROM agencies WHERE barangay_id = ? AND agency_type = 'BDRRMC' LIMIT 1");
+        $stmt->execute([(int)$user['barangay_id']]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    if (!empty($user['agency_id'])) {
+        $stmt = $db->prepare("SELECT * FROM agencies WHERE id = ? LIMIT 1");
+        $stmt->execute([(int)$user['agency_id']]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    return null;
+}
+}
+
+// Fetch all active static resource catalog definitions
+if (!function_exists('getStaticResourcesCatalog')) {
+function getStaticResourcesCatalog(): array {
+    $db = getDBConnection();
+    $stmt = $db->query("
+        SELECT id, code, name, category, unit, brand, description, is_perishable, status
+        FROM resources
+        WHERE status = 'active' OR status IS NULL
+        ORDER BY category ASC, name ASC
+    ");
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+}

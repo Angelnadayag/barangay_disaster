@@ -29,15 +29,24 @@ $search = trim($_GET['search'] ?? '');
 $filterCategory = trim($_GET['category'] ?? '');
 $filterStockLevel = trim($_GET['stock'] ?? '');
 
-// Metrics for Central Depot Stockroom (where barangay_id IS NULL)
-$totalDepotStock = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id IS NULL AND (status != 'archived' OR status IS NULL)")->fetchColumn();
-$foodPacksAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id IS NULL AND (status != 'archived' OR status IS NULL) AND (category = 'Relief Goods' OR name LIKE '%Food%' OR name LIKE '%Water%')")->fetchColumn();
-$medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id IS NULL AND (status != 'archived' OR status IS NULL) AND (category = 'Medical Supplies' OR name LIKE '%Medical%' OR name LIKE '%First Aid%')")->fetchColumn();
-$localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM resources WHERE barangay_id IS NULL AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold")->fetchColumn();
+// Agency Resolution for ICDRRMO Central Command
+$userAgency = getAgencyForUser($user);
+$icdrrmoAgencyId = $userAgency ? (int)$userAgency['id'] : 1;
 
-// Fetch Central Depot Resources
-$invSql = "SELECT r.*, rs.name AS supplier_donor, rs.name AS supplier_name FROM resources r LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id WHERE r.barangay_id IS NULL AND (r.status != 'archived' OR r.status IS NULL)";
-$invParams = [];
+// Metrics for Central Depot Stockroom (via agency_resources junction table for Agency ID 1)
+$totalDepotStock = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM agency_resources WHERE agency_id = {$icdrrmoAgencyId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
+$foodPacksAvailable = (int)$db->query("SELECT COALESCE(SUM(ar.available_quantity), 0) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$icdrrmoAgencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND (r.category = 'Relief Goods' OR r.name LIKE '%Food%' OR r.name LIKE '%Water%')")->fetchColumn();
+$medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(ar.available_quantity), 0) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$icdrrmoAgencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND (r.category = 'Medical Supplies' OR r.name LIKE '%Medical%' OR r.name LIKE '%First Aid%')")->fetchColumn();
+$localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$icdrrmoAgencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND ar.available_quantity <= ar.min_threshold")->fetchColumn();
+
+// Fetch Central Depot Resources via agency_resources junction table
+$invSql = "SELECT ar.*, ar.id AS id, ar.id AS agency_resource_id, r.id AS resource_id, r.code, r.name, r.category, r.unit, r.brand, r.weight_per_unit, r.cost_per_unit, r.description, r.is_perishable,
+                  rs.name AS supplier_donor, rs.name AS supplier_name
+           FROM agency_resources ar
+           JOIN resources r ON ar.resource_id = r.id
+           LEFT JOIN resource_suppliers rs ON ar.supplier_id = rs.id
+           WHERE ar.agency_id = ? AND (ar.status != 'archived' OR ar.status IS NULL)";
+$invParams = [$icdrrmoAgencyId];
 
 if (!empty($filterCategory)) {
     $invSql .= " AND r.category = ?";
@@ -45,11 +54,11 @@ if (!empty($filterCategory)) {
 }
 
 if ($filterStockLevel === 'low') {
-    $invSql .= " AND r.available_quantity <= r.min_threshold";
+    $invSql .= " AND ar.available_quantity <= ar.min_threshold";
 } elseif ($filterStockLevel === 'out') {
-    $invSql .= " AND r.available_quantity = 0";
+    $invSql .= " AND ar.available_quantity = 0";
 } elseif ($filterStockLevel === 'damaged') {
-    $invSql .= " AND r.damaged_quantity > 0";
+    $invSql .= " AND ar.damaged_quantity > 0";
 }
 
 if (!empty($search)) {
@@ -61,13 +70,20 @@ if (!empty($search)) {
     $invParams[] = $like;
 }
 
-$invSql .= " ORDER BY (r.available_quantity <= r.min_threshold) DESC, r.category ASC, r.name ASC";
+$invSql .= " ORDER BY (ar.available_quantity <= ar.min_threshold) DESC, r.category ASC, r.name ASC";
 $invStmt = $db->prepare($invSql);
 $invStmt->execute($invParams);
 $inventoryList = $invStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch All Resources for Dropdown selections in modals
-$localCatalogStmt = $db->query("SELECT id, code, name, category, unit, available_quantity, total_quantity, min_threshold FROM resources WHERE barangay_id IS NULL AND (status != 'archived' OR status IS NULL) ORDER BY name ASC");
+$localCatalogStmt = $db->prepare("
+    SELECT ar.id, r.code, r.name, r.category, r.unit, ar.available_quantity, ar.total_quantity, ar.min_threshold 
+    FROM agency_resources ar 
+    JOIN resources r ON ar.resource_id = r.id 
+    WHERE ar.agency_id = ? AND (ar.status != 'archived' OR ar.status IS NULL) 
+    ORDER BY r.name ASC
+");
+$localCatalogStmt->execute([$icdrrmoAgencyId]);
 $localCatalog = $localCatalogStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Stock Movements Log (Tab 2) for Central Depot

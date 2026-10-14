@@ -13,9 +13,9 @@ requireLogin();
 $db = getDBConnection();
 
 $stmt = $db->query("
-    SELECT id, code, name, category, unit, available_quantity, total_quantity, min_threshold, item_condition
+    SELECT id, code, name, category, unit, brand, description, is_perishable, available_quantity, total_quantity, min_threshold, item_condition
     FROM resources
-    WHERE barangay_id IS NULL AND status = 'active'
+    WHERE status = 'active' OR status IS NULL
     ORDER BY category ASC, name ASC
 ");
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
