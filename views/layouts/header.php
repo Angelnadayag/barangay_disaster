@@ -82,13 +82,6 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
           <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </button>
-
-      <!-- Secondary Logo: Displayed in Topbar ONLY when sidebar is naka tiklop (folded/collapsed) -->
-      <div class="topbar-brand-wrap" id="topbarBrandWrap">
-        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-secondary-logo-link" title="Disaster Resource Allocation Recommender">
-          <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender" class="topbar-secondary-logo-img">
-        </a>
-      </div>
     </div>
 
     <div class="topbar-right">
@@ -157,7 +150,7 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
                 <?= clean(formatRoleName($currentUser['role'])) ?>
               </div>
               <div style="font-size:9px;color:#8A96A0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
-                <?= clean($currentUser['email']) ?>
+                <?= clean($currentUser['email'] ?? '') ?>
               </div>
             </div>
           </div>

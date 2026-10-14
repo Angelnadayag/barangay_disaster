@@ -180,50 +180,6 @@ a:hover {
   color: #B5C6D4;
 }
 
-/* Topbar Brand Wrap (Secondary Logo displayed ONLY when sidebar is naka tiklop / collapsed) */
-.topbar-brand-wrap {
-  display: none;
-  align-items: center;
-  margin-left: 6px;
-  animation: fadeInLogo 0.2s ease-in-out;
-}
-
-@keyframes fadeInLogo {
-  from { opacity: 0; transform: translateY(-2px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.topbar-secondary-logo-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #FFFFFF;
-  padding: 3px 8px;
-  border-radius: var(--radius-primary, 6px);
-  text-decoration: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  flex-shrink: 0;
-}
-
-.topbar-secondary-logo-link:hover {
-  opacity: 0.95;
-  transform: translateY(-1px);
-}
-
-.topbar-secondary-logo-img {
-  height: 30px;
-  max-width: 120px;
-  width: auto;
-  object-fit: contain;
-  display: block;
-}
-
-/* When desktop sidebar is collapsed (naka tiklop), show the secondary logo in navbar */
-body.sidebar-collapsed .topbar-brand-wrap,
-html.sidebar-collapsed body .topbar-brand-wrap {
-  display: inline-flex !important;
-}
 
 /* Sidebar transition and collapse rules */
 .sidebar {
@@ -1344,14 +1300,6 @@ select.form-control {
   }
   .brand-subtitle {
     display: none;
-  }
-  /* On mobile, sidebar is naka tiklop by default -> show secondary logo in topbar */
-  .topbar-brand-wrap {
-    display: inline-flex !important;
-  }
-  /* When drawer is open (sidebar visible on mobile) -> hide secondary logo in topbar */
-  body.mobile-sidebar-open .topbar-brand-wrap {
-    display: none !important;
   }
   .sidebar {
     position: fixed !important;
