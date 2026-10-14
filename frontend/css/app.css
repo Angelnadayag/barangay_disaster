@@ -183,20 +183,17 @@ a:hover {
 
 /* Sidebar transition and collapse rules */
 .sidebar {
-  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-body.sidebar-collapsed .sidebar,
-html.sidebar-collapsed body .sidebar {
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  margin-left: calc(-1 * var(--sidebar-width, 220px)) !important;
-  overflow: hidden !important;
-  border-right: none !important;
-  box-shadow: none !important;
-  pointer-events: none !important;
-  padding: 0 !important;
+@media (min-width: 901px) {
+  body.sidebar-collapsed .sidebar,
+  html.sidebar-collapsed body .sidebar {
+    margin-left: calc(-1 * var(--sidebar-width, 220px)) !important;
+    border-right: none !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+  }
 }
 
 /* Sidebar Brand Header */
@@ -617,6 +614,16 @@ html.sidebar-collapsed body .sidebar {
   padding: var(--space-5);
   overflow-y: auto;
   max-width: 100%;
+}
+
+/* Neutralize redundant nested .main-content instances */
+.main-content .main-content {
+  padding: 0 !important;
+  overflow: visible !important;
+  flex: none !important;
+  background: transparent !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 /* Page Header Pattern */

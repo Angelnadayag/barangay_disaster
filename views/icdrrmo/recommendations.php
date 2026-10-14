@@ -42,7 +42,7 @@ if ($recId > 0) {
   $rec = $stmt->fetch();
 
   if (!$rec) {
-    echo '<main class="main-content"><div class="empty-state"><div class="empty-state-title">Recommendation Not Found</div><p class="empty-state-desc">The requested recommendation could not be located.</p><a href="' . BASE_URL . '/views/icdrrmo/recommendations.php" class="btn btn-primary">Back to Recommendations</a></div></main>';
+    echo '<div class="empty-state"><div class="empty-state-title">Recommendation Not Found</div><p class="empty-state-desc">The requested recommendation could not be located.</p><a href="' . BASE_URL . '/views/icdrrmo/recommendations.php" class="btn btn-primary">Back to Recommendations</a></div>';
     require_once __DIR__ . '/../layouts/footer.php';
     exit;
   }
@@ -194,7 +194,6 @@ if ($recId > 0) {
 }
 ?>
 
-<main class="main-content">
   <?php if ($recId > 0): ?>
     <!-- ========================================================================= -->
     <!-- RECOMMENDATION DETAIL & HUMAN REVIEW PAGE                                 -->
@@ -1249,6 +1248,6 @@ if ($recId > 0) {
       </table>
     </div>
   <?php endif; ?>
-</main>
+
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>
