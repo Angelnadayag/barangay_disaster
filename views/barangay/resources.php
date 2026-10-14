@@ -45,7 +45,7 @@ $pendingRequestsCount = (int) $db->query("SELECT COUNT(*) FROM barangay_resource
 $approvedRequestsCount = (int) $db->query("SELECT COUNT(*) FROM barangay_resource_requests WHERE barangay_id = {$barangayId} AND status = 'Approved'")->fetchColumn();
 
 // 1. Fetch Local Barangay Inventory
-$invSql = "SELECT * FROM resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)";
+$invSql = "SELECT * FROM (SELECT r.*, rs.name AS supplier_donor FROM resources r LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id) resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)";
 $invParams = [$barangayId];
 
 if (!empty($filterCategory)) {

@@ -70,34 +70,47 @@ try {
         $remainingBudget = $totalBudget;
         $disbursedBudget = 0.00;
 
+        $addedType = trim($_POST['added_type'] ?? '');
+        if (!in_array($addedType, ['ai_recommended', 'added_by_admin'], true)) {
+            $addedType = 'ai_recommended';
+        }
+
         $insertStmt = $db->prepare("
             INSERT INTO financial_aid_allocations (
                 allocation_code, program_name, disaster_type, barangay_id,
                 total_budget, amount_per_beneficiary, disbursed_budget, remaining_budget,
-                funding_source, target_beneficiaries, status, notes, allocated_by
+                funding_source, target_beneficiaries, status, added_type, notes, allocated_by
             ) VALUES (
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
-                ?, ?, 'Active', ?, ?
+                ?, ?, 'Active', ?, ?, ?
             )
         ");
         $insertStmt->execute([
             $allocationCode, $programName, $disasterType, $barangayId,
             $totalBudget, $amountPerBeneficiary, $disbursedBudget, $remainingBudget,
-            $fundingSource, $targetBeneficiaries, $notes, $user['id']
+            $fundingSource, $targetBeneficiaries, $addedType, $notes, $user['id']
         ]);
         $allocationId = (int)$db->lastInsertId();
 
-        // Audit Trail entry
+        $recId = (int)($_POST['recommendation_id'] ?? 0);
+        if ($recId > 0) {
+            $linkStmt = $db->prepare("UPDATE recommendations SET financial_aid_allocation_id = ? WHERE id = ?");
+            $linkStmt->execute([$allocationId, $recId]);
+        }
+
+        // Audit Trail entry with added_type
+        $typeLabel = ($addedType === 'added_by_admin') ? 'Added by Admin' : 'AI Recommended';
         $auditDetails = sprintf(
-            "ICDRRMO allocated ₱%s to Barangay %s under %s (%s). Target: %d beneficiaries at ₱%s each. Funding: %s.",
+            "ICDRRMO allocated ₱%s to Barangay %s under %s (%s). Target: %d beneficiaries at ₱%s each. Funding: %s. [Source: %s].",
             number_format($totalBudget, 2),
             $barangayName,
             $programName,
             $allocationCode,
             $targetBeneficiaries,
             number_format($amountPerBeneficiary, 2),
-            $fundingSource
+            $fundingSource,
+            $typeLabel
         );
 
         $auditStmt = $db->prepare("

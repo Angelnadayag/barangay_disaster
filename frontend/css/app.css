@@ -672,22 +672,35 @@ a:hover {
   border: 1px solid transparent;
   transition: all 0.15s ease;
   white-space: nowrap;
+  text-decoration: none;
 }
 
-.btn-primary {
+.btn-primary,
+a.btn-primary {
   background-color: var(--color-primary);
-  color: #FFFFFF;
+  color: #FFFFFF !important;
 }
-.btn-primary:hover {
+.btn-primary:hover,
+.btn-primary:focus,
+a.btn-primary:hover,
+a.btn-primary:focus {
   background-color: var(--color-primary-dark);
+  color: #FFFFFF !important;
+  text-decoration: none;
 }
 
-.btn-secondary {
+.btn-secondary,
+a.btn-secondary {
   background-color: var(--color-secondary);
-  color: #FFFFFF;
+  color: #FFFFFF !important;
 }
-.btn-secondary:hover {
+.btn-secondary:hover,
+.btn-secondary:focus,
+a.btn-secondary:hover,
+a.btn-secondary:focus {
   background-color: var(--color-secondary-light);
+  color: #FFFFFF !important;
+  text-decoration: none;
 }
 
 .btn-outline {
@@ -700,20 +713,32 @@ a:hover {
   border-color: var(--color-text-secondary);
 }
 
-.btn-danger {
+.btn-danger,
+a.btn-danger {
   background-color: var(--color-danger);
-  color: #FFFFFF;
+  color: #FFFFFF !important;
 }
-.btn-danger:hover {
+.btn-danger:hover,
+.btn-danger:focus,
+a.btn-danger:hover,
+a.btn-danger:focus {
   background-color: #B71C1C;
+  color: #FFFFFF !important;
+  text-decoration: none;
 }
 
-.btn-success {
+.btn-success,
+a.btn-success {
   background-color: var(--color-success);
-  color: #FFFFFF;
+  color: #FFFFFF !important;
 }
-.btn-success:hover {
+.btn-success:hover,
+.btn-success:focus,
+a.btn-success:hover,
+a.btn-success:focus {
   background-color: #1B5E20;
+  color: #FFFFFF !important;
+  text-decoration: none;
 }
 
 .btn-sm {
@@ -1229,3 +1254,770 @@ select.form-control {
   cursor: pointer;
   padding: 4px;
 }
+
+/* ==========================================================================
+   DECISION TREE CONFIDENCE HOVER BOX & BREAKDOWN POPOVER
+   ========================================================================== */
+.confidence-hover-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  outline: none;
+}
+
+.confidence-info-icon {
+  display: inline-block;
+  font-size: 9px;
+  opacity: 0.8;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
+.confidence-hover-box {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  width: 295px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(23, 50, 77, 0.2), 0 2px 8px rgba(23, 50, 77, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10500;
+  overflow: visible;
+  text-align: left;
+  line-height: 1.4;
+}
+
+/* Tooltip downward caret */
+.confidence-hover-box::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: #FFFFFF;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 10501;
+}
+
+.confidence-hover-wrap:hover .confidence-hover-box,
+.confidence-hover-wrap:focus .confidence-hover-box,
+.confidence-hover-wrap:focus-within .confidence-hover-box {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Position adjustments for table edges */
+.confidence-hover-wrap.align-left .confidence-hover-box {
+  left: 0;
+  transform: translateX(0) translateY(6px);
+}
+.confidence-hover-wrap.align-left .confidence-hover-box::after {
+  left: 24px;
+}
+.confidence-hover-wrap.align-left:hover .confidence-hover-box {
+  transform: translateX(0) translateY(0);
+}
+
+.confidence-hover-wrap.align-right .confidence-hover-box {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(6px);
+}
+.confidence-hover-wrap.align-right .confidence-hover-box::after {
+  left: auto;
+  right: 24px;
+}
+.confidence-hover-wrap.align-right:hover .confidence-hover-box {
+  transform: translateX(0) translateY(0);
+}
+
+.confidence-hover-header {
+  background: #17324D;
+  color: #FFFFFF;
+  padding: 9px 12px;
+  border-top-left-radius: 9px;
+  border-top-right-radius: 9px;
+  border-bottom: 1px solid #102336;
+}
+
+.confidence-model-tag {
+  font-size: 8.5px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.confidence-hover-body {
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border-bottom-left-radius: 9px;
+  border-bottom-right-radius: 9px;
+}
+
+.confidence-hover-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  padding: 4px 0;
+  border-bottom: 1px dashed #E2E8F0;
+}
+
+.confidence-hover-row:last-of-type {
+  border-bottom: none;
+}
+
+.confidence-row-label {
+  color: #475569;
+  font-weight: 500;
+}
+
+.confidence-row-value {
+  font-family: var(--font-secondary);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.confidence-hover-footer {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #F8FAFC;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+}
+
+/* ==========================================================================
+   DECISION SUPPORT SYSTEM (DSS) EXECUTION MODAL
+   Uses only the core palette tokens, Poppins/Roboto and the 9-13px scale
+   ========================================================================== */
+.dss-subtext {
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.dss-label {
+  display: block;
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 3px;
+}
+
+.dss-value {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.dss-num {
+  font-family: var(--font-secondary);
+}
+
+.dss-section-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 16px 0 8px;
+}
+
+.dss-context {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-primary);
+  padding: 10px 12px;
+}
+
+.dss-context-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.dss-context-head .dss-label {
+  margin: 0;
+}
+
+.dss-context-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.dss-modality-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-primary);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  margin-bottom: 8px;
+}
+
+.dss-modality-card input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+}
+
+.dss-modality-card:hover {
+  border-color: var(--color-secondary);
+}
+
+.dss-modality-card.active,
+.dss-modality-card:has(input[type="radio"]:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-surface-subtle);
+}
+
+.dss-modality-content {
+  flex: 1;
+}
+
+.dss-modality-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dss-modality-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.dss-modality-tag {
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--color-secondary);
+  border: 1px solid var(--color-secondary);
+  border-radius: var(--radius-full);
+  padding: 1px 7px;
+}
+
+.dss-modality-desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-top: 3px;
+}
+
+.dss-modality-list {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+
+.dss-modality-list li {
+  margin-bottom: 2px;
+}
+
+.dss-modality-list strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* Financial aid optional parameters */
+.dss-aid-inputs-box {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-primary);
+  padding: 4px 12px 12px;
+  margin-top: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.dss-aid-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0 8px;
+}
+
+.dss-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.dss-check input {
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+}
+
+.dss-aid-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dss-chip-row {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dss-chip-row .dss-subtext {
+  margin: 0 4px 0 0;
+}
+
+.dss-sponsor-chip {
+  display: inline-block;
+  font-size: var(--text-2xs);
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.dss-sponsor-chip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.dss-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-primary);
+  padding: 8px 12px;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.dss-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* Progress screen */
+.dss-loading-wrapper {
+  padding: 8px 8px 12px;
+}
+
+.dss-result-title {
+  font-size: var(--text-section-title);
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0 0 2px;
+}
+
+.dss-progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background: var(--color-border-light);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin: 12px 0 16px;
+}
+
+.dss-progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.35s ease;
+}
+
+.dss-step-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dss-step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.dss-step-item.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.dss-step-item.completed {
+  color: var(--color-text-secondary);
+}
+
+.dss-step-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-2xs);
+  flex-shrink: 0;
+  background: var(--color-border-light);
+  color: var(--color-text-secondary);
+}
+
+.dss-step-item.active .dss-step-icon {
+  background: var(--color-primary);
+  color: #FFFFFF;
+}
+
+.dss-step-item.completed .dss-step-icon {
+  background: var(--color-secondary);
+  color: #FFFFFF;
+}
+
+/* Results screen */
+.dss-result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dss-result-card {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-primary);
+  padding: 10px 12px;
+}
+
+.dss-result-details {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-primary);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+/* ==========================================================================
+   DSS Decision Tree Flowchart & Section 2 Path Beautification
+   ========================================================================== */
+.dss-flowchart-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dss-pipeline-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px 2px;
+  scrollbar-width: thin;
+}
+
+.dss-pipeline-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+.dss-pipeline-scroll::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+.dss-node-card {
+  flex: 0 0 auto;
+  min-width: 140px;
+  max-width: 220px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dss-node-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border-color: #93C5FD;
+}
+
+.dss-node-card.root-node {
+  border-left: 3.5px solid #2563EB;
+  background: #F8FAFC;
+}
+
+.dss-node-card.severity-node {
+  border-left: 3.5px solid #EA580C;
+}
+
+.dss-node-card.impact-node {
+  border-left: 3.5px solid #7C3AED;
+}
+
+.dss-node-card.urgency-node {
+  border-left: 3.5px solid #0284C7;
+}
+
+.dss-node-card.stock-node {
+  border-left: 3.5px solid #059669;
+}
+
+.dss-node-card.ayuda-node {
+  border-left: 3.5px solid #D97706;
+  background: #FFFDF7;
+}
+
+.dss-node-card.outcome-node {
+  border-left: 3.5px solid #10B981;
+  background: #F0FDF4;
+}
+
+.dss-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.dss-node-step {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.4px;
+}
+
+.dss-node-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.dss-node-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.3;
+}
+
+.dss-node-desc {
+  font-size: 9px;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+  line-height: 1.25;
+}
+
+.dss-node-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94A3B8;
+  font-size: 13px;
+  font-weight: bold;
+  padding: 0 2px;
+  user-select: none;
+}
+
+.dss-structured-rationale {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dss-rationale-pill-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+}
+
+.dss-rationale-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 9.5px;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.dss-rationale-plan-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .dss-rationale-plan-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dss-plan-card {
+  padding: 9px 11px;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.dss-plan-card.plan-resources {
+  border-left: 3px solid #0284C7;
+  background: #F0F9FF;
+}
+
+.dss-plan-card.plan-ayuda {
+  border-left: 3px solid #059669;
+  background: #F0FDF4;
+}
+
+/* ==========================================================================
+   Section 5: Human Review & Administrative Validation Deck
+   ========================================================================== */
+.review-deck-card {
+  border-top: 3px solid #2563EB !important;
+  background: #FFFFFF;
+}
+
+.review-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (max-width: 768px) {
+  .review-action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.review-btn-card {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  outline: none;
+}
+
+.review-btn-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.review-btn-card.approve {
+  border-color: #059669;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F0FDF4 100%);
+}
+.review-btn-card.approve:hover {
+  border-color: #047857;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.2);
+}
+
+.review-btn-card.modify {
+  border-color: #2563EB;
+  background: linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%);
+}
+.review-btn-card.modify:hover {
+  border-color: #1D4ED8;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+}
+
+.review-btn-card.reject {
+  border-color: #DC2626;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FEF2F2 100%);
+}
+.review-btn-card.reject:hover {
+  border-color: #B91C1C;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.2);
+}
+
+.review-btn-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.review-btn-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.review-btn-title {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.review-btn-card.approve .review-btn-title { color: #065F46; }
+.review-btn-card.modify .review-btn-title { color: #1E40AF; }
+.review-btn-card.reject .review-btn-title { color: #991B1B; }
+
+.review-btn-desc {
+  font-size: 9.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+
+
+
+.dss-res-row {
+  display: grid;
+  grid-template-columns: 1fr 80px auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+

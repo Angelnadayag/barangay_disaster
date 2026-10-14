@@ -118,6 +118,7 @@ CREATE TABLE `disaster_reports` (
   `disaster_type` enum('Flood','Typhoon','Landslide','Earthquake','Fire','Storm Surge','Flash Flood') NOT NULL,
   `severity` enum('Low','Moderate','High','Critical') NOT NULL,
   `urgency` enum('Immediate','High','Medium','Low') NOT NULL,
+  `aid_support` enum('resources','financial_aid','both') NOT NULL DEFAULT 'resources',
   `affected_families` int(11) NOT NULL DEFAULT 0,
   `affected_individuals` int(11) NOT NULL DEFAULT 0,
   `displaced_families` int(11) NOT NULL DEFAULT 0,
@@ -127,7 +128,7 @@ CREATE TABLE `disaster_reports` (
   `requested_assistance` text NOT NULL,
   `situation_overview` text DEFAULT NULL,
   `resolution_notes` text DEFAULT NULL,
-  `status` enum('Submitted','Ongoing','Under Review','Recommendation Ready','Approved','Allocated','Dispatched','Completed','Rejected') NOT NULL DEFAULT 'Ongoing',
+  `status` enum('Ongoing','Completed') NOT NULL DEFAULT 'Ongoing',
   `submitted_by` int(11) NOT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -304,9 +305,17 @@ CREATE TABLE `recommendations` (
   `recommendation_code` varchar(50) NOT NULL,
   `disaster_request_id` int(11) NOT NULL,
   `priority` enum('Low','Medium','High','Critical') NOT NULL,
+  `modality` enum('both','resources','financial_aid') NOT NULL DEFAULT 'both',
   `confidence_score` decimal(5,2) NOT NULL DEFAULT 85.00,
   `decision_path` text NOT NULL,
   `recommendation_reason` text NOT NULL,
+  `financial_aid_recommended_budget` decimal(12,2) DEFAULT NULL,
+  `financial_aid_per_family` decimal(10,2) DEFAULT NULL,
+  `financial_aid_target_families` int(11) DEFAULT NULL,
+  `financial_aid_source` varchar(150) NOT NULL DEFAULT 'LGU Calamity Fund (QRF)',
+  `financial_aid_approved_budget` decimal(12,2) DEFAULT NULL,
+  `financial_aid_added_type` enum('ai_recommended','added_by_admin') NOT NULL DEFAULT 'ai_recommended',
+  `financial_aid_allocation_id` int(11) DEFAULT NULL,
   `status` enum('Pending Review','Approved','Rejected','Modified') DEFAULT 'Pending Review',
   `reviewed_by` int(11) DEFAULT NULL,
   `reviewed_at` datetime DEFAULT NULL,
@@ -331,6 +340,7 @@ CREATE TABLE `recommended_items` (
   `approved_quantity` int(11) DEFAULT NULL,
   `allocated_quantity` int(11) NOT NULL DEFAULT 0,
   `status` enum('Pending','Approved','Allocated','Rejected') DEFAULT 'Pending',
+  `added_type` enum('ai_recommended','added_by_admin') NOT NULL DEFAULT 'ai_recommended',
   PRIMARY KEY (`id`),
   KEY `recommendation_id` (`recommendation_id`),
   KEY `resource_id` (`resource_id`),
@@ -374,6 +384,7 @@ CREATE TABLE `resource_transactions` (
   `quantity` int(11) NOT NULL,
   `reference_type` varchar(50) DEFAULT 'manual',
   `reference_id` int(11) DEFAULT NULL,
+  `added_type` enum('ai_recommended','added_by_admin') DEFAULT NULL,
   `remarks` text DEFAULT NULL,
   `performed_by` int(11) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
@@ -384,42 +395,6 @@ CREATE TABLE `resource_transactions` (
   CONSTRAINT `resource_transactions_ibfk_2` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `resources`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `resources` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `code` varchar(30) NOT NULL,
-  `name` varchar(150) NOT NULL,
-  `category` varchar(150) NOT NULL,
-  `status` enum('active','archived') NOT NULL DEFAULT 'active',
-  `description` text DEFAULT NULL,
-  `unit` varchar(30) NOT NULL,
-  `total_quantity` int(11) NOT NULL DEFAULT 0,
-  `available_quantity` int(11) NOT NULL DEFAULT 0,
-  `in_use_quantity` int(11) NOT NULL DEFAULT 0,
-  `damaged_quantity` int(11) NOT NULL DEFAULT 0,
-  `min_threshold` int(11) NOT NULL DEFAULT 50,
-  `storage_location` varchar(150) NOT NULL DEFAULT 'Central ICDRRMO Depot',
-  `batch_number` varchar(50) DEFAULT NULL COMMENT 'Batch/Lot number from supplier',
-  `supplier_donor` varchar(150) DEFAULT NULL COMMENT 'Source: OCD, DSWD, NGO donor name, LGU procurement',
-  `date_acquired` date DEFAULT NULL COMMENT 'Date the resource was received/procured',
-  `expiry_date` date DEFAULT NULL COMMENT 'Expiration date for perishable items',
-  `is_perishable` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Whether the item is perishable (food, medicine)',
-  `brand` varchar(100) DEFAULT NULL COMMENT 'Brand name or manufacturer',
-  `weight_per_unit` varchar(50) DEFAULT NULL COMMENT 'Weight per unit e.g. 5kg, 500g',
-  `cost_per_unit` decimal(10,2) DEFAULT NULL COMMENT 'Cost per unit in PHP for valuation',
-  `item_condition` enum('New','Good','Fair','Poor','Expired') NOT NULL DEFAULT 'New' COMMENT 'Current physical condition',
-  `barangay_id` int(11) DEFAULT NULL,
-  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `created_at` datetime DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `code` (`code`),
-  KEY `barangay_id` (`barangay_id`),
-  CONSTRAINT `resources_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
 DROP TABLE IF EXISTS `resource_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -453,6 +428,44 @@ CREATE TABLE `resource_suppliers` (
   `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `resources`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `resources` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `code` varchar(30) NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `category` varchar(150) NOT NULL,
+  `status` enum('active','archived') NOT NULL DEFAULT 'active',
+  `description` text DEFAULT NULL,
+  `unit` varchar(30) NOT NULL,
+  `total_quantity` int(11) NOT NULL DEFAULT 0,
+  `available_quantity` int(11) NOT NULL DEFAULT 0,
+  `in_use_quantity` int(11) NOT NULL DEFAULT 0,
+  `damaged_quantity` int(11) NOT NULL DEFAULT 0,
+  `min_threshold` int(11) NOT NULL DEFAULT 50,
+  `storage_location` varchar(150) NOT NULL DEFAULT 'Central ICDRRMO Depot',
+  `batch_number` varchar(50) DEFAULT NULL COMMENT 'Batch/Lot number from supplier',
+  `supplier_id` int(11) DEFAULT NULL COMMENT 'Foreign key to resource_suppliers table',
+  `date_acquired` date DEFAULT NULL COMMENT 'Date the resource was received/procured',
+  `expiry_date` date DEFAULT NULL COMMENT 'Expiration date for perishable items',
+  `is_perishable` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Whether the item is perishable (food, medicine)',
+  `brand` varchar(100) DEFAULT NULL COMMENT 'Brand name or manufacturer',
+  `weight_per_unit` varchar(50) DEFAULT NULL COMMENT 'Weight per unit e.g. 5kg, 500g',
+  `cost_per_unit` decimal(10,2) DEFAULT NULL COMMENT 'Cost per unit in PHP for valuation',
+  `item_condition` enum('New','Good','Fair','Poor','Expired') NOT NULL DEFAULT 'New' COMMENT 'Current physical condition',
+  `barangay_id` int(11) DEFAULT NULL,
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`),
+  KEY `barangay_id` (`barangay_id`),
+  KEY `supplier_id` (`supplier_id`),
+  CONSTRAINT `resources_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `resources_ibfk_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `resource_suppliers` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `responder_field_updates`;

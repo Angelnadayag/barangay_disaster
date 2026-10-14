@@ -61,8 +61,31 @@ $totalQuantity = isset($_POST['total_quantity']) && $_POST['total_quantity'] !==
     : ($availableQuantity + $inUseQuantity + $damagedQuantity);
 $minThreshold = max(1, (int)($_POST['min_threshold'] ?? $res['min_threshold']));
 $location = trim($_POST['storage_location'] ?? $res['storage_location']);
-$batchNumber = trim($_POST['batch_number'] ?? '') ?: $res['batch_number'];
-$supplierDonor = trim($_POST['supplier_donor'] ?? '') ?: $res['supplier_donor'];
+$batchNumber = trim($_POST['batch_number'] ?? '') ?: ($res['batch_number'] ?? null);
+
+$supplierInput = trim($_POST['supplier_id'] ?? ($_POST['supplier_donor'] ?? ($_POST['supplier'] ?? '')));
+$supplierId = $res['supplier_id'] ?? null;
+
+if ($supplierInput !== '') {
+    if (is_numeric($supplierInput)) {
+        $chkSupp = $db->prepare("SELECT id FROM resource_suppliers WHERE id = ?");
+        $chkSupp->execute([(int)$supplierInput]);
+        if ($chkSupp->fetch()) {
+            $supplierId = (int)$supplierInput;
+        }
+    } else {
+        $chkSupp = $db->prepare("SELECT id FROM resource_suppliers WHERE LOWER(name) = LOWER(?)");
+        $chkSupp->execute([$supplierInput]);
+        $existingSupp = $chkSupp->fetch();
+        if ($existingSupp) {
+            $supplierId = (int)$existingSupp['id'];
+        } else {
+            $db->prepare("INSERT IGNORE INTO resource_suppliers (name) VALUES (?)")->execute([$supplierInput]);
+            $supplierId = (int)$db->lastInsertId();
+        }
+    }
+}
+
 $dateAcquired = !empty($_POST['date_acquired']) ? $_POST['date_acquired'] : $res['date_acquired'];
 $expiryDate = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : $res['expiry_date'];
 $isPerishable = isset($_POST['is_perishable']) ? 1 : $res['is_perishable'];
@@ -89,7 +112,7 @@ try {
         UPDATE resources SET
             code = ?, name = ?, category = ?, description = ?, unit = ?,
             total_quantity = ?, available_quantity = ?, in_use_quantity = ?, damaged_quantity = ?,
-            min_threshold = ?, storage_location = ?, batch_number = ?, supplier_donor = ?,
+            min_threshold = ?, storage_location = ?, batch_number = ?, supplier_id = ?,
             date_acquired = ?, expiry_date = ?, is_perishable = ?, brand = ?,
             weight_per_unit = ?, cost_per_unit = ?, item_condition = ?, updated_at = NOW()
         WHERE id = ?
@@ -97,21 +120,18 @@ try {
     $updateStmt->execute([
         $code, $name, $category, $description, $unit,
         $totalQuantity, $availableQuantity, $inUseQuantity, $damagedQuantity,
-        $minThreshold, $location, $batchNumber, $supplierDonor,
+        $minThreshold, $location, $batchNumber, $supplierId,
         $dateAcquired, $expiryDate, $isPerishable, $brand,
         $weightPerUnit, $costPerUnit, $itemCondition,
         $id
     ]);
 
-    // Ensure category, brand, and supplier persist into dedicated lookup tables
+    // Ensure category and brand persist into dedicated lookup tables
     if (!empty($category)) {
         $db->prepare("INSERT IGNORE INTO resource_categories (name) VALUES (?)")->execute([$category]);
     }
     if (!empty($brand)) {
         $db->prepare("INSERT IGNORE INTO resource_brands (name) VALUES (?)")->execute([$brand]);
-    }
-    if (!empty($supplierDonor)) {
-        $db->prepare("INSERT IGNORE INTO resource_suppliers (name) VALUES (?)")->execute([$supplierDonor]);
     }
 
     logSystemEvent('UPDATE_RESOURCE', 'Resources', "Updated resource '$name' ($code)");

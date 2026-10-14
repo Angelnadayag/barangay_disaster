@@ -35,29 +35,32 @@ $expiredCount = (int)$db->query("SELECT COUNT(*) FROM resources WHERE status = '
 
 // Fetch Resources for Active / Archived tab
 $resStatus = ($activeTab === 'archived') ? 'archived' : 'active';
-$resSql = "SELECT * FROM resources WHERE status = ?";
+$resSql = "SELECT r.*, rs.name AS supplier_donor, rs.name AS supplier_name, rs.id AS supplier_id
+           FROM resources r
+           LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id
+           WHERE r.status = ?";
 $resParams = [$resStatus];
 
 if (!empty($filterCategory)) {
-    $resSql .= " AND category = ?";
+    $resSql .= " AND r.category = ?";
     $resParams[] = $filterCategory;
 }
 
 if ($filterStockLevel === 'low') {
-    $resSql .= " AND available_quantity <= min_threshold";
+    $resSql .= " AND r.available_quantity <= r.min_threshold";
 } elseif ($filterStockLevel === 'expiring') {
-    $resSql .= " AND expiry_date IS NOT NULL AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND expiry_date >= CURDATE()";
+    $resSql .= " AND r.expiry_date IS NOT NULL AND r.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND r.expiry_date >= CURDATE()";
 } elseif ($filterStockLevel === 'expired') {
-    $resSql .= " AND expiry_date IS NOT NULL AND expiry_date < CURDATE()";
+    $resSql .= " AND r.expiry_date IS NOT NULL AND r.expiry_date < CURDATE()";
 }
 
 if (!empty($filterCondition)) {
-    $resSql .= " AND item_condition = ?";
+    $resSql .= " AND r.item_condition = ?";
     $resParams[] = $filterCondition;
 }
 
 if (!empty($search)) {
-    $resSql .= " AND (code LIKE ? OR name LIKE ? OR storage_location LIKE ? OR supplier_donor LIKE ? OR brand LIKE ? OR batch_number LIKE ?)";
+    $resSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR r.storage_location LIKE ? OR rs.name LIKE ? OR r.brand LIKE ? OR r.batch_number LIKE ?)";
     $like = "%$search%";
     $resParams[] = $like;
     $resParams[] = $like;
@@ -67,7 +70,7 @@ if (!empty($search)) {
     $resParams[] = $like;
 }
 
-$resSql .= " ORDER BY (available_quantity <= min_threshold) DESC, category ASC, name ASC";
+$resSql .= " ORDER BY (r.available_quantity <= r.min_threshold) DESC, r.category ASC, r.name ASC";
 $resStmt = $db->prepare($resSql);
 $resStmt->execute($resParams);
 $resourcesList = $resStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -140,9 +143,11 @@ if (empty($brands)) {
 }
 
 // Dynamic Suppliers / Donors / Source: strictly persisted in resource_suppliers table
-$supplierDonorSources = $db->query("SELECT name FROM resource_suppliers ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
-if (empty($supplierDonorSources)) {
+$suppliersList = $db->query("SELECT id, name FROM resource_suppliers ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$supplierDonorSources = array_column($suppliersList, 'name');
+if (empty($suppliersList)) {
     $supplierDonorSources = ['LGU General Procurement', 'DSWD Regional Office', 'DOH Central Depot', 'Office of Civil Defense', 'Philippine Red Cross', 'Private Donor', 'Barangay Disaster Fund'];
+    $suppliersList = array_map(function($i, $n) { return ['id' => $i + 1, 'name' => $n]; }, array_keys($supplierDonorSources), $supplierDonorSources);
 }
 
 $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
@@ -487,26 +492,22 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
   <!-- Filters Bar -->
   <div class="card" style="margin-bottom:var(--space-4);">
     <div class="card-body" style="padding:10px 14px;">
-      <form method="GET" class="filter-bar" style="margin-bottom:0;">
+      <form method="GET" class="filter-bar" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:center;width:100%;flex-wrap:wrap;gap:12px;">
         <input type="hidden" name="tab" value="<?= clean($activeTab) ?>">
 
-        <div class="filter-group">
-          <div class="search-input-wrap">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" name="search" class="form-control" placeholder="Search SKU, name, brand, supplier..." value="<?= clean($search) ?>">
-          </div>
+        <!-- Group 1 (Left): Track Barangay -> Category Filter -> Stock Levels -> Condition -->
+        <div class="filter-group" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <select onchange="if(this.value){ window.location.href='<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays&barangay_id=' + this.value; }" class="form-control" style="width:180px;background:#F8FAFC;" title="Monitor Barangay Local Inventory">
+            <option value="">Track Barangay Stock...</option>
+            <?php foreach ($allBarangays as $b): ?>
+              <option value="<?= $b['id'] ?>">Brgy. <?= clean($b['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
 
           <select name="category" class="form-control" style="width:170px;">
             <option value="">All Categories</option>
             <?php foreach ($categories as $cat): ?>
               <option value="<?= clean($cat) ?>" <?= $filterCategory === $cat ? 'selected' : '' ?>><?= clean($cat) ?></option>
-            <?php endforeach; ?>
-          </select>
-
-          <select onchange="if(this.value){ window.location.href='<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays&barangay_id=' + this.value; }" class="form-control" style="width:180px;background:#F8FAFC;" title="Monitor Barangay Local Inventory">
-            <option value="">Track Barangay Stock...</option>
-            <?php foreach ($allBarangays as $b): ?>
-              <option value="<?= $b['id'] ?>">Brgy. <?= clean($b['name']) ?></option>
             <?php endforeach; ?>
           </select>
 
@@ -531,34 +532,36 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
             <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=<?= clean($activeTab) ?>" class="btn btn-outline" style="color:var(--color-text-muted);">Reset</a>
           <?php endif; ?>
         </div>
-        <div style="display:flex;align-items:center;gap:12px;margin-left:auto;">
-          <span style="font-size:11px;color:var(--color-text-muted);font-weight:600;">
-            Showing: <?= count($resourcesList) ?> Resource(s) (<?= ucfirst($activeTab) ?>)
-          </span>
+
+        <!-- Group 2 (Right): Search -->
+        <div class="filter-search-group" style="display:flex;align-items:center;gap:8px;">
+          <div class="search-input-wrap" style="width:260px;">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" name="search" class="form-control" placeholder="Search SKU, name, brand, location..." value="<?= clean($search) ?>" style="width:100%;">
+          </div>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Resources Data Table (Full Detail) -->
-  <div class="table-responsive">
-    <table class="data-table">
-      <thead>
+  <!-- Resources Data Table (Full Detail with Sticky Header and Vertical Scrollbar) -->
+  <div class="table-responsive" style="max-height: 620px; overflow-y: auto; overflow-x: auto; position: relative; border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.05));">
+    <table class="data-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+      <thead style="position: sticky; top: 0; background: var(--color-surface, #ffffff); z-index: 10; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
         <tr>
-          <th>SKU Code</th>
-          <th>Resource Name</th>
-          <th>Category</th>
-          <th>Depot Stock</th>
-          <th>Brand</th>
-          <th>Condition</th>
-          <th>Expiry Date</th>
-          <th>Supplier / Donor</th>
-          <th style="text-align:right;">Actions</th>
+          <th style="background: inherit;">SKU Code</th>
+          <th style="background: inherit;">Resource Name</th>
+          <th style="background: inherit;">Category</th>
+          <th style="background: inherit;">Depot Stock</th>
+          <th style="background: inherit;">Brand</th>
+          <th style="background: inherit;">Condition</th>
+          <th style="background: inherit;">Expiry Date</th>
+          <th style="text-align:right; background: inherit;">Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($resourcesList)): ?>
-          <tr><td colspan="9" style="text-align:center;padding:32px;">No <?= $activeTab === 'archived' ? 'archived' : 'active' ?> resources match your filter criteria.</td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:32px;">No <?= $activeTab === 'archived' ? 'archived' : 'active' ?> resources match your filter criteria.</td></tr>
         <?php else: ?>
           <?php foreach ($resourcesList as $r): ?>
             <?php
@@ -572,6 +575,9 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
                 <span class="badge badge-neutral" style="font-family:var(--font-secondary);font-weight:700;font-size:10px;">
                   <?= clean($r['code']) ?>
                 </span>
+                <?php if (!empty($r['batch_number'])): ?>
+                  <div style="font-size:9px;color:var(--color-text-muted);margin-top:2px;">Lot: <?= clean($r['batch_number']) ?></div>
+                <?php endif; ?>
               </td>
               <td>
                 <div style="font-weight:700;color:var(--color-primary);font-size:12.5px;"><?= clean($r['name']) ?></div>
@@ -607,12 +613,6 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
                   <?php endif; ?>
                 <?php else: ?>
                   <span style="font-size:10px;color:var(--color-text-muted);">N/A</span>
-                <?php endif; ?>
-              </td>
-              <td style="font-size:10px;color:var(--color-text-secondary);max-width:140px;">
-                <?= clean($r['supplier_donor'] ?: '—') ?>
-                <?php if (!empty($r['batch_number'])): ?>
-                  <div style="font-size:9px;color:var(--color-text-muted);">Batch: <?= clean($r['batch_number']) ?></div>
                 <?php endif; ?>
               </td>
               <td style="text-align:right;">
@@ -1327,10 +1327,10 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
               <label class="form-label" style="margin-bottom:2px;">Supplier / Donor</label>
               <button type="button" class="btn btn-outline btn-xs" id="btnAdd_supplier_create" onclick="toggleDynamicField('supplier', 'create')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;">+ Add</button>
             </div>
-            <select name="supplier_donor" id="create_res_supplier" class="form-control">
+            <select name="supplier_id" id="create_res_supplier" class="form-control">
               <option value="">— Select Supplier / Donor —</option>
-              <?php foreach ($supplierDonorSources as $s): ?>
-                <option value="<?= clean($s) ?>"><?= clean($s) ?></option>
+              <?php foreach ($suppliersList as $s): ?>
+                <option value="<?= (int)$s['id'] ?>"><?= clean($s['name']) ?></option>
               <?php endforeach; ?>
             </select>
             <div id="dynAddContainer_supplier_create" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
@@ -1548,10 +1548,10 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
               <label class="form-label" style="margin-bottom:2px;">Supplier / Donor</label>
               <button type="button" class="btn btn-outline btn-xs" id="btnAdd_supplier_view" onclick="toggleDynamicField('supplier', 'view')" style="font-size:10px;padding:1px 6px;height:auto;line-height:1.2;" disabled>+ Add</button>
             </div>
-            <select name="supplier_donor" id="view_res_supplier_donor" class="form-control" disabled>
+            <select name="supplier_id" id="view_res_supplier_donor" class="form-control" disabled>
               <option value="">— Select Supplier / Donor —</option>
-              <?php foreach ($supplierDonorSources as $s): ?>
-                <option value="<?= clean($s) ?>"><?= clean($s) ?></option>
+              <?php foreach ($suppliersList as $s): ?>
+                <option value="<?= (int)$s['id'] ?>"><?= clean($s['name']) ?></option>
               <?php endforeach; ?>
             </select>
             <div id="dynAddContainer_supplier_view" style="display:none;margin-top:6px;background:#F8FAFC;border:1px dashed var(--color-border);padding:6px;border-radius:4px;">
@@ -2022,7 +2022,7 @@ async function confirmDynamicField(field, mode) {
     if (select) {
       let foundIndex = -1;
       for (let i = 0; i < select.options.length; i++) {
-        if (select.options[i].value.toLowerCase() === val.toLowerCase()) {
+        if (select.options[i].text.toLowerCase() === val.toLowerCase() || select.options[i].value.toLowerCase() === val.toLowerCase()) {
           foundIndex = i;
           break;
         }
@@ -2031,10 +2031,10 @@ async function confirmDynamicField(field, mode) {
         if (m === mode) select.selectedIndex = foundIndex;
       } else {
         const opt = document.createElement('option');
-        opt.value = val;
+        opt.value = (field === 'supplier' && data && data.id) ? data.id : val;
         opt.textContent = val;
         select.appendChild(opt);
-        if (m === mode) select.value = val;
+        if (m === mode) select.value = opt.value;
       }
     }
   });
@@ -2163,23 +2163,26 @@ function openViewResourceModal(r) {
   // Set Supplier select (ensure option exists dynamically)
   const suppSelect = document.getElementById('view_res_supplier_donor');
   if (suppSelect) {
-    if (r.supplier_donor) {
-      let exists = false;
-      for (let i = 0; i < suppSelect.options.length; i++) {
-        if (suppSelect.options[i].value.toLowerCase() === r.supplier_donor.toLowerCase()) {
-          exists = true;
-          suppSelect.selectedIndex = i;
-          break;
-        }
+    let matched = false;
+    for (let i = 0; i < suppSelect.options.length; i++) {
+      const optVal = suppSelect.options[i].value;
+      const optText = suppSelect.options[i].textContent.trim().toLowerCase();
+      if ((r.supplier_id && optVal == r.supplier_id) ||
+          (r.supplier_donor && (optText === r.supplier_donor.trim().toLowerCase() || optVal === r.supplier_donor)) ||
+          (r.supplier_name && optText === r.supplier_name.trim().toLowerCase())) {
+        suppSelect.selectedIndex = i;
+        matched = true;
+        break;
       }
-      if (!exists) {
-        const opt = document.createElement('option');
-        opt.value = r.supplier_donor;
-        opt.textContent = r.supplier_donor;
-        suppSelect.appendChild(opt);
-        suppSelect.value = r.supplier_donor;
-      }
-    } else {
+    }
+    if (!matched && (r.supplier_donor || r.supplier_name)) {
+      const suppText = r.supplier_donor || r.supplier_name;
+      const opt = document.createElement('option');
+      opt.value = r.supplier_id || suppText;
+      opt.textContent = suppText;
+      suppSelect.appendChild(opt);
+      suppSelect.value = opt.value;
+    } else if (!matched) {
       suppSelect.value = '';
     }
   }
@@ -2296,7 +2299,7 @@ function cancelResourceEditMode() {
     document.getElementById('view_res_expiry_date').value = r.expiry_date || '';
     document.getElementById('view_res_is_perishable').checked = (r.is_perishable == 1);
     const suppSelect = document.getElementById('view_res_supplier_donor');
-    if (suppSelect) suppSelect.value = r.supplier_donor || '';
+    if (suppSelect) suppSelect.value = r.supplier_id || '';
     document.getElementById('view_res_batch_number').value = r.batch_number || '';
   }
 

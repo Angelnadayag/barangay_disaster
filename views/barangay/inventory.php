@@ -47,7 +47,7 @@ $medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity)
 $localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold")->fetchColumn();
 
 // Fetch Local Resources
-$invSql = "SELECT * FROM resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)";
+$invSql = "SELECT * FROM (SELECT r.*, rs.name AS supplier_donor FROM resources r LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id) resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)";
 $invParams = [$barangayId];
 
 if (!empty($filterCategory)) {

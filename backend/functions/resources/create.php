@@ -36,7 +36,31 @@ $initialQuantity = max(0, (int)($_POST['quantity'] ?? ($_POST['available_quantit
 $minThreshold = max(1, (int)($_POST['min_threshold'] ?? 20));
 $location = trim($_POST['storage_location'] ?? ($role === 'barangay_head' ? 'Barangay Hall Stockroom' : 'Central ICDRRMO Depot'));
 $batchNumber = trim($_POST['batch_number'] ?? '') ?: null;
-$supplierDonor = trim($_POST['supplier_donor'] ?? '') ?: null;
+$supplierInput = trim($_POST['supplier_id'] ?? ($_POST['supplier_donor'] ?? ($_POST['supplier'] ?? '')));
+$supplierId = null;
+
+if (!empty($supplierInput)) {
+    if (is_numeric($supplierInput)) {
+        $chkSupp = $db->prepare("SELECT id FROM resource_suppliers WHERE id = ?");
+        $chkSupp->execute([(int)$supplierInput]);
+        if ($chkSupp->fetch()) {
+            $supplierId = (int)$supplierInput;
+        }
+    }
+    if (!$supplierId) {
+        // Find by name or insert dynamically
+        $chkSupp = $db->prepare("SELECT id FROM resource_suppliers WHERE LOWER(name) = LOWER(?)");
+        $chkSupp->execute([$supplierInput]);
+        $existingSupp = $chkSupp->fetch();
+        if ($existingSupp) {
+            $supplierId = (int)$existingSupp['id'];
+        } else {
+            $db->prepare("INSERT IGNORE INTO resource_suppliers (name) VALUES (?)")->execute([$supplierInput]);
+            $supplierId = (int)$db->lastInsertId();
+        }
+    }
+}
+
 $dateAcquired = !empty($_POST['date_acquired']) ? $_POST['date_acquired'] : date('Y-m-d');
 $expiryDate = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
 $isPerishable = isset($_POST['is_perishable']) ? 1 : 0;
@@ -53,7 +77,12 @@ if (empty($code)) {
         'Medical Supplies' => 'MED',
         'Rescue Equipment' => 'EQP',
         'Emergency Supplies' => 'EMG',
-        'Shelter & Sanitation' => 'SHT'
+        'Shelter & Sanitation' => 'SHT',
+        'Emergency Shelters' => 'SHT',
+        'Sanitation & Hygiene' => 'SAN',
+        'Emergency Supplies & Power' => 'PWR',
+        'Water Supply & Distribution' => 'WAT',
+        'Evacuation Center & Community Support' => 'COM'
     ];
     $prefix = $catPrefixMap[$category] ?? 'GEN';
     $prefixScope = ($barangayId) ? "BRG{$barangayId}-{$prefix}" : "ICD-{$prefix}";
@@ -79,28 +108,25 @@ try {
         INSERT INTO resources (
             code, name, category, status, description, unit, total_quantity,
             available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-            storage_location, batch_number, supplier_donor, date_acquired,
+            storage_location, batch_number, supplier_id, date_acquired,
             expiry_date, is_perishable, brand, weight_per_unit, cost_per_unit,
             item_condition, barangay_id, updated_at, created_at
         ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
     $stmt->execute([
         $code, $name, $category, $description, $unit, $initialQuantity,
-        $initialQuantity, $minThreshold, $location, $batchNumber, $supplierDonor,
+        $initialQuantity, $minThreshold, $location, $batchNumber, $supplierId,
         $dateAcquired, $expiryDate, $isPerishable, $brand, $weightPerUnit,
         $costPerUnit, $itemCondition, $barangayId
     ]);
     $resourceId = (int)$db->lastInsertId();
 
-    // Ensure category, brand, and supplier persist into dedicated lookup tables
+    // Ensure category and brand persist into dedicated lookup tables
     if (!empty($category)) {
         $db->prepare("INSERT IGNORE INTO resource_categories (name) VALUES (?)")->execute([$category]);
     }
     if (!empty($brand)) {
         $db->prepare("INSERT IGNORE INTO resource_brands (name) VALUES (?)")->execute([$brand]);
-    }
-    if (!empty($supplierDonor)) {
-        $db->prepare("INSERT IGNORE INTO resource_suppliers (name) VALUES (?)")->execute([$supplierDonor]);
     }
 
     // Log movement transaction

@@ -69,19 +69,24 @@ $countStmt = $db->query("SELECT COUNT(*) FROM disaster_reports");
 $nextId = ((int)$countStmt->fetchColumn()) + 1;
 $trackingCode = 'REQ-' . date('Y') . '-' . str_pad($nextId, 3, '0', STR_PAD_LEFT);
 
+$aidSupport = trim($_POST['aid_support'] ?? 'resources');
+if (!in_array($aidSupport, ['resources', 'financial_aid', 'both'], true)) {
+    $aidSupport = 'resources';
+}
+
 try {
     $stmt = $db->prepare("
         INSERT INTO disaster_reports (
             tracking_code, barangay_id, purok_name, coordinates_lat, coordinates_lng, incident_location,
-            disaster_type, severity, urgency,
+            disaster_type, severity, urgency, aid_support,
             affected_families, affected_individuals, displaced_families,
             casualties_count, injuries_count, missing_count,
             requested_assistance, situation_overview, status, submitted_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
     $stmt->execute([
         $trackingCode, $barangayId, $purokName, $coordinatesLat, $coordinatesLng, $incidentLocation,
-        $disasterType, $severity, $urgency,
+        $disasterType, $severity, $urgency, $aidSupport,
         $affectedFamilies, $affectedIndividuals, $displacedFamilies,
         $casualties, $injuries, $missing,
         $requestedAssistance, $situationOverview, $status, $user['id']

@@ -28,11 +28,11 @@ $requestId = (int)($_POST['request_id'] ?? ($_POST['id'] ?? 0));
 $status = trim($_POST['status'] ?? '');
 $resolutionNotes = isset($_POST['resolution_notes']) ? trim($_POST['resolution_notes']) : null;
 
-$allowed = ['Submitted', 'Ongoing', 'Under Review', 'Recommendation Ready', 'Approved', 'Allocated', 'Dispatched', 'Completed', 'Rejected'];
+$allowed = ['Ongoing', 'Completed'];
 
 if (!$requestId || !in_array($status, $allowed, true)) {
-    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Invalid status or report ID specified.'], 400);
-    redirectWithFlash($returnUrl, 'error', 'Invalid status specified.');
+    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Invalid status. Status must be Ongoing or Completed.'], 400);
+    redirectWithFlash($returnUrl, 'error', 'Invalid status. Status must be Ongoing or Completed.');
 }
 
 // Check ownership if Barangay Head
@@ -43,6 +43,12 @@ $req = $chk->fetch(PDO::FETCH_ASSOC);
 if (!$req) {
     if ($isAjax) jsonResponse(['success' => false, 'message' => 'Report not found.'], 404);
     redirectWithFlash($returnUrl, 'error', 'Report not found.');
+}
+
+// Only Barangay Head can conclude the incident
+if ($status === 'Completed' && $role !== 'barangay_head') {
+    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Only the Barangay Head can conclude and finish this incident report.'], 403);
+    redirectWithFlash($returnUrl, 'error', 'Only the Barangay Head can conclude and finish this incident report.');
 }
 
 if ($role === 'barangay_head' && (int)$req['barangay_id'] !== (int)$user['barangay_id']) {

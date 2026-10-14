@@ -89,7 +89,7 @@ $totalDisplacedFamilies = 0;
 
 foreach ($allRequests as $r) {
     $status = $r['status'] ?? 'Ongoing';
-    if (in_array($status, ['Ongoing', 'Submitted', 'Under Review', 'Recommendation Ready', 'Approved', 'Allocated', 'Dispatched'], true)) {
+    if ($status === 'Ongoing') {
         $activeRequestsList[] = $r;
     }
     $dtype = $r['disaster_type'] ?? 'Other';

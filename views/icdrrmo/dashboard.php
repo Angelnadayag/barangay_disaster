@@ -142,7 +142,9 @@ $lowStockItems = $db->query("
               </td>
               <td><?= renderStatusBadge($rec['severity']) ?></td>
               <td><?= renderStatusBadge($rec['priority']) ?></td>
-              <td style="font-family:var(--font-secondary);font-weight:600;"><?= number_format($rec['confidence_score'], 1) ?>%</td>
+              <td style="font-family:var(--font-secondary);font-weight:600;">
+                <?= renderConfidenceBadge($rec['confidence_score'], $rec['severity'], $rec['decision_path'] ?? '', $rec['modality'] ?? null, 'badge-info', 'font-size:10px;padding:3px 7px;', '') ?>
+              </td>
               <td style="max-width:320px;font-size:10px;color:var(--color-text-secondary);line-height:1.3;"><?= clean($rec['recommendation_reason']) ?></td>
               <td><?= renderStatusBadge($rec['status']) ?></td>
               <td>
