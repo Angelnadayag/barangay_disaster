@@ -54,10 +54,12 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/frontend/css/app.css?v=<?= filemtime(__DIR__ . '/../../frontend/css/app.css') ?>">
-  <!-- Favicon -->
+  <!-- Favicon & Touch Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= BASE_URL ?>/frontend/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= BASE_URL ?>/frontend/images/favicon-16x16.png">
   <link rel="icon" type="image/png" href="<?= BASE_URL ?>/frontend/images/favicon.png">
   <link rel="shortcut icon" href="<?= BASE_URL ?>/favicon.ico">
-  <link rel="apple-touch-icon" href="<?= BASE_URL ?>/frontend/images/favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="<?= BASE_URL ?>/frontend/images/apple-touch-icon.png">
   <script>var BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
 </head>
 <body>

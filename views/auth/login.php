@@ -123,10 +123,12 @@ unset($_SESSION['login_error']);
   <!-- Project CSS & Fonts -->
   <link rel="stylesheet" href="<?= BASE_URL ?>/frontend/css/app.css">
   
-  <!-- Favicon -->
+  <!-- Favicon & Touch Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= BASE_URL ?>/frontend/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= BASE_URL ?>/frontend/images/favicon-16x16.png">
   <link rel="icon" type="image/png" href="<?= BASE_URL ?>/frontend/images/favicon.png">
   <link rel="shortcut icon" href="<?= BASE_URL ?>/favicon.ico">
-  <link rel="apple-touch-icon" href="<?= BASE_URL ?>/frontend/images/favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="<?= BASE_URL ?>/frontend/images/apple-touch-icon.png">
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
