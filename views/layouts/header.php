@@ -119,27 +119,19 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
       <!-- User Profile Dropdown Component -->
       <div class="user-profile-dropdown-wrap" id="userProfileWrap" style="position:relative;display:inline-block;">
         <button type="button" 
-                class="user-profile-btn" 
+                class="user-profile-btn circle-profile-btn" 
                 id="userProfileDropdownBtn" 
                 onclick="toggleUserDropdown(event)" 
                 aria-haspopup="true" 
                 aria-expanded="false" 
-                style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.28);border-radius:8px;padding:3px 6px;color:#FFFFFF;cursor:pointer;font-family:inherit;transition:all 0.15s ease;"
                 title="<?= clean($currentUser['full_name']) ?> — Account & Profile Settings">
-          <!-- Avatar Icon Only -->
-          <div class="user-avatar-sm" style="width:28px;height:28px;border-radius:6px;background:var(--color-secondary,#2F6F73);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;overflow:hidden;flex-shrink:0;">
+          <!-- Circular Avatar Icon -->
+          <div class="user-avatar-sm circle-avatar">
             <?php if (!empty($currentUser['image'])): ?>
-              <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
+              <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="<?= clean($currentUser['full_name']) ?>">
             <?php else: ?>
               <?= strtoupper(substr($currentUser['full_name'] ?? 'U', 0, 1)) ?>
             <?php endif; ?>
-          </div>
-
-          <!-- Caret / Dropdown Indicator -->
-          <div style="display:flex;align-items:center;justify-content:center;width:12px;height:12px;">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="color:rgba(255,255,255,0.8);transition:transform 0.2s ease;" id="userProfileCaret">
-              <path d="M7 10l5 5 5-5z"/>
-            </svg>
           </div>
         </button>
 

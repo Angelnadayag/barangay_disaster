@@ -367,41 +367,66 @@ html.sidebar-collapsed body .sidebar {
   justify-content: center;
 }
 
-.user-profile-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-primary);
-  padding: 4px 10px;
+.user-profile-btn,
+.circle-profile-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  margin: 0;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.45) !important;
   color: #FFFFFF;
   cursor: pointer;
-  font-size: var(--text-xs);
-  transition: all 0.15s ease;
-  font-family: inherit;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
   outline: none;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
 }
 
 .user-profile-btn:hover,
-.user-profile-btn[aria-expanded="true"] {
-  background-color: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.35);
+.circle-profile-btn:hover,
+.user-profile-btn[aria-expanded="true"],
+.circle-profile-btn[aria-expanded="true"] {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: #FFFFFF !important;
+  transform: scale(1.06);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.user-avatar-sm {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-primary);
-  background-color: var(--color-secondary);
+.user-avatar-sm,
+.circle-avatar {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  background-color: var(--color-secondary, #2F6F73);
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   overflow: hidden;
   flex-shrink: 0;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.user-avatar-sm img,
+.circle-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50% !important;
+  display: block;
 }
 
 /* User Profile Dropdown Menu */
