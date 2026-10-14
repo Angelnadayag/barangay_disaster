@@ -13,7 +13,7 @@ requireLogin();
 $db = getDBConnection();
 
 $stmt = $db->query("
-    SELECT id, code, name, category, unit, available_quantity, total_quantity, min_threshold, storage_location, item_condition
+    SELECT id, code, name, category, unit, available_quantity, total_quantity, min_threshold, item_condition
     FROM resources
     WHERE barangay_id IS NULL AND status = 'active'
     ORDER BY category ASC, name ASC

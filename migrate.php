@@ -241,6 +241,14 @@ try {
                     $pdo->exec("ALTER TABLE `resources` DROP COLUMN `supplier_donor`;");
                 } catch (Throwable $e) {}
             }
+            if (in_array('storage_location', $resCols, true)) {
+                try {
+                    echo "  [-] Dropping column `storage_location` from `resources`...\n";
+                    $pdo->exec("ALTER TABLE `resources` DROP COLUMN `storage_location`;");
+                } catch (Throwable $e) {
+                    echo "  [!] Notice dropping storage_location: " . $e->getMessage() . "\n";
+                }
+            }
             if (!in_array('supplier_id', $resCols, true)) {
                 try {
                     $pdo->exec("ALTER TABLE `resources` ADD COLUMN `supplier_id` int(11) DEFAULT NULL AFTER `batch_number`;");

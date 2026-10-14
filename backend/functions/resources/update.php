@@ -60,7 +60,6 @@ $totalQuantity = isset($_POST['total_quantity']) && $_POST['total_quantity'] !==
     ? max(0, (int)$_POST['total_quantity'])
     : ($availableQuantity + $inUseQuantity + $damagedQuantity);
 $minThreshold = max(1, (int)($_POST['min_threshold'] ?? $res['min_threshold']));
-$location = trim($_POST['storage_location'] ?? $res['storage_location']);
 $batchNumber = trim($_POST['batch_number'] ?? '') ?: ($res['batch_number'] ?? null);
 
 $supplierInput = trim($_POST['supplier_id'] ?? ($_POST['supplier_donor'] ?? ($_POST['supplier'] ?? '')));
@@ -112,7 +111,7 @@ try {
         UPDATE resources SET
             code = ?, name = ?, category = ?, description = ?, unit = ?,
             total_quantity = ?, available_quantity = ?, in_use_quantity = ?, damaged_quantity = ?,
-            min_threshold = ?, storage_location = ?, batch_number = ?, supplier_id = ?,
+            min_threshold = ?, batch_number = ?, supplier_id = ?,
             date_acquired = ?, expiry_date = ?, is_perishable = ?, brand = ?,
             weight_per_unit = ?, cost_per_unit = ?, item_condition = ?, updated_at = NOW()
         WHERE id = ?
@@ -120,7 +119,7 @@ try {
     $updateStmt->execute([
         $code, $name, $category, $description, $unit,
         $totalQuantity, $availableQuantity, $inUseQuantity, $damagedQuantity,
-        $minThreshold, $location, $batchNumber, $supplierId,
+        $minThreshold, $batchNumber, $supplierId,
         $dateAcquired, $expiryDate, $isPerishable, $brand,
         $weightPerUnit, $costPerUnit, $itemCondition,
         $id

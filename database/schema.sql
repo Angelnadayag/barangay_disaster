@@ -447,7 +447,6 @@ CREATE TABLE `resources` (
   `in_use_quantity` int(11) NOT NULL DEFAULT 0,
   `damaged_quantity` int(11) NOT NULL DEFAULT 0,
   `min_threshold` int(11) NOT NULL DEFAULT 50,
-  `storage_location` varchar(150) NOT NULL DEFAULT 'Central ICDRRMO Depot',
   `batch_number` varchar(50) DEFAULT NULL COMMENT 'Batch/Lot number from supplier',
   `supplier_id` int(11) DEFAULT NULL COMMENT 'Foreign key to resource_suppliers table',
   `date_acquired` date DEFAULT NULL COMMENT 'Date the resource was received/procured',

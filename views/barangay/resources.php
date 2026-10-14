@@ -60,9 +60,8 @@ if ($filterStock === 'low') {
 }
 
 if (!empty($search)) {
-  $invSql .= " AND (code LIKE ? OR name LIKE ? OR storage_location LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
+  $invSql .= " AND (code LIKE ? OR name LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
   $like = "%$search%";
-  $invParams[] = $like;
   $invParams[] = $like;
   $invParams[] = $like;
   $invParams[] = $like;
@@ -114,7 +113,7 @@ $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 4. Central Depot Catalog (for requisition items dropdown)
 $centralCatalog = $db->query("
-    SELECT id, code, name, category, unit, available_quantity, storage_location
+    SELECT id, code, name, category, unit, available_quantity
     FROM resources
     WHERE barangay_id IS NULL AND status = 'active'
     ORDER BY category ASC, name ASC
@@ -1033,11 +1032,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           </div>
         </div>
 
-        <div class="form-section-title">Storage & Details</div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Storage Depot / Warehouse Location</label>
-          <input type="text" name="storage_location" class="form-control" value="Barangay Hall Stockroom">
-        </div>
+        <div class="form-section-title">Description & Details</div>
 
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Description & Specifications</label>
@@ -1255,11 +1250,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           </div>
         </div>
 
-        <div class="form-section-title">Storage & Details</div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Storage Depot / Warehouse Location</label>
-          <input type="text" name="storage_location" id="view_res_storage_location" class="form-control" disabled>
-        </div>
+        <div class="form-section-title">Description & Details</div>
 
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Description & Specifications</label>
@@ -1338,8 +1329,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
               style="font-size:9.5px;text-transform:uppercase;font-weight:700;color:var(--color-primary);letter-spacing:0.5px;">ICDRRMO
               Central Depot Live Stock</span>
             <div id="boxDepotItemName" style="font-weight:700;font-size:13.5px;color:#0F172A;margin-top:2px;"></div>
-            <div id="boxDepotLocation" style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">Central
-              ICDRRMO Depot</div>
+            <div id="boxDepotCategory" style="font-size:10px;color:var(--color-text-muted);margin-top:2px;"></div>
           </div>
           <div style="text-align:right;">
             <div id="boxDepotStockNum"
@@ -1378,7 +1368,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
               data-category="<?= htmlspecialchars($catItem['category']) ?>"
               data-unit="<?= htmlspecialchars($catItem['unit']) ?>"
               data-avail="<?= (int) $catItem['available_quantity'] ?>"
-              data-location="<?= htmlspecialchars($catItem['storage_location'] ?? 'Central ICDRRMO Depot') ?>"
               <?= $isOutOfStock ? 'disabled style="color:#94A3B8;background:#F8FAFC;"' : '' ?>>
               [<?= clean($catItem['category']) ?>] <?= clean($catItem['name']) ?> —
               <?= number_format($catItem['available_quantity']) ?>   <?= clean($catItem['unit']) ?> available
@@ -1894,7 +1883,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       opt.setAttribute('data-category', item.category);
       opt.setAttribute('data-unit', item.unit);
       opt.setAttribute('data-avail', item.available_quantity);
-      opt.setAttribute('data-location', item.storage_location || 'Central ICDRRMO Depot');
 
       if (isOut) {
         opt.disabled = true;
@@ -1926,7 +1914,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const cat = opt.getAttribute('data-category');
     const unit = opt.getAttribute('data-unit');
     const avail = parseInt(opt.getAttribute('data-avail') || 0);
-    const location = opt.getAttribute('data-location') || 'Central ICDRRMO Depot';
 
     selectedCentralResourceMax = avail;
 
@@ -1949,7 +1936,8 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     if (infoBox) {
       infoBox.style.display = 'block';
       document.getElementById('boxDepotItemName').innerText = name;
-      document.getElementById('boxDepotLocation').innerText = `Location: ${location}`;
+      const catEl = document.getElementById('boxDepotCategory');
+      if (catEl) catEl.innerText = cat ? `Category: ${cat}` : '';
       document.getElementById('boxDepotStockNum').innerText = `${avail.toLocaleString()} ${unit}`;
 
       const badge = document.getElementById('boxDepotBadge');
@@ -2125,7 +2113,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     document.getElementById('view_res_available_quantity').value = r.available_quantity || 0;
     document.getElementById('view_res_in_use_quantity').value = r.in_use_quantity || 0;
     document.getElementById('view_res_damaged_quantity').value = r.damaged_quantity || 0;
-    document.getElementById('view_res_storage_location').value = r.storage_location || '';
     document.getElementById('view_res_description').value = r.description || '';
 
     // Set Brand select (ensure option exists dynamically)
@@ -2276,7 +2263,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       document.getElementById('view_res_available_quantity').value = r.available_quantity || 0;
       document.getElementById('view_res_in_use_quantity').value = r.in_use_quantity || 0;
       document.getElementById('view_res_damaged_quantity').value = r.damaged_quantity || 0;
-      document.getElementById('view_res_storage_location').value = r.storage_location || '';
       document.getElementById('view_res_description').value = r.description || '';
       const brandSelect = document.getElementById('view_res_brand');
       if (brandSelect) brandSelect.value = r.brand || '';
@@ -2308,7 +2294,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const fields = [
       'view_res_code', 'view_res_category', 'view_res_name', 'view_res_unit',
       'view_res_min_threshold', 'view_res_available_quantity', 'view_res_in_use_quantity',
-      'view_res_damaged_quantity', 'view_res_storage_location', 'view_res_description',
+      'view_res_damaged_quantity', 'view_res_description',
       'view_res_brand', 'view_res_item_condition', 'view_res_weight_per_unit',
       'view_res_cost_per_unit', 'view_res_date_acquired', 'view_res_expiry_date',
       'view_res_is_perishable', 'view_res_supplier_donor', 'view_res_batch_number'

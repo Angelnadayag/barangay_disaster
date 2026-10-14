@@ -37,8 +37,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             fputcsv($output, $row);
         }
     } elseif ($reportType === 'inventory') {
-        fputcsv($output, ['SKU Code', 'Resource Name', 'Category', 'Available', 'In Use', 'Damaged', 'Total', 'Min Threshold', 'Location']);
-        $q = $db->query("SELECT code, name, category, available_quantity, in_use_quantity, damaged_quantity, total_quantity, min_threshold, storage_location FROM resources");
+        fputcsv($output, ['SKU Code', 'Resource Name', 'Category', 'Available', 'In Use', 'Damaged', 'Total', 'Min Threshold']);
+        $q = $db->query("SELECT code, name, category, available_quantity, in_use_quantity, damaged_quantity, total_quantity, min_threshold FROM resources");
         while ($row = $q->fetch()) {
             fputcsv($output, $row);
         }

@@ -138,13 +138,13 @@ try {
                     INSERT INTO resources (
                         code, name, category, status, description, unit, total_quantity,
                         available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                        storage_location, supplier_id, item_condition, barangay_id, updated_at, created_at
-                    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, ?, ?, ?, ?, NOW(), NOW())
+                        supplier_id, item_condition, barangay_id, updated_at, created_at
+                    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, ?, ?, ?, NOW(), NOW())
                 ");
                 $insLocal->execute([
                     $localCode, $centralRes['name'], $centralRes['category'],
                     $centralRes['description'], $centralRes['unit'], $approvedQty,
-                    $approvedQty, 'Barangay Hall Stockroom', $suppIdForLocal,
+                    $approvedQty, $suppIdForLocal,
                     'New', $barangayId
                 ]);
                 $targetLocalResId = (int)$db->lastInsertId();

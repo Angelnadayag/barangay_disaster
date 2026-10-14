@@ -60,9 +60,8 @@ if (!empty($filterCondition)) {
 }
 
 if (!empty($search)) {
-    $resSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR r.storage_location LIKE ? OR rs.name LIKE ? OR r.brand LIKE ? OR r.batch_number LIKE ?)";
+    $resSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR rs.name LIKE ? OR r.brand LIKE ? OR r.batch_number LIKE ?)";
     $like = "%$search%";
-    $resParams[] = $like;
     $resParams[] = $like;
     $resParams[] = $like;
     $resParams[] = $like;
@@ -1347,11 +1346,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
           </div>
         </div>
 
-        <div class="form-section-title">Storage & Details</div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Storage Depot / Warehouse Location</label>
-          <input type="text" name="storage_location" class="form-control" value="Central ICDRRMO Depot">
-        </div>
+        <div class="form-section-title">Description & Details</div>
 
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Description & Specifications</label>
@@ -1568,11 +1563,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
           </div>
         </div>
 
-        <div class="form-section-title">Storage & Details</div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Storage Depot / Warehouse Location</label>
-          <input type="text" name="storage_location" id="view_res_storage_location" class="form-control" disabled>
-        </div>
+        <div class="form-section-title">Description & Details</div>
 
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Description & Specifications</label>
@@ -1891,8 +1882,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
                         data-name="<?= clean($res['name']) ?>"
                         data-avail="<?= (int)$res['available_quantity'] ?>"
                         data-unit="<?= clean($res['unit']) ?>"
-                        data-category="<?= clean($res['category']) ?>"
-                        data-location="<?= clean($res['storage_location']) ?>">
+                        data-category="<?= clean($res['category']) ?>">
                   [<?= clean($res['code']) ?>] <?= clean($res['name']) ?> (<?= number_format($res['available_quantity']) ?> <?= clean($res['unit']) ?> available)
                 </option>
               <?php endif; ?>
@@ -1908,8 +1898,8 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
               <div id="directAllocAvailText" style="font-size:18px;font-weight:800;color:#15803D;margin-top:2px;">0</div>
             </div>
             <div style="text-align:right;">
-              <div style="font-size:9.5px;color:#166534;font-weight:600;">Warehouse Location</div>
-              <div id="directAllocLocationText" style="font-size:11.5px;color:#14532D;font-weight:600;margin-top:2px;">—</div>
+              <div style="font-size:9.5px;color:#166534;font-weight:600;">Category</div>
+              <div id="directAllocCategoryText" style="font-size:11.5px;color:#14532D;font-weight:600;margin-top:2px;">—</div>
             </div>
           </div>
         </div>
@@ -2126,7 +2116,6 @@ function openViewResourceModal(r) {
   document.getElementById('view_res_available_quantity').value = r.available_quantity || 0;
   document.getElementById('view_res_in_use_quantity').value = r.in_use_quantity || 0;
   document.getElementById('view_res_damaged_quantity').value = r.damaged_quantity || 0;
-  document.getElementById('view_res_storage_location').value = r.storage_location || '';
   document.getElementById('view_res_description').value = r.description || '';
 
   // Set Brand select (ensure option exists dynamically)
@@ -2288,7 +2277,6 @@ function cancelResourceEditMode() {
     document.getElementById('view_res_available_quantity').value = r.available_quantity || 0;
     document.getElementById('view_res_in_use_quantity').value = r.in_use_quantity || 0;
     document.getElementById('view_res_damaged_quantity').value = r.damaged_quantity || 0;
-    document.getElementById('view_res_storage_location').value = r.storage_location || '';
     document.getElementById('view_res_description').value = r.description || '';
     const brandSelect = document.getElementById('view_res_brand');
     if (brandSelect) brandSelect.value = r.brand || '';
@@ -2324,7 +2312,7 @@ function setResourceFormInputsDisabled(disabled) {
   const fields = [
     'view_res_code', 'view_res_category', 'view_res_name', 'view_res_unit',
     'view_res_min_threshold', 'view_res_available_quantity', 'view_res_in_use_quantity',
-    'view_res_damaged_quantity', 'view_res_storage_location', 'view_res_description',
+    'view_res_damaged_quantity', 'view_res_description',
     'view_res_brand', 'view_res_item_condition', 'view_res_weight_per_unit',
     'view_res_cost_per_unit', 'view_res_date_acquired', 'view_res_expiry_date',
     'view_res_is_perishable', 'view_res_supplier_donor', 'view_res_batch_number'
@@ -3226,11 +3214,11 @@ function onDirectResourceChange() {
 
   const avail = parseInt(opt.dataset.avail) || 0;
   const unit = opt.dataset.unit || 'units';
-  const location = opt.dataset.location || 'Central Depot Stockroom';
+  const category = opt.dataset.category || 'Relief Goods';
 
   stockCard.style.display = 'block';
   document.getElementById('directAllocAvailText').innerText = `${avail.toLocaleString()} ${unit}`;
-  document.getElementById('directAllocLocationText').innerText = location;
+  document.getElementById('directAllocCategoryText').innerText = category;
   document.getElementById('directAllocMaxHint').innerText = `Max Available: ${avail.toLocaleString()} ${unit}`;
 
   validateDirectAllocQuantity();

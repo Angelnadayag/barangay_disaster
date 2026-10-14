@@ -64,9 +64,8 @@ if ($filterStockLevel === 'low') {
 }
 
 if (!empty($search)) {
-    $invSql .= " AND (code LIKE ? OR name LIKE ? OR storage_location LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
+    $invSql .= " AND (code LIKE ? OR name LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
     $like = "%$search%";
-    $invParams[] = $like;
     $invParams[] = $like;
     $invParams[] = $like;
     $invParams[] = $like;
@@ -295,7 +294,6 @@ $categories = [
             <th>In-Use / Disbursed</th>
             <th>Damaged</th>
             <th>Total Stock</th>
-            <th>Storage Location</th>
             <th>Condition</th>
             <th>Expiry Date</th>
             <th style="text-align:right;">Action</th>
@@ -303,7 +301,7 @@ $categories = [
         </thead>
         <tbody id="brgyTableBody">
           <?php if (empty($inventoryList)): ?>
-            <tr id="noBrgyInvRow"><td colspan="11" style="text-align:center;padding:32px;color:var(--color-text-muted);">No resources found in Barangay <?= clean($barangay['name']) ?> inventory.</td></tr>
+            <tr id="noBrgyInvRow"><td colspan="10" style="text-align:center;padding:32px;color:var(--color-text-muted);">No resources found in Barangay <?= clean($barangay['name']) ?> inventory.</td></tr>
           <?php else: ?>
             <?php foreach ($inventoryList as $res): ?>
               <?php
@@ -334,7 +332,6 @@ $categories = [
                   data-damaged="<?= (int)$res['damaged_quantity'] ?>"
                   data-total="<?= (int)$res['total_quantity'] ?>"
                   data-min="<?= (int)$res['min_threshold'] ?>"
-                  data-location="<?= clean($res['storage_location']) ?>"
                   data-brand="<?= clean($res['brand'] ?: '') ?>"
                   data-supplier="<?= clean($res['supplier_donor'] ?: '') ?>"
                   data-condition="<?= clean($res['item_condition']) ?>"
@@ -370,9 +367,6 @@ $categories = [
                 </td>
                 <td style="font-family:var(--font-secondary);font-weight:600;font-size:12px;" id="brgy-cell-total-<?= $res['id'] ?>">
                   <span class="val-total"><?= number_format($res['total_quantity']) ?></span> <?= clean($res['unit']) ?>
-                </td>
-                <td style="font-size:11px;color:var(--color-text-secondary);">
-                  <?= clean($res['storage_location'] ?: 'Barangay Stockroom') ?>
                 </td>
                 <td><span class="badge <?= $condBadge ?>" style="font-size:9px;"><?= clean($res['item_condition']) ?></span></td>
                 <td style="font-size:10.5px;font-family:var(--font-secondary);">
@@ -517,7 +511,6 @@ $categories = [
       <!-- Tab Content 1: Specifications -->
       <div id="brgyModalTabSpecs" style="display:block;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11.5px;background:var(--color-surface-subtle);padding:12px;border-radius:var(--radius-sm, 6px);border:1px solid var(--color-border-light);color:var(--color-text);">
-          <div><strong style="color:var(--color-text-secondary);">Storage Room / Shelf:</strong> <span id="brgySpecLocation"></span></div>
           <div><strong style="color:var(--color-text-secondary);">Source / Donor:</strong> <span id="brgySpecSupplier"></span></div>
           <div><strong style="color:var(--color-text-secondary);">Condition:</strong> <span id="brgySpecCondition"></span></div>
           <div><strong style="color:var(--color-text-secondary);">Expiry Date:</strong> <span id="brgySpecExpiry"></span></div>
@@ -678,14 +671,13 @@ function openBarangayItemModal(res) {
   document.getElementById('brgyModalItemCode').innerText = res.code || '';
   document.getElementById('brgyModalItemCategory').innerText = res.category || '';
   document.getElementById('brgyModalItemName').innerText = res.name || '';
-  document.getElementById('brgyModalItemSub').innerText = res.storage_location || 'Barangay Hall Stockroom';
+  document.getElementById('brgyModalItemSub').innerText = res.brand || 'Barangay Stockroom';
 
   document.getElementById('brgyStockAvail').innerText = `${parseInt(res.available_quantity || 0).toLocaleString()} ${res.unit || ''}`;
   document.getElementById('brgyStockInUse').innerText = `${parseInt(res.in_use_quantity || 0).toLocaleString()} ${res.unit || ''}`;
   document.getElementById('brgyStockDamaged').innerText = `${parseInt(res.damaged_quantity || 0).toLocaleString()} ${res.unit || ''}`;
   document.getElementById('brgyStockTotal').innerText = `${parseInt(res.total_quantity || 0).toLocaleString()} ${res.unit || ''}`;
 
-  document.getElementById('brgySpecLocation').innerText = res.storage_location || 'Barangay Hall Stockroom';
   document.getElementById('brgySpecSupplier').innerText = res.supplier_donor || 'Local Barangay Inventory';
   document.getElementById('brgySpecCondition').innerText = res.item_condition || 'Good';
   document.getElementById('brgySpecExpiry').innerText = res.expiry_date || 'N/A (Non-perishable)';
@@ -902,12 +894,11 @@ function filterBarangayInventoryTable() {
     const name = (row.dataset.name || '').toLowerCase();
     const cat = (row.dataset.category || '').toLowerCase();
     const brand = (row.dataset.brand || '').toLowerCase();
-    const location = (row.dataset.location || '').toLowerCase();
     const avail = parseInt(row.dataset.available) || 0;
     const isLow = row.dataset.isLow === '1';
     const damaged = parseInt(row.dataset.damaged) || 0;
 
-    let matchesSearch = (!query || code.includes(query) || name.includes(query) || brand.includes(query) || location.includes(query));
+    let matchesSearch = (!query || code.includes(query) || name.includes(query) || brand.includes(query));
     let matchesCategory = (!category || cat === category);
     let matchesStock = true;
 

@@ -34,7 +34,6 @@ $description = trim($_POST['description'] ?? '');
 $unit = trim($_POST['unit'] ?? 'units');
 $initialQuantity = max(0, (int)($_POST['quantity'] ?? ($_POST['available_quantity'] ?? 0)));
 $minThreshold = max(1, (int)($_POST['min_threshold'] ?? 20));
-$location = trim($_POST['storage_location'] ?? ($role === 'barangay_head' ? 'Barangay Hall Stockroom' : 'Central ICDRRMO Depot'));
 $batchNumber = trim($_POST['batch_number'] ?? '') ?: null;
 $supplierInput = trim($_POST['supplier_id'] ?? ($_POST['supplier_donor'] ?? ($_POST['supplier'] ?? '')));
 $supplierId = null;
@@ -108,14 +107,14 @@ try {
         INSERT INTO resources (
             code, name, category, status, description, unit, total_quantity,
             available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-            storage_location, batch_number, supplier_id, date_acquired,
+            batch_number, supplier_id, date_acquired,
             expiry_date, is_perishable, brand, weight_per_unit, cost_per_unit,
             item_condition, barangay_id, updated_at, created_at
-        ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
     $stmt->execute([
         $code, $name, $category, $description, $unit, $initialQuantity,
-        $initialQuantity, $minThreshold, $location, $batchNumber, $supplierId,
+        $initialQuantity, $minThreshold, $batchNumber, $supplierId,
         $dateAcquired, $expiryDate, $isPerishable, $brand, $weightPerUnit,
         $costPerUnit, $itemCondition, $barangayId
     ]);
