@@ -68,10 +68,19 @@ $coordinatesLng = (isset($_POST['coordinates_lng']) && $_POST['coordinates_lng']
     ? (float)$_POST['coordinates_lng'] 
     : (isset($req['coordinates_lng']) && $req['coordinates_lng'] !== null ? (float)$req['coordinates_lng'] : null);
 
-// Optional status transition
+$aidSupport = trim($_POST['aid_support'] ?? ($req['aid_support'] ?? 'resources'));
+if (!in_array($aidSupport, ['resources', 'financial_aid', 'both'], true)) {
+    $aidSupport = 'resources';
+}
+
+// Optional status transition (only Ongoing or Completed) - Concluding an incident is restricted to Barangay Head
 $newStatus = trim($_POST['status'] ?? '');
-$allowedStatuses = ['Submitted', 'Ongoing', 'Under Review', 'Recommendation Ready', 'Approved', 'Allocated', 'Dispatched', 'Completed', 'Rejected'];
-$status = (in_array($newStatus, $allowedStatuses, true)) ? $newStatus : $req['status'];
+$allowedStatuses = ['Ongoing', 'Completed'];
+if ($newStatus === 'Completed' && $role !== 'barangay_head') {
+    $status = $req['status']; // Non-barangay head cannot conclude incident
+} else {
+    $status = (in_array($newStatus, $allowedStatuses, true)) ? $newStatus : (in_array($req['status'], $allowedStatuses, true) ? $req['status'] : 'Ongoing');
+}
 
 // Handle completion timestamp
 $completedAt = $req['completed_at'];
@@ -92,6 +101,7 @@ try {
             disaster_type = ?,
             severity = ?,
             urgency = ?,
+            aid_support = ?,
             affected_families = ?,
             affected_individuals = ?,
             displaced_families = ?,
@@ -113,6 +123,7 @@ try {
         $coordinatesLng,
         $incidentLocation,
         $disasterType, $severity, $urgency,
+        $aidSupport,
         $affectedFamilies, $affectedIndividuals, $displacedFamilies,
         $casualties, $injuries, $missing,
         $requestedAssistance, $situationOverview, $resolutionNotes,

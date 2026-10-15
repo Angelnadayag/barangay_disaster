@@ -36,24 +36,24 @@ $medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity)
 $localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM resources WHERE barangay_id IS NULL AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold")->fetchColumn();
 
 // Fetch Central Depot Resources
-$invSql = "SELECT * FROM resources WHERE barangay_id IS NULL AND (status != 'archived' OR status IS NULL)";
+$invSql = "SELECT r.*, rs.name AS supplier_donor, rs.name AS supplier_name FROM resources r LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id WHERE r.barangay_id IS NULL AND (r.status != 'archived' OR r.status IS NULL)";
 $invParams = [];
 
 if (!empty($filterCategory)) {
-    $invSql .= " AND category = ?";
+    $invSql .= " AND r.category = ?";
     $invParams[] = $filterCategory;
 }
 
 if ($filterStockLevel === 'low') {
-    $invSql .= " AND available_quantity <= min_threshold";
+    $invSql .= " AND r.available_quantity <= r.min_threshold";
 } elseif ($filterStockLevel === 'out') {
-    $invSql .= " AND available_quantity = 0";
+    $invSql .= " AND r.available_quantity = 0";
 } elseif ($filterStockLevel === 'damaged') {
-    $invSql .= " AND damaged_quantity > 0";
+    $invSql .= " AND r.damaged_quantity > 0";
 }
 
 if (!empty($search)) {
-    $invSql .= " AND (code LIKE ? OR name LIKE ? OR storage_location LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
+    $invSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR r.storage_location LIKE ? OR rs.name LIKE ? OR r.brand LIKE ?)";
     $like = "%$search%";
     $invParams[] = $like;
     $invParams[] = $like;
@@ -62,7 +62,7 @@ if (!empty($search)) {
     $invParams[] = $like;
 }
 
-$invSql .= " ORDER BY (available_quantity <= min_threshold) DESC, category ASC, name ASC";
+$invSql .= " ORDER BY (r.available_quantity <= r.min_threshold) DESC, r.category ASC, r.name ASC";
 $invStmt = $db->prepare($invSql);
 $invStmt->execute($invParams);
 $inventoryList = $invStmt->fetchAll(PDO::FETCH_ASSOC);

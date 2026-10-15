@@ -121,17 +121,18 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
             $chkCode->execute([$localCode]);
             if ($chkCode->fetch()) $localCode .= '-' . rand(10, 99);
 
+            $suppIdForLocal = $centralRes['supplier_id'] ?? null;
             $insLocal = $db->prepare("
                 INSERT INTO resources (
                     code, name, category, status, description, unit, total_quantity,
                     available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                    storage_location, supplier_donor, item_condition, barangay_id, updated_at, created_at
+                    storage_location, supplier_id, item_condition, barangay_id, updated_at, created_at
                 ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, ?, ?, 'New', ?, NOW(), NOW())
             ");
             $insLocal->execute([
                 $localCode, $centralRes['name'], $centralRes['category'],
                 $centralRes['description'], $centralRes['unit'], $quantity,
-                $quantity, 'Barangay Hall Stockroom', "Direct Allocation by ICDRRMO Central Depot",
+                $quantity, 'Barangay Hall Stockroom', $suppIdForLocal,
                 $barangayId
             ]);
             $targetLocalResId = (int)$db->lastInsertId();
@@ -359,16 +360,17 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
                 $chkCode->execute([$localCode]);
                 if ($chkCode->fetch()) $localCode .= '-' . rand(10, 99);
 
+                $suppIdForLocal = $pItem['supplier_id'] ?? null;
                 $insLocal = $db->prepare("
                     INSERT INTO resources (
                         code, name, category, status, description, unit, total_quantity,
                         available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                        storage_location, supplier_donor, item_condition, barangay_id, updated_at, created_at
-                    ) VALUES (?, ?, ?, 'active', '', ?, ?, ?, 0, 0, 20, 'Barangay Hall Stockroom', 'ICDRRMO Central Allocation', 'New', ?, NOW(), NOW())
+                        storage_location, supplier_id, item_condition, barangay_id, updated_at, created_at
+                    ) VALUES (?, ?, ?, 'active', '', ?, ?, ?, 0, 0, 20, 'Barangay Hall Stockroom', ?, 'New', ?, NOW(), NOW())
                 ");
                 $insLocal->execute([
                     $localCode, $pItem['resource_name'], $pItem['category'],
-                    $pItem['unit'], $qtyToAlloc, $qtyToAlloc, $rec['barangay_id']
+                    $pItem['unit'], $qtyToAlloc, $qtyToAlloc, $suppIdForLocal, $rec['barangay_id']
                 ]);
                 $targetLocalResId = (int)$db->lastInsertId();
             }
@@ -555,17 +557,18 @@ else {
                 $chkCode->execute([$localCode]);
                 if ($chkCode->fetch()) $localCode .= '-' . rand(10, 99);
 
+                $suppIdForLocal = $item['supplier_id'] ?? null;
                 $insLocal = $db->prepare("
                     INSERT INTO resources (
                         code, name, category, status, description, unit, total_quantity,
                         available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                        storage_location, supplier_donor, item_condition, barangay_id, updated_at, created_at
-                    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, 'Barangay Hall Stockroom', 'Allocated by ICDRRMO Central Depot', 'New', ?, NOW(), NOW())
+                        storage_location, supplier_id, item_condition, barangay_id, updated_at, created_at
+                    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, 'Barangay Hall Stockroom', ?, 'New', ?, NOW(), NOW())
                 ");
                 $insLocal->execute([
                     $localCode, $item['resource_name'], $item['category'],
                     $item['description'], $item['unit'], $allocQty, $allocQty,
-                    $item['barangay_id']
+                    $suppIdForLocal, $item['barangay_id']
                 ]);
                 $targetLocalResId = (int)$db->lastInsertId();
             }

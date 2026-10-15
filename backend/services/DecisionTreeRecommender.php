@@ -18,9 +18,15 @@ class DecisionTreeRecommender {
     /**
      * Run Decision Tree Analysis on a given Disaster Request
      * @param int $requestId
+     * @param string $modality 'both', 'resources', or 'financial_aid'
+     * @param array $options Optional custom parameters ['financial_aid_amount', 'financial_aid_sponsor', 'financial_aid_target']
      * @return array Result of analysis
      */
-    public function evaluateRequest(int $requestId): array {
+    public function evaluateRequest(int $requestId, string $modality = 'both', array $options = []): array {
+        if (!in_array($modality, ['both', 'resources', 'financial_aid'])) {
+            $modality = 'both';
+        }
+
         // 1. Fetch disaster request with barangay & purok details
         $stmt = $this->db->prepare("
             SELECT r.*, b.name AS barangay_name, b.risk_level AS barangay_risk_level
@@ -62,22 +68,26 @@ class DecisionTreeRecommender {
         $recommendedItems = [];
         $priority = 'Medium';
         $baseConfidence = 85.0;
+        $severityBonus = 0.0;
 
-        // --- TREE LEVEL 1: Disaster Classification ---
-        $decisionSteps[] = "Root [Disaster: $disaster]";
+        // --- TREE LEVEL 1: Disaster Classification & Modality ---
+        $modalityTitle = ($modality === 'resources') ? 'Physical Resources Only' : (($modality === 'financial_aid') ? 'Emergency Financial Aid (Ayuda) Only' : 'Comprehensive Dual Support');
+        $decisionSteps[] = "Root [Disaster: $disaster | Modality: $modalityTitle]";
 
         // --- TREE LEVEL 2: Severity Assessment ---
         $decisionSteps[] = "Branch [Severity: $severity]";
         if ($severity === 'Critical') {
             $priority = 'Critical';
-            $baseConfidence += 5.0;
+            $severityBonus = 5.0;
         } elseif ($severity === 'High') {
             $priority = 'High';
-            $baseConfidence += 3.0;
+            $severityBonus = 3.0;
         } elseif ($severity === 'Moderate') {
             $priority = 'Medium';
+            $severityBonus = 0.0;
         } else {
             $priority = 'Low';
+            $severityBonus = -5.0;
         }
 
         // --- TREE LEVEL 3: Population & Displacement Scale ---
@@ -86,28 +96,28 @@ class DecisionTreeRecommender {
         // --- TREE LEVEL 4: Urgency Weighting ---
         $decisionSteps[] = "Branch [Urgency: $urgency]";
 
-        // Calculate Specific Resources based on Tree Branches:
+        // Calculate Specific Resources based on Tree Branches (only if modality covers resources):
+        if ($modality !== 'financial_aid') {
+            // 1. Food Packs Calculation (NDRRMC Standard: 1 pack per family per 3 days)
+            $foodRatio = 1.0;
+            if ($severity === 'Moderate') $foodRatio = 0.75;
+            if ($severity === 'Low') $foodRatio = 0.5;
+            $foodQty = max(10, (int)ceil($families * $foodRatio));
 
-        // 1. Food Packs Calculation (NDRRMC Standard: 1 pack per family per 3 days)
-        $foodRatio = 1.0;
-        if ($severity === 'Moderate') $foodRatio = 0.75;
-        if ($severity === 'Low') $foodRatio = 0.5;
-        $foodQty = max(10, (int)ceil($families * $foodRatio));
+            if (isset($inventory['RES-FOOD-001'])) {
+                $recommendedItems[] = [
+                    'resource_id' => $inventory['RES-FOOD-001']['id'],
+                    'code' => 'RES-FOOD-001',
+                    'name' => $inventory['RES-FOOD-001']['name'],
+                    'quantity' => $foodQty,
+                    'unit' => $inventory['RES-FOOD-001']['unit']
+                ];
+            }
 
-        if (isset($inventory['RES-FOOD-001'])) {
-            $recommendedItems[] = [
-                'resource_id' => $inventory['RES-FOOD-001']['id'],
-                'code' => 'RES-FOOD-001',
-                'name' => $inventory['RES-FOOD-001']['name'],
-                'quantity' => $foodQty,
-                'unit' => $inventory['RES-FOOD-001']['unit']
-            ];
-        }
-
-        // 2. Ready-to-Eat Emergency Meals (for Immediate urgency or high displacement)
-        if ($urgency === 'Immediate' || $displaced > 50) {
-            $rteQty = max(20, (int)ceil($displaced * 1.5));
-            if (isset($inventory['RES-FOOD-002'])) {
+            // 2. Ready-to-Eat Emergency Meals (for Immediate urgency or high displacement)
+            if ($urgency === 'Immediate' || $displaced > 50) {
+                $rteQty = max(20, (int)ceil($displaced * 1.5));
+                if (isset($inventory['RES-FOOD-002'])) {
                 $recommendedItems[] = [
                     'resource_id' => $inventory['RES-FOOD-002']['id'],
                     'code' => 'RES-FOOD-002',
@@ -195,63 +205,168 @@ class DecisionTreeRecommender {
             }
         }
 
-        // 7. Medical Supplies
-        $firstAidQty = max(5, (int)ceil(($families / 40) + ($injuries * 2)));
-        if (isset($inventory['RES-MED-001'])) {
-            $recommendedItems[] = [
-                'resource_id' => $inventory['RES-MED-001']['id'],
-                'code' => 'RES-MED-001',
-                'name' => $inventory['RES-MED-001']['name'],
-                'quantity' => $firstAidQty,
-                'unit' => $inventory['RES-MED-001']['unit']
-            ];
+            // 7. Medical Supplies
+            $firstAidQty = max(5, (int)ceil(($families / 40) + ($injuries * 2)));
+            if (isset($inventory['RES-MED-001'])) {
+                $recommendedItems[] = [
+                    'resource_id' => $inventory['RES-MED-001']['id'],
+                    'code' => 'RES-MED-001',
+                    'name' => $inventory['RES-MED-001']['name'],
+                    'quantity' => $firstAidQty,
+                    'unit' => $inventory['RES-MED-001']['unit']
+                ];
+            }
+        } // End if ($modality !== 'financial_aid')
+
+        // --- Optional ICDRRMO customization: override quantities / add resources ---
+        if ($modality !== 'financial_aid' && !empty($options['custom_resources']) && is_array($options['custom_resources'])) {
+            $invById = [];
+            foreach ($inventory as $invRow) {
+                $invById[(int)$invRow['id']] = $invRow;
+            }
+            $customCount = 0;
+            foreach ($options['custom_resources'] as $resId => $qty) {
+                $resId = (int)$resId;
+                $qty = (int)$qty;
+                if ($qty <= 0 || !isset($invById[$resId])) {
+                    continue;
+                }
+                $found = false;
+                foreach ($recommendedItems as &$existing) {
+                    if ((int)$existing['resource_id'] === $resId) {
+                        $existing['quantity'] = $qty;
+                        $found = true;
+                        break;
+                    }
+                }
+                unset($existing);
+                if (!$found) {
+                    $recommendedItems[] = [
+                        'resource_id' => $resId,
+                        'code' => $invById[$resId]['code'],
+                        'name' => $invById[$resId]['name'],
+                        'quantity' => $qty,
+                        'unit' => $invById[$resId]['unit']
+                    ];
+                }
+                $customCount++;
+            }
+            if ($customCount > 0) {
+                $decisionSteps[] = "Custom Resources [$customCount item(s) adjusted or added by ICDRRMO]";
+            }
         }
 
         // --- TREE LEVEL 5: Stock Sufficiency & Feasibility Check ---
         $stockDeficit = false;
-        foreach ($recommendedItems as &$item) {
-            $code = $item['code'];
-            $avail = $inventory[$code]['available_quantity'] ?? 0;
-            $req = $item['quantity'];
-            if ($avail < $req) {
-                $stockDeficit = true;
+        $stockBonus = 4.0;
+        $feasibilityLabel = "All recommended supplies in stock at Central Depot";
+        $feasibilityShort = "100% Supplies In Stock";
+
+        if ($modality === 'financial_aid') {
+            $decisionSteps[] = "LGU Calamity Liquidity [Quick Response Fund cash reserves verified for immediate disbursement]";
+            $feasibilityLabel = "LGU Calamity Cash Reserve Liquidity Verified";
+            $feasibilityShort = "Quick Response Fund Liquidity Verified";
+            $stockBonus = 4.0;
+        } else {
+            foreach ($recommendedItems as &$item) {
+                $code = $item['code'];
+                $avail = $inventory[$code]['available_quantity'] ?? 0;
+                $req = $item['quantity'];
+                if ($avail < $req) {
+                    $stockDeficit = true;
+                }
+            }
+
+            if ($stockDeficit) {
+                $decisionSteps[] = "Stock Feasibility [Bottlenecks Detected: Stock shortfall on some items; Human review should adjust or request external mutual aid]";
+                $stockBonus = -6.0;
+                $feasibilityLabel = "Central Depot Stock Shortfall (-6%)";
+                $feasibilityShort = "Stock Bottleneck Deficit";
+            } else {
+                $decisionSteps[] = "Stock Feasibility [All recommended supplies in stock at Central Depot (+4%)]";
+                $stockBonus = 4.0;
+                $feasibilityLabel = "All recommended supplies in stock at Central Depot (+4%)";
+                $feasibilityShort = "100% Supplies In Stock";
             }
         }
 
-        if ($stockDeficit) {
-            $decisionSteps[] = "Stock Feasibility [Bottlenecks Detected: Stock shortfall on some items; Human review should adjust or request external mutual aid]";
-            $baseConfidence -= 6.0;
-        } else {
-            $decisionSteps[] = "Stock Feasibility [All recommended supplies in stock at Central Depot]";
-            $baseConfidence += 4.0;
-        }
-
         // --- TREE LEVEL 6: Emergency Financial Aid (Ayuda) Allocation Analysis ---
-        // Based on DSWD Emergency Cash Transfer (ECT) and LGU Calamity Fund benchmarks
-        $targetAidFamilies = ($displaced > 0) ? $displaced : $families;
-        if ($targetAidFamilies <= 0) $targetAidFamilies = 1;
+        $targetAidFamilies = 0;
+        $aidRatePerFamily = 0.00;
+        $totalAidBudget = 0.00;
+        $aidSource = !empty($options['financial_aid_sponsor']) 
+            ? trim($options['financial_aid_sponsor']) 
+            : (!empty($options['financial_aid_source']) ? trim($options['financial_aid_source']) : 'LGU Calamity Fund (QRF)');
 
-        $aidRatePerFamily = 3000.00; // Baseline Moderate
-        if ($severity === 'Critical') {
-            $aidRatePerFamily = 5000.00;
-        } elseif ($severity === 'High') {
-            $aidRatePerFamily = 4000.00;
-        } elseif ($severity === 'Low') {
-            $aidRatePerFamily = 2000.00;
+        if ($modality === 'resources') {
+            $decisionSteps[] = "Ayuda Evaluation [Deferred: Physical Relief Resources prioritization selected]";
+        } else {
+            // Target scope: displaced families vs all affected families
+            $targetScope = $options['financial_aid_target'] ?? 'displaced';
+            if ($targetScope === 'all_affected' || $displaced <= 0) {
+                $targetAidFamilies = $families > 0 ? $families : 1;
+            } else {
+                $targetAidFamilies = $displaced > 0 ? $displaced : $families;
+            }
+            if ($targetAidFamilies <= 0) $targetAidFamilies = 1;
+
+            $customAmount = isset($options['financial_aid_amount']) && is_numeric($options['financial_aid_amount']) && (float)$options['financial_aid_amount'] > 0
+                ? (float)$options['financial_aid_amount']
+                : null;
+
+            if ($customAmount !== null) {
+                $aidRatePerFamily = $customAmount;
+            } else {
+                $aidRatePerFamily = 3000.00; // Baseline Moderate
+                if ($severity === 'Critical') {
+                    $aidRatePerFamily = 5000.00;
+                } elseif ($severity === 'High') {
+                    $aidRatePerFamily = 4000.00;
+                } elseif ($severity === 'Low') {
+                    $aidRatePerFamily = 2000.00;
+                }
+            }
+            $totalAidBudget = round($targetAidFamilies * $aidRatePerFamily, 2);
+
+            $decisionSteps[] = "Ayuda Feasibility [Emergency Cash Aid: ₱" . number_format($aidRatePerFamily, 2) . "/fam for " . number_format($targetAidFamilies) . " families = ₱" . number_format($totalAidBudget, 2) . " from " . clean($aidSource) . "]";
         }
-        $totalAidBudget = round($targetAidFamilies * $aidRatePerFamily, 2);
 
-        $decisionSteps[] = "Ayuda Feasibility [Emergency Cash Aid: ₱" . number_format($aidRatePerFamily, 2) . "/fam for " . number_format($targetAidFamilies) . " families = ₱" . number_format($totalAidBudget, 2) . " from LGU Calamity Fund]";
-
-        $confidence = min(96.0, max(75.0, round($baseConfidence, 1)));
+        // --- TREE LEVEL 7: Confidence Score Synthesis ---
+        // Formula: Base 85% + Severity Bonus (+5%/+3%/0%/-5%) + Feasibility Bonus (+4%/-6%)
+        $calculatedConfidence = $baseConfidence + $severityBonus + $stockBonus;
+        $confidence = min(96.0, max(75.0, round($calculatedConfidence, 1)));
         $decisionPathString = implode(" -> ", $decisionSteps);
 
-        // Explanatory Reason with Dual Intervention (Resources + Ayuda)
-        $reason = "Recommendation generated using Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
-                . "Assessment parameters: $severity severity, $urgency urgency, $families affected families ($displaced displaced). "
-                . "Dual Intervention Plan: 1) Physical Relief Allocation (NDRRMC relief supply matrix and depot stock analysis); "
-                . "2) Emergency Financial Aid (Ayuda): Recommended budget of ₱" . number_format($totalAidBudget, 2) . " (₱" . number_format($aidRatePerFamily, 2) . " per family for $targetAidFamilies families) under LGU Calamity Fund. "
-                . ($stockDeficit ? "Notice: Central inventory has partial stock constraints for one or more physical items; human review may adjust quantities or request mutual aid." : "Central inventory possesses adequate stock for physical resource dispatch.");
+        // Structured Breakdown for Tooltip & Explainability
+        $confidenceBreakdown = [
+            'base' => 85.0,
+            'severity_bonus' => $severityBonus,
+            'severity_label' => $severity,
+            'feasibility_bonus' => $stockBonus,
+            'feasibility_label' => $feasibilityLabel,
+            'feasibility_short' => $feasibilityShort,
+            'total' => $confidence,
+            'modality' => $modality,
+            'formula' => "85% (Base) " . ($severityBonus >= 0 ? "+ {$severityBonus}%" : "{$severityBonus}%") . " ({$severity} Severity) " . ($stockBonus >= 0 ? "+ {$stockBonus}%" : "{$stockBonus}%") . " ({$feasibilityShort}) = " . round($confidence, 0) . "%"
+        ];
+
+        // Explanatory Reason with Selected Modality (Resources, Ayuda, or Both)
+        if ($modality === 'resources') {
+            $reason = "Recommendation generated using Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
+                    . "Assessment parameters: $severity severity, $urgency urgency, $families affected families ($displaced displaced). "
+                    . "Intervention Plan: Physical Relief Allocation prioritized (NDRRMC relief supply matrix and depot stock analysis). "
+                    . ($stockDeficit ? "Notice: Central inventory has partial stock constraints for one or more physical items; human review may adjust quantities or request mutual aid." : "Central inventory possesses adequate stock for physical resource dispatch.");
+        } elseif ($modality === 'financial_aid') {
+            $reason = "Recommendation generated using Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
+                    . "Assessment parameters: $severity severity, $urgency urgency, $families affected families ($displaced displaced). "
+                    . "Intervention Plan: Emergency Financial Aid (Ayuda) Cash Grant prioritized: Recommended budget of ₱" . number_format($totalAidBudget, 2) . " (₱" . number_format($aidRatePerFamily, 2) . " per family for $targetAidFamilies families) under $aidSource.";
+        } else {
+            $reason = "Recommendation generated using Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
+                    . "Assessment parameters: $severity severity, $urgency urgency, $families affected families ($displaced displaced). "
+                    . "Dual Intervention Plan: 1) Physical Relief Allocation (NDRRMC relief supply matrix and depot stock analysis); "
+                    . "2) Emergency Financial Aid (Ayuda): Recommended budget of ₱" . number_format($totalAidBudget, 2) . " (₱" . number_format($aidRatePerFamily, 2) . " per family for $targetAidFamilies families) under $aidSource. "
+                    . ($stockDeficit ? "Notice: Central inventory has partial stock constraints for one or more physical items; human review may adjust quantities or request mutual aid." : "Central inventory possesses adequate stock for physical resource dispatch.");
+        }
 
         // Check if recommendation already exists for this request
         $chkStmt = $this->db->prepare("SELECT id, recommendation_code FROM recommendations WHERE disaster_request_id = ?");
@@ -268,54 +383,71 @@ class DecisionTreeRecommender {
                 $updStmt = $this->db->prepare("
                     UPDATE recommendations SET
                         priority = ?,
+                        modality = ?,
                         confidence_score = ?,
                         decision_path = ?,
                         recommendation_reason = ?,
                         financial_aid_recommended_budget = ?,
                         financial_aid_per_family = ?,
                         financial_aid_target_families = ?,
+                        financial_aid_source = ?,
                         status = 'Pending Review',
                         reviewed_by = NULL,
                         reviewed_at = NULL,
                         review_remarks = NULL
                     WHERE id = ?
                 ");
-                $updStmt->execute([$priority, $confidence, $decisionPathString, $reason, $totalAidBudget, $aidRatePerFamily, $targetAidFamilies, $recId]);
+                $updStmt->execute([$priority, $modality, $confidence, $decisionPathString, $reason, $totalAidBudget, $aidRatePerFamily, $targetAidFamilies, $aidSource, $recId]);
+
+                // Return any stock previously allocated by this recommendation before discarding its items
+                $oldItemsStmt = $this->db->prepare("SELECT resource_id, allocated_quantity FROM recommended_items WHERE recommendation_id = ? AND allocated_quantity > 0 AND status = 'Allocated'");
+                $oldItemsStmt->execute([$recId]);
+                $restoreStmt = $this->db->prepare("
+                    UPDATE resources SET
+                        available_quantity = available_quantity + ?,
+                        in_use_quantity = GREATEST(0, in_use_quantity - ?)
+                    WHERE id = ?
+                ");
+                foreach ($oldItemsStmt->fetchAll() as $old) {
+                    $restoreStmt->execute([$old['allocated_quantity'], $old['allocated_quantity'], $old['resource_id']]);
+                }
 
                 $delStmt = $this->db->prepare("DELETE FROM recommended_items WHERE recommendation_id = ?");
                 $delStmt->execute([$recId]);
             } else {
                 $code = 'REC-' . date('Y') . '-' . str_pad((string)$requestId, 3, '0', STR_PAD_LEFT);
                 $insStmt = $this->db->prepare("
-                    INSERT INTO recommendations (recommendation_code, disaster_request_id, priority, confidence_score, decision_path, recommendation_reason, financial_aid_recommended_budget, financial_aid_per_family, financial_aid_target_families, status, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending Review', NOW())
+                    INSERT INTO recommendations (recommendation_code, disaster_request_id, priority, modality, confidence_score, decision_path, recommendation_reason, financial_aid_recommended_budget, financial_aid_per_family, financial_aid_target_families, financial_aid_source, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending Review', NOW())
                 ");
-                $insStmt->execute([$code, $requestId, $priority, $confidence, $decisionPathString, $reason, $totalAidBudget, $aidRatePerFamily, $targetAidFamilies]);
+                $insStmt->execute([$code, $requestId, $priority, $modality, $confidence, $decisionPathString, $reason, $totalAidBudget, $aidRatePerFamily, $targetAidFamilies, $aidSource]);
                 $recId = (int)$this->db->lastInsertId();
             }
 
             // Insert recommended items
-            $itemStmt = $this->db->prepare("
-                INSERT INTO recommended_items (recommendation_id, resource_id, recommended_quantity, approved_quantity, allocated_quantity, status)
-                VALUES (?, ?, ?, NULL, 0, 'Pending')
-            ");
-            foreach ($recommendedItems as $item) {
-                $itemStmt->execute([$recId, $item['resource_id'], $item['quantity']]);
+            if (!empty($recommendedItems)) {
+                $itemStmt = $this->db->prepare("
+                    INSERT INTO recommended_items (recommendation_id, resource_id, recommended_quantity, approved_quantity, allocated_quantity, status, added_type)
+                    VALUES (?, ?, ?, NULL, 0, 'Pending', 'ai_recommended')
+                ");
+                foreach ($recommendedItems as $item) {
+                    $itemStmt->execute([$recId, $item['resource_id'], $item['quantity']]);
+                }
             }
 
-            // Update Disaster Request status
-            $reqUpd = $this->db->prepare("UPDATE disaster_reports SET status = 'Recommendation Ready' WHERE id = ?");
-            $reqUpd->execute([$requestId]);
+            // Update Disaster Request aid_support (status remains Ongoing until concluded by Barangay Head)
+            $reqUpd = $this->db->prepare("UPDATE disaster_reports SET aid_support = ?, status = 'Ongoing' WHERE id = ?");
+            $reqUpd->execute([$modality, $requestId]);
 
             // Add notification for ICDRRMO personnel
             $notifStmt = $this->db->prepare("
                 INSERT INTO notifications (target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at)
                 VALUES ('icdrrmo', ?, ?, ?, 'warning', 'recommendation', ?, NOW())
             ");
-            $notifMsg = "Decision Support recommendation ready for {$request['barangay_name']} ({$request['disaster_type']} - $severity). Priority: $priority.";
-            $notifStmt->execute([$request['barangay_id'], "Resource & Ayuda Recommendation Ready ($priority)", $notifMsg, $recId]);
+            $notifMsg = "Decision Support recommendation ready for {$request['barangay_name']} ({$request['disaster_type']} - $severity). Modality: $modalityTitle. Priority: $priority.";
+            $notifStmt->execute([$request['barangay_id'], "Recommendation Ready ($priority)", $notifMsg, $recId]);
 
-            logSystemEvent('RUN_RECOMMENDER', 'Decision Tree Engine', "Generated recommendation #$recId for Disaster Request #$requestId ($disaster, $severity)");
+            logSystemEvent('RUN_RECOMMENDER', 'Decision Tree Engine', "Generated recommendation #$recId for Disaster Request #$requestId ($disaster, $severity, modality: $modality)");
 
             $this->db->commit();
 
@@ -324,7 +456,9 @@ class DecisionTreeRecommender {
                 'recommendation_id' => $recId,
                 'recommendation_code' => $code,
                 'priority' => $priority,
+                'modality' => $modality,
                 'confidence' => $confidence,
+                'confidence_breakdown' => $confidenceBreakdown,
                 'items_count' => count($recommendedItems),
                 'decision_path' => $decisionPathString,
                 'reason' => $reason,
@@ -332,7 +466,7 @@ class DecisionTreeRecommender {
                     'recommended_budget' => $totalAidBudget,
                     'per_family' => $aidRatePerFamily,
                     'target_families' => $targetAidFamilies,
-                    'funding_source' => 'LGU Calamity Fund'
+                    'funding_source' => $aidSource
                 ]
             ];
         } catch (Exception $e) {
@@ -402,11 +536,15 @@ class DecisionTreeRecommender {
                     ");
                     $updItem->execute([$qtyToApprove, $actualAlloc, $item['id']]);
 
+                    $itemAddedType = $item['added_type'] ?? 'ai_recommended';
+                    $typeLabel = ($itemAddedType === 'added_by_admin') ? 'Added by Admin' : 'AI Recommended';
+
                     $trxStmt = $this->db->prepare("
-                        INSERT INTO resource_transactions (resource_id, transaction_type, quantity, reference_type, reference_id, remarks, performed_by, created_at)
-                        VALUES (?, 'Allocation', ?, 'disaster_request', ?, ?, ?, NOW())
+                        INSERT INTO resource_transactions (resource_id, transaction_type, quantity, reference_type, reference_id, added_type, remarks, performed_by, created_at)
+                        VALUES (?, 'Allocation', ?, 'disaster_request', ?, ?, ?, ?, NOW())
                     ");
-                    $trxStmt->execute([$resId, $actualAlloc, $rec['request_id'], "Allocated via approved recommendation #{$rec['recommendation_code']}", $reviewerId]);
+                    $trxRemarks = "Allocated via approved recommendation #{$rec['recommendation_code']} [Source: {$typeLabel}]";
+                    $trxStmt->execute([$resId, $actualAlloc, $rec['request_id'], $itemAddedType, $trxRemarks, $reviewerId]);
                 }
 
                 $recUpd = $this->db->prepare("
@@ -419,8 +557,8 @@ class DecisionTreeRecommender {
                 ");
                 $recUpd->execute([$status, $reviewerId, $remarks, $recommendationId]);
 
-                $reqUpd = $this->db->prepare("UPDATE disaster_reports SET status = 'Allocated' WHERE id = ?");
-                $reqUpd->execute([$rec['request_id']]);
+                // Note: The incident report status remains Ongoing until concluded by Barangay Head.
+                // The allocation approval is tracked on the recommendation record.
 
                 $notifStmt = $this->db->prepare("
                     INSERT INTO notifications (target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at)
@@ -445,8 +583,8 @@ class DecisionTreeRecommender {
                 $updItem = $this->db->prepare("UPDATE recommended_items SET status = 'Rejected' WHERE recommendation_id = ?");
                 $updItem->execute([$recommendationId]);
 
-                $reqUpd = $this->db->prepare("UPDATE disaster_reports SET status = 'Under Review' WHERE id = ?");
-                $reqUpd->execute([$rec['request_id']]);
+                // Note: The incident report status remains Ongoing until concluded by Barangay Head.
+                // The allocation review status is recorded on the recommendation record.
 
                 logSystemEvent('REJECT_RECOMMENDATION', 'Decision Tree Engine', "Rejected recommendation #$recommendationId. Remarks: $remarks", $reviewerId);
             }

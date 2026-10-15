@@ -417,8 +417,15 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
                     <?= htmlspecialchars($row['allocation_code']) ?>
                   </td>
                   <td style="padding: 10px 14px;">
-                    <div style="font-weight: 600; color: var(--color-text); font-size: 11px;"><?= htmlspecialchars($row['program_name']) ?></div>
-                    <div style="font-size: 10px; color: var(--color-text-muted);">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                      <div style="font-weight: 600; color: var(--color-text); font-size: 11px;"><?= htmlspecialchars($row['program_name']) ?></div>
+                      <?php if (($row['added_type'] ?? 'ai_recommended') === 'added_by_admin'): ?>
+                        <span class="badge" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;font-size:9px;padding:1px 6px;font-weight:600;">👤 Added by Admin</span>
+                      <?php else: ?>
+                        <span class="badge" style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;font-size:9px;padding:1px 6px;font-weight:600;">🤖 AI Recommended</span>
+                      <?php endif; ?>
+                    </div>
+                    <div style="font-size: 10px; color: var(--color-text-muted); margin-top:2px;">
                       <?= htmlspecialchars($row['disaster_type'] ?: 'General Incident') ?> &bull; <?= htmlspecialchars($row['funding_source']) ?>
                     </div>
                   </td>
@@ -537,18 +544,19 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
     <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/allocate.php">
       <input type="hidden" name="action" value="create">
+      <input type="hidden" name="recommendation_id" id="alloc_recommendation_id" value="">
       <div class="modal-body">
         <div style="display: flex; flex-direction: column; gap: 12px;">
           
           <div>
             <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Program Name</label>
-            <input type="text" name="program_name" class="form-control" placeholder="e.g. Typhoon Kristine Emergency Cash Relief" required style="font-size: 11px;">
+            <input type="text" name="program_name" id="alloc_program_name" class="form-control" placeholder="e.g. Typhoon Kristine Emergency Cash Relief" required style="font-size: 11px;">
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
               <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Target Barangay</label>
-              <select name="barangay_id" class="form-control" required style="font-size: 11px;">
+              <select name="barangay_id" id="alloc_barangay_id" class="form-control" required style="font-size: 11px;">
                 <option value="">-- Select Barangay --</option>
                 <?php foreach ($allBarangays as $b): ?>
                   <option value="<?= $b['id'] ?>"><?= htmlspecialchars($b['name']) ?></option>
@@ -557,7 +565,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <div>
               <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Disaster / Calamity Type</label>
-              <select name="disaster_type" class="form-control" style="font-size: 11px;">
+              <select name="disaster_type" id="alloc_disaster_type" class="form-control" style="font-size: 11px;">
                 <option value="Typhoon">Typhoon</option>
                 <option value="Flood">Flood</option>
                 <option value="Landslide">Landslide</option>
@@ -585,9 +593,18 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <span id="alloc_target_preview" style="font-size: 12px; font-weight: 700; color: var(--color-primary); font-family: var(--font-secondary);">0 families</span>
           </div>
 
-          <div>
-            <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Funding Source</label>
-            <input type="text" name="funding_source" class="form-control" value="LGU Calamity Fund" placeholder="e.g. Quick Response Fund (QRF)" style="font-size: 11px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Funding Source</label>
+              <input type="text" name="funding_source" id="alloc_funding_source" class="form-control" value="LGU Calamity Fund" placeholder="e.g. Quick Response Fund (QRF)" style="font-size: 11px;">
+            </div>
+            <div>
+              <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Budget Source Type</label>
+              <select name="added_type" id="alloc_added_type" class="form-control" style="font-size: 11px;">
+                <option value="ai_recommended">🤖 AI Recommended</option>
+                <option value="added_by_admin">👤 Added by Admin</option>
+              </select>
+            </div>
           </div>
 
           <div>
@@ -652,6 +669,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
           <div>
             <span style="font-size: 10px; color: var(--color-text-muted); display: block;">Funding Source:</span>
             <span id="view_alloc_funding" style="font-size: 11px;"></span>
+          </div>
+          <div>
+            <span style="font-size: 10px; color: var(--color-text-muted); display: block;">Budget Source Type:</span>
+            <span id="view_alloc_source_type"></span>
           </div>
           <div>
             <span style="font-size: 10px; color: var(--color-text-muted); display: block;">Status:</span>
@@ -727,6 +748,10 @@ function viewAllocationDetails(data) {
   document.getElementById('view_alloc_rate').textContent = '₱' + Number(data.amount_per_beneficiary).toLocaleString('en-US', {minimumFractionDigits: 2});
   document.getElementById('view_alloc_target').textContent = Number(data.target_beneficiaries).toLocaleString() + ' families';
   document.getElementById('view_alloc_funding').textContent = data.funding_source;
+  const isCustom = data.added_type === 'added_by_admin';
+  document.getElementById('view_alloc_source_type').innerHTML = isCustom 
+    ? '<span class="badge" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;font-size:9.5px;padding:2px 7px;font-weight:600;">👤 Added by Admin</span>' 
+    : '<span class="badge" style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;font-size:9.5px;padding:2px 7px;font-weight:600;">🤖 AI Recommended</span>';
   document.getElementById('view_alloc_status').textContent = data.status;
   document.getElementById('view_alloc_notes').textContent = data.notes || 'No administrative notes specified.';
   document.getElementById('viewAllocationModal').classList.add('show');
@@ -760,12 +785,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const disasterSelect = document.querySelector('select[name="disaster_type"]');
     const budgetInput = document.getElementById('alloc_total_budget');
     const rateInput = document.getElementById('alloc_rate_budget');
+    const fundingInput = document.querySelector('input[name="funding_source"]');
+    const typeSelect = document.getElementById('alloc_added_type');
+    const recInput = document.getElementById('alloc_recommendation_id');
 
     if (params.get('program_name') && progInput) progInput.value = params.get('program_name');
     if (params.get('barangay_id') && brgySelect) brgySelect.value = params.get('barangay_id');
     if (params.get('disaster_type') && disasterSelect) disasterSelect.value = params.get('disaster_type');
     if (params.get('budget') && budgetInput) budgetInput.value = parseFloat(params.get('budget')).toFixed(2);
     if (params.get('per_family') && rateInput) rateInput.value = parseFloat(params.get('per_family')).toFixed(2);
+    if (params.get('funding_source') && fundingInput) fundingInput.value = params.get('funding_source');
+    if (params.get('added_type') && typeSelect) typeSelect.value = params.get('added_type');
+    if (params.get('recommendation_id') && recInput) recInput.value = params.get('recommendation_id');
+
+    const origBudget = parseFloat(params.get('budget') || 0);
+    if (budgetInput) {
+      budgetInput.addEventListener('input', function() {
+        const currentVal = parseFloat(this.value || 0);
+        if (typeSelect && origBudget > 0 && Math.abs(currentVal - origBudget) > 0.01) {
+          typeSelect.value = 'added_by_admin';
+        }
+      });
+    }
 
     updateTargetCountPreview();
     openCreateAllocationModal();

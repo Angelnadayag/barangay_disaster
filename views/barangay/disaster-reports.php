@@ -107,7 +107,7 @@ if (!empty($search)) {
   $params[] = $like;
 }
 
-$sql .= " ORDER BY FIELD(dr.status, 'Ongoing', 'Submitted', 'Recommendation Ready', 'Approved', 'Allocated', 'Dispatched', 'Completed', 'Rejected'), dr.created_at DESC";
+$sql .= " ORDER BY FIELD(dr.status, 'Ongoing', 'Completed'), dr.created_at DESC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -351,16 +351,10 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
   }
 
-  .kpi-stat-card.ongoing-card {
-    border-left: 4px solid #F59E0B;
-  }
-
-  .kpi-stat-card.completed-card {
-    border-left: 4px solid #10B981;
-  }
-
+  .kpi-stat-card.ongoing-card,
+  .kpi-stat-card.completed-card,
   .kpi-stat-card.displaced-card {
-    border-left: 4px solid #EF4444;
+    border-left: 1px solid var(--color-border, #E2E8F0);
   }
 
   /* Pulsing badge indicator for Ongoing */
@@ -626,12 +620,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
               <option value="">All Statuses</option>
               <option value="Ongoing" <?= $filterStatus === 'Ongoing' ? 'selected' : '' ?>>Ongoing</option>
               <option value="Completed" <?= $filterStatus === 'Completed' ? 'selected' : '' ?>>Completed</option>
-              <option value="Submitted" <?= $filterStatus === 'Submitted' ? 'selected' : '' ?>>Submitted</option>
-              <option value="Recommendation Ready" <?= $filterStatus === 'Recommendation Ready' ? 'selected' : '' ?>>
-                Recommendation Ready</option>
-              <option value="Approved" <?= $filterStatus === 'Approved' ? 'selected' : '' ?>>Approved</option>
-              <option value="Allocated" <?= $filterStatus === 'Allocated' ? 'selected' : '' ?>>Allocated</option>
-              <option value="Dispatched" <?= $filterStatus === 'Dispatched' ? 'selected' : '' ?>>Dispatched</option>
             </select>
           <?php endif; ?>
 
@@ -658,6 +646,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           <th>Incident # & Hazard</th>
           <th>Purok Cluster</th>
           <th>Severity / Urgency</th>
+          <th>Aid Support</th>
           <th>Impact & Displaced</th>
           <th>Status</th>
           <th>Date Filed</th>
@@ -667,7 +656,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       <tbody>
         <?php if (empty($requests)): ?>
           <tr>
-            <td colspan="7" style="text-align:center;padding:36px;color:var(--color-text-muted);">
+            <td colspan="8" style="text-align:center;padding:36px;color:var(--color-text-muted);">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                 style="margin:0 auto 8px;display:block;opacity:0.6;">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -727,6 +716,11 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 </div>
               </td>
 
+              <!-- Aid Support -->
+              <td>
+                <?= renderAidSupportBadge($r['aid_support'] ?? 'resources') ?>
+              </td>
+
               <!-- Impact & Displaced -->
               <td style="font-family:var(--font-secondary);font-size:11px;">
                 <div style="font-weight:600;color:var(--color-text);">
@@ -749,15 +743,13 @@ require_once __DIR__ . '/../layouts/sidebar.php';
               <td>
                 <?php if ($r['status'] === 'Ongoing'): ?>
                   <span class="badge-ongoing-pulse">Ongoing</span>
-                <?php elseif ($r['status'] === 'Completed'): ?>
+                <?php else: ?>
                   <span class="badge badge-success" style="font-weight:700;">✓ Completed</span>
                   <?php if (!empty($r['completed_at'])): ?>
                     <div style="font-size:8.5px;color:var(--color-text-muted);margin-top:2px;">Ended
                       <?= formatDate($r['completed_at'], 'M d, h:i A') ?>
                     </div>
                   <?php endif; ?>
-                <?php else: ?>
-                  <?= renderStatusBadge($r['status']) ?>
                 <?php endif; ?>
               </td>
 
@@ -964,6 +956,14 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
 
       <div class="form-row">
+        <div class="form-group">
+          <label class="form-label form-label-required">Aid Support Needed</label>
+          <select name="aid_support" id="create_aid_support" class="form-control" required>
+            <option value="resources" selected>Physical Relief Resources</option>
+            <option value="financial_aid">Emergency Financial Aid (Ayuda)</option>
+            <option value="both">Both (Relief &amp; Financial Aid)</option>
+          </select>
+        </div>
         <div class="form-group">
           <label class="form-label form-label-required">Incident Severity</label>
           <select name="severity" class="form-control" required>
@@ -1217,6 +1217,14 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
 
       <div class="form-row">
+        <div class="form-group">
+          <label class="form-label form-label-required">Aid Support Needed</label>
+          <select name="aid_support" id="view_aid_support" class="form-control" disabled required>
+            <option value="resources">Physical Relief Resources</option>
+            <option value="financial_aid">Emergency Financial Aid (Ayuda)</option>
+            <option value="both">Both (Relief &amp; Financial Aid)</option>
+          </select>
+        </div>
         <div class="form-group">
           <label class="form-label form-label-required">Severity Level</label>
           <select name="severity" id="view_severity" class="form-control" disabled required>
@@ -2133,6 +2141,9 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       viewPurokSelect.add(newOpt);
     }
 
+    const aidSelect = document.getElementById('view_aid_support');
+    if (aidSelect) aidSelect.value = req.aid_support || 'resources';
+
     document.getElementById('view_severity').value = req.severity;
     document.getElementById('view_urgency').value = req.urgency;
     document.getElementById('view_incident_location').value = req.incident_location || '';
@@ -2264,7 +2275,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     isEditModeActive = enableEdit;
 
     const fields = [
-      'view_disaster_type', 'view_purok_name', 'view_severity', 'view_urgency',
+      'view_aid_support', 'view_disaster_type', 'view_purok_name', 'view_severity', 'view_urgency',
       'view_incident_location', 'view_lat', 'view_lng',
       'view_affected_families', 'view_displaced_families', 'view_affected_individuals',
       'view_casualties_count', 'view_injuries_count', 'view_missing_count',

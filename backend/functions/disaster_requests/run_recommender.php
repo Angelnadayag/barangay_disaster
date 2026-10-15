@@ -33,11 +33,38 @@ if (!$requestId) {
     redirectWithFlash($returnUrl, 'error', 'Invalid request ID.');
 }
 
+$modality = clean($_POST['modality'] ?? ($_GET['modality'] ?? 'both'));
+if (!in_array($modality, ['both', 'resources', 'financial_aid'])) {
+    $modality = 'both';
+}
+
+$options = [
+    'financial_aid_amount' => isset($_POST['financial_aid_amount']) && is_numeric($_POST['financial_aid_amount']) ? (float)$_POST['financial_aid_amount'] : null,
+    'financial_aid_sponsor' => trim($_POST['financial_aid_sponsor'] ?? ($_POST['financial_aid_source'] ?? '')),
+    'financial_aid_target' => trim($_POST['financial_aid_target'] ?? 'displaced')
+];
+
 try {
+    $customResources = [];
+    if (!empty($_POST['custom_resources'])) {
+        $decoded = json_decode($_POST['custom_resources'], true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $cr) {
+                $rid = (int)($cr['resource_id'] ?? 0);
+                $qty = (int)($cr['quantity'] ?? 0);
+                if ($rid > 0 && $qty > 0) {
+                    $customResources[$rid] = $qty;
+                }
+            }
+        }
+    }
+    $options['custom_resources'] = $customResources;
+
     $recommender = new DecisionTreeRecommender();
-    $result = $recommender->evaluateRequest($requestId);
+    $result = $recommender->evaluateRequest($requestId, $modality, $options);
     
-    $msg = "Decision Support recommendation generated successfully for Request #" . $requestId;
+    $modalityLabel = ($modality === 'resources') ? 'Physical Resources' : (($modality === 'financial_aid') ? 'Emergency Financial Aid' : 'Comprehensive Dual Support');
+    $msg = "Decision Support recommendation ($modalityLabel) generated successfully for Request #" . $requestId;
     if ($isAjax) {
         jsonResponse([
             'success' => true,
@@ -45,6 +72,8 @@ try {
             'recommendation_id' => $result['recommendation_id'] ?? null,
             'recommendation_code' => $result['recommendation_code'] ?? null,
             'confidence' => $result['confidence'] ?? 0,
+            'confidence_breakdown' => $result['confidence_breakdown'] ?? null,
+            'modality' => $result['modality'] ?? $modality,
             'priority' => $result['priority'] ?? 'Moderate',
             'items_count' => $result['items_count'] ?? 0,
             'financial_aid' => $result['financial_aid'] ?? null,

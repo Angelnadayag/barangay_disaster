@@ -291,7 +291,9 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
               <td style="font-weight:600;"><?= clean($rr['barangay_name']) ?></td>
               <td><?= clean($rr['disaster_type']) ?> (<?= clean($rr['severity']) ?>)</td>
               <td><?= renderStatusBadge($rr['priority']) ?></td>
-              <td style="font-family:var(--font-secondary);font-weight:700;"><?= number_format($rr['confidence_score'], 1) ?>%</td>
+              <td style="font-family:var(--font-secondary);font-weight:700;">
+                <?= renderConfidenceBadge($rr['confidence_score'], $rr['severity'], $rr['decision_path'] ?? '', $rr['modality'] ?? null, 'badge-info', 'font-size:10px;padding:3px 7px;', '') ?>
+              </td>
               <td><?= renderStatusBadge($rr['status']) ?></td>
               <td><?= clean($rr['reviewer_name'] ?: 'Pending Review') ?></td>
               <td style="font-size:9px;"><?= formatDate($rr['reviewed_at']) ?></td>

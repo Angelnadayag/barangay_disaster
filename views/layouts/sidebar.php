@@ -17,8 +17,8 @@ $localLowStockCount = 0;
 
 if ($role === 'icdrrmo' || $role === 'barangay_head') {
     $reqSql = ($role === 'barangay_head') 
-        ? "SELECT COUNT(*) FROM disaster_reports WHERE status IN ('Submitted', 'Recommendation Ready', 'Ongoing') AND barangay_id = ?"
-        : "SELECT COUNT(*) FROM disaster_reports WHERE status IN ('Submitted', 'Recommendation Ready', 'Ongoing', 'Under Review')";
+        ? "SELECT COUNT(*) FROM disaster_reports WHERE status = 'Ongoing' AND barangay_id = ?"
+        : "SELECT COUNT(*) FROM disaster_reports WHERE status = 'Ongoing'";
     $reqStmt = $db->prepare($reqSql);
     $reqStmt->execute($role === 'barangay_head' ? [$user['barangay_id']] : []);
     $pendingReqs = (int)$reqStmt->fetchColumn();
