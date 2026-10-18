@@ -8,6 +8,11 @@ require_once __DIR__ . '/../../backend/services/Auth.php';
 require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireLogin();
+if (!headers_sent()) {
+    header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+}
 $currentUser = getCurrentUser();
 $db = getDBConnection();
 
