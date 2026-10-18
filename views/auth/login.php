@@ -15,7 +15,7 @@ if (isLoggedIn()) {
     $u = getCurrentUser();
     $folder = getRoleFolder($u['role']);
     if ($u['role'] === 'icdrrmo') {
-        $redir = BASE_URL . '/views/icdrrmo/users.php';
+        $redir = BASE_URL . '/views/icdrrmo/dashboard.php';
     } elseif ($u['role'] === 'barangay_head') {
         $redir = BASE_URL . '/views/barangay/dashboard.php';
     } else {

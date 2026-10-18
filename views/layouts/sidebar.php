@@ -68,6 +68,12 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
       <div class="sidebar-section-title">Admin Management</div>
       <ul class="nav-list">
         <li class="nav-item">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/dashboard.php" class="nav-link <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span>
+            Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/users.php" class="nav-link <?= $currentPage === 'users.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
             Manage User
