@@ -2128,3 +2128,164 @@ select.form-control {
   margin-bottom: 8px;
 }
 
+/* ==========================================================================
+   Resident & Responder Mobile-First Layout & Navigation
+   No Sidebar, Modern Top Desktop Nav, Sleek Bottom Mobile Nav
+   ========================================================================== */
+
+/* Portal Brand Header Link */
+.portal-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: #FFFFFF;
+}
+.portal-brand-logo {
+  height: 28px;
+  max-width: 110px;
+  width: auto;
+  object-fit: contain;
+  background: #FFFFFF;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 6px);
+  display: block;
+}
+.portal-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+.portal-brand-title {
+  font-family: var(--font-primary, 'Poppins', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.2;
+  letter-spacing: 0.3px;
+}
+.portal-brand-sub {
+  font-size: 9px;
+  color: #B5C6D4;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+/* Desktop Navigation in Topbar (>= 901px) */
+.topbar-desktop-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.topbar-nav-pill {
+  color: #B5C6D4;
+  font-family: var(--font-primary, 'Poppins', sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm, 6px);
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.topbar-nav-pill:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.08);
+}
+.topbar-nav-pill.active {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.16);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .topbar-desktop-nav {
+    display: none !important;
+  }
+}
+
+/* Full Width App Container When No Sidebar */
+.app-container-no-sidebar {
+  width: 100vw;
+  max-width: 100vw;
+  overflow: hidden;
+}
+.app-container-no-sidebar .main-content {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 100%;
+}
+
+/* Citizen & Responder Shell Body */
+body.citizen-responder-shell .main-content {
+  padding: 14px 18px;
+}
+@media (min-width: 901px) {
+  body.citizen-responder-shell .main-content {
+    padding: 20px 32px;
+  }
+  body.citizen-responder-shell .main-content > * {
+    max-width: 1320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Mobile Fixed Bottom Navigation (< 900px) */
+.mobile-bottom-nav {
+  display: none;
+}
+@media (max-width: 900px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 58px;
+    background: #FFFFFF;
+    border-top: 1px solid var(--color-border, #D9E0E3);
+    box-shadow: 0 -2px 10px rgba(23, 50, 77, 0.08);
+    z-index: 1000;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 4px;
+  }
+  body.citizen-responder-shell .main-content {
+    padding-bottom: 74px !important;
+  }
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px;
+    color: var(--color-text-secondary, #66737D);
+    text-decoration: none;
+    font-family: var(--font-primary, 'Poppins', sans-serif);
+    font-size: 9.5px;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    min-height: 48px;
+  }
+  .bottom-nav-item svg {
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+  .bottom-nav-item:hover,
+  .bottom-nav-item:active {
+    color: var(--color-primary, #17324D);
+  }
+  .bottom-nav-item.active {
+    color: var(--color-primary, #17324D);
+    font-weight: 700;
+  }
+  .bottom-nav-item.active svg {
+    stroke-width: 2.4;
+    transform: translateY(-1px);
+  }
+}
+
+

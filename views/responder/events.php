@@ -66,7 +66,6 @@ $countMyDuties = count($myConfirmedEventIds);
 
 $pageTitle = "Tactical Drills & Events";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
 <style>
@@ -235,7 +234,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 }
 </style>
 
-<main class="main-content">
   <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-title-wrap">

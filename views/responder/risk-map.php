@@ -36,10 +36,8 @@ $barangays = $db->query("SELECT id, name, risk_level, area_radius, coordinates_l
 
 $pageTitle = "Tactical Hazard Map — Field Ops";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Tactical Operations & Hazard Map</h1>

@@ -43,6 +43,8 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
 } else {
     $officeSubtitle = 'Iligan City Disaster Risk Reduction and Management Office • Local Government of Iligan';
 }
+$isCitizenOrResponder = in_array($currentUser['role'] ?? '', ['resident', 'responder'], true);
+$currentPage = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -70,19 +72,49 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
     }
   </script>
 </head>
-<body>
+<body class="<?= $isCitizenOrResponder ? 'citizen-responder-shell' : '' ?>">
 <div class="app-shell">
   <!-- Topbar -->
   <header class="topbar">
     <div class="topbar-left">
-      <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle Navigation" title="Toggle Navigation Sidebar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
+      <?php if (!$isCitizenOrResponder): ?>
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle Navigation" title="Toggle Navigation Sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      <?php else: ?>
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="portal-brand-link" title="Disaster Portal">
+          <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Logo" class="portal-brand-logo">
+          <div class="portal-brand-text">
+            <div class="portal-brand-title"><?= $currentUser['role'] === 'responder' ? 'Tactical Responders' : 'Barangay Safety' ?></div>
+            <div class="portal-brand-sub"><?= clean($currentUser['barangay_name'] ?? 'Iligan City') ?></div>
+          </div>
+        </a>
+      <?php endif; ?>
     </div>
+
+    <?php if ($isCitizenOrResponder): ?>
+      <nav class="topbar-desktop-nav">
+        <?php if ($currentUser['role'] === 'resident'): ?>
+          <a href="<?= BASE_URL ?>/views/resident/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Dashboard</a>
+          <a href="<?= BASE_URL ?>/views/resident/evacuation.php" class="topbar-nav-pill <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">Evacuation Routing</a>
+          <a href="<?= BASE_URL ?>/views/resident/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events &amp; Drills</a>
+          <a href="<?= BASE_URL ?>/views/resident/risk-map.php" class="topbar-nav-pill <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">Hazard Map</a>
+          <a href="<?= BASE_URL ?>/views/resident/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">Advisories</a>
+        <?php elseif ($currentUser['role'] === 'responder'): ?>
+          <a href="<?= BASE_URL ?>/views/responder/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Field Dashboard</a>
+          <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="topbar-nav-pill <?= $currentPage === 'active-incidents.php' ? 'active' : '' ?>">Incidents</a>
+          <a href="<?= BASE_URL ?>/views/responder/evacuation.php" class="topbar-nav-pill <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">Evacuation Routing</a>
+          <a href="<?= BASE_URL ?>/views/responder/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events &amp; Drills</a>
+          <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="topbar-nav-pill <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">Hazard Map</a>
+          <a href="<?= BASE_URL ?>/views/responder/field-status.php" class="topbar-nav-pill <?= $currentPage === 'field-status.php' ? 'active' : '' ?>">Field Status</a>
+          <a href="<?= BASE_URL ?>/views/responder/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">Alerts</a>
+        <?php endif; ?>
+      </nav>
+    <?php endif; ?>
 
     <div class="topbar-right">
       <!-- Notification Bell -->
@@ -248,9 +280,11 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
   </header>
 
   <!-- App Body Layout -->
-  <div class="app-container">
-    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-    <?php require_once __DIR__ . '/sidebar.php'; ?>
+  <div class="app-container <?= $isCitizenOrResponder ? 'app-container-no-sidebar' : '' ?>">
+    <?php if (!$isCitizenOrResponder): ?>
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+      <?php require_once __DIR__ . '/sidebar.php'; ?>
+    <?php endif; ?>
     <main class="main-content" id="mainContent">
       <?php if (!empty($_SESSION['flash_success'])): ?>
         <div style="margin-bottom:14px;padding:10px 14px;background:var(--color-success-bg, #EAF4EB);border:1px solid var(--color-success-border, #BCE3C1);color:var(--color-success, #2E7D32);border-radius:6px;font-size:12px;font-family:var(--font-primary);display:flex;justify-content:space-between;align-items:center;">

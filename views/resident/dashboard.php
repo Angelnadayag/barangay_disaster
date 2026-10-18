@@ -72,10 +72,8 @@ $upcomingDrills = $actStmt->fetchAll();
 
 $pageTitle = "Community Safety Dashboard";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Barangay <?= clean($barangay['name'] ?? 'Local') ?> Resident Portal</h1>
@@ -301,6 +299,5 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
     </div>
   </div>
-</main>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

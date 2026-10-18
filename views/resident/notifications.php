@@ -41,10 +41,8 @@ $alerts = $stmt->fetchAll();
 
 $pageTitle = "Public Advisories & Bulletins";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Public Advisories & Disaster Bulletins</h1>

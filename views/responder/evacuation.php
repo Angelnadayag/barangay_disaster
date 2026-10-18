@@ -70,7 +70,6 @@ foreach ($centers as $c) {
 
 $pageTitle = "Evacuation Routing & Camps — Tactical View";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
 <!-- Leaflet GIS Map Styling -->
@@ -320,7 +319,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 }
 </style>
 
-<main class="main-content">
   <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-title-wrap">

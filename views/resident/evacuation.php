@@ -84,7 +84,6 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
 
 $pageTitle = "Evacuation Routing & Shelters";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
 <!-- Leaflet GIS Map Styling -->
@@ -444,8 +443,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
   text-transform: uppercase;
 }
 </style>
-
-<main class="main-content">
   <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-title-wrap">

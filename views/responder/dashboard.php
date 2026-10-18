@@ -50,10 +50,8 @@ $urgentAlerts = $notifStmt->fetchAll();
 
 $pageTitle = "Responder Field Dashboard";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <!-- Tactical Identity Banner -->
   <div style="background:var(--color-primary);color:#FFF;border-radius:10px;padding:14px 18px;margin-bottom:var(--space-4);box-shadow:var(--shadow-subtle);">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
@@ -193,7 +191,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
     </div>
   </div>
-</main>
 
 <script>
 async function setQuickStatus(status) {
