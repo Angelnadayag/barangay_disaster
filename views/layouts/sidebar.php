@@ -73,14 +73,14 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
             Manage User
           </a>
         </li>
-        <?php /* Hidden: Manage Barangay Module (Code preserved as requested) ?>
+        <?php if (false): // Hidden from left sidebar as requested; module code preserved ?>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/barangays.php" class="nav-link <?= $currentPage === 'barangays.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
             Manage Barangay
           </a>
         </li>
-        <?php */ ?>
+        <?php endif; ?>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-reports.php" class="nav-link <?= in_array($currentPage, ['disaster-reports.php', 'disaster-requests.php'], true) ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
