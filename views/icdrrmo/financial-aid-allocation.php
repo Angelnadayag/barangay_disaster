@@ -561,13 +561,9 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <input type="text" name="program_name" id="alloc_program_name" class="form-control" placeholder="e.g. Typhoon Kristine Emergency Cash Relief" required style="font-size: 11px;">
           </div>
 
+          <input type="hidden" name="barangay_id" id="alloc_barangay_id" value="12">
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>
-              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Target Barangay</label>
-              <select name="barangay_id" id="alloc_barangay_id" class="form-control" required style="font-size: 11px; background: #F8FAFC;">
-                <option value="12" selected>Brgy. Hinaplanon</option>
-              </select>
-            </div>
             <div>
               <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Allocate to Purok (Hinaplanon)</label>
               <select name="target_purok" id="alloc_target_purok" class="form-control" required style="font-size: 11px;">
@@ -577,18 +573,17 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
                 <?php endforeach; ?>
               </select>
             </div>
-          </div>
-
-          <div>
-            <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Disaster / Calamity Type</label>
-            <select name="disaster_type" id="alloc_disaster_type" class="form-control" style="font-size: 11px;">
-              <option value="Typhoon">Typhoon</option>
-              <option value="Flood">Flood</option>
-              <option value="Landslide">Landslide</option>
-              <option value="Fire">Fire</option>
-              <option value="Earthquake">Earthquake</option>
-              <option value="General Calamity">General Calamity</option>
-            </select>
+            <div>
+              <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Disaster / Calamity Type</label>
+              <select name="disaster_type" id="alloc_disaster_type" class="form-control" style="font-size: 11px;">
+                <option value="Typhoon">Typhoon</option>
+                <option value="Flood">Flood</option>
+                <option value="Landslide">Landslide</option>
+                <option value="Fire">Fire</option>
+                <option value="Earthquake">Earthquake</option>
+                <option value="General Calamity">General Calamity</option>
+              </select>
+            </div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -801,7 +796,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('action') === 'new') {
     const progInput = document.querySelector('input[name="program_name"]');
-    const brgySelect = document.querySelector('select[name="barangay_id"]');
+    const brgyInput = document.getElementById('alloc_barangay_id');
     const disasterSelect = document.querySelector('select[name="disaster_type"]');
     const budgetInput = document.getElementById('alloc_total_budget');
     const rateInput = document.getElementById('alloc_rate_budget');
@@ -811,6 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const purokSelect = document.getElementById('alloc_target_purok');
 
+    if (brgyInput) brgyInput.value = '12';
     if (params.get('program_name') && progInput) progInput.value = params.get('program_name');
     if (params.get('target_purok') && purokSelect) purokSelect.value = params.get('target_purok');
     if (params.get('disaster_type') && disasterSelect) disasterSelect.value = params.get('disaster_type');
