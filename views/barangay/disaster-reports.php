@@ -139,11 +139,11 @@ foreach ($customClusters as $cc) {
   }
 }
 
-// 2. Dynamically load Hazard Types specific to this Barangay and its Puroks
+// 2. Dynamically load Hazard Types specific to this Barangay and its Puroks (including global system defaults)
 $hazOptionsStmt = $db->prepare("
   SELECT id, purok_id, barangay_id, name 
   FROM hazard_type_options 
-  WHERE barangay_id = ? OR purok_id IN (SELECT id FROM puroks WHERE barangay_id = ?)
+  WHERE barangay_id = ? OR purok_id IN (SELECT id FROM puroks WHERE barangay_id = ?) OR (barangay_id IS NULL AND purok_id IS NULL)
   ORDER BY name ASC
 ");
 $hazOptionsStmt->execute([$barangayId, $barangayId]);
