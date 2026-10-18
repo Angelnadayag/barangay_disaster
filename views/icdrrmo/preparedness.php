@@ -221,7 +221,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     </div>
     <form id="createActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/create.php">
       <input type="hidden" name="action" value="create">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label form-label-required">Activity Title</label>
@@ -315,7 +315,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     </div>
     <form id="evaluateForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/evaluate.php">
       <input type="hidden" name="action" value="evaluate">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="activity_id" id="evalActId">
       <div class="modal-body">
         <div style="font-weight:700;font-size:11px;color:var(--color-primary);margin-bottom:8px;" id="evalActName"></div>

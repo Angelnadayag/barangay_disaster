@@ -83,65 +83,197 @@ $recentRecs = $recommendationsStmt->fetchAll(PDO::FETCH_ASSOC);
 // 2. AI Susceptibility Model Profiles for Hinaplanon Puroks
 // ----------------------------------------------------------------------------
 $purokProfiles = [
-    'Purok 1' => [
-        'ai_risk_score' => 94,
+    'Purok Riverside 1' => [
+        'ai_risk_score' => 96,
         'prone_category' => 'River Delta Inundation Corridor',
         'susceptibility' => 'Critical',
         'primary_hazard' => 'Flash Flood & River Overflow',
-        'elevation' => '3.2m',
-        'river_distance' => '45m',
+        'elevation' => '3.1m',
+        'river_distance' => '35m',
         'alert_level' => 'Red Alert',
         'ai_recommendation' => 'Early evacuation trigger at 1.8m river stage; pre-position watercraft at Sector 1-A.',
         'radius' => 200,
-        'color' => '#C62828' // var(--color-danger)
+        'color' => '#ef4444'
     ],
-    'Purok 3A' => [
+    'Purok Riverside 2' => [
+        'ai_risk_score' => 94,
+        'prone_category' => 'Riverbend Silt Deposition Basin',
+        'susceptibility' => 'Critical',
+        'primary_hazard' => 'Flash Flood & River Inundation',
+        'elevation' => '3.4m',
+        'river_distance' => '45m',
+        'alert_level' => 'Red Alert',
+        'ai_recommendation' => 'Mandatory pre-emptive evacuation to Hinaplanon NHS Gym upon Red Warning.',
+        'radius' => 200,
+        'color' => '#ef4444'
+    ],
+    'Purok Sambag' => [
+        'ai_risk_score' => 92,
+        'prone_category' => 'Tributary Confluence & Silt Deposition',
+        'susceptibility' => 'Critical',
+        'primary_hazard' => 'Flash Flood & Riverbank Erosion',
+        'elevation' => '3.8m',
+        'river_distance' => '60m',
+        'alert_level' => 'Red Alert',
+        'ai_recommendation' => 'Stage rescue craft and life vests; monitor tributary culvert water level.',
+        'radius' => 195,
+        'color' => '#ef4444'
+    ],
+    'Purok Baybay' => [
+        'ai_risk_score' => 90,
+        'prone_category' => 'Coastal Seawall & Surge Inundation',
+        'susceptibility' => 'Critical',
+        'primary_hazard' => 'Coastal Storm Surge & Tidal Swells',
+        'elevation' => '2.9m',
+        'river_distance' => '80m',
+        'alert_level' => 'Red Alert',
+        'ai_recommendation' => 'Pre-emptive evacuation for coastal households during gale warnings.',
+        'radius' => 195,
+        'color' => '#ef4444'
+    ],
+    'Purok San Miguel' => [
         'ai_risk_score' => 84,
         'prone_category' => 'Low-Lying Urban Catchment',
         'susceptibility' => 'High',
-        'primary_hazard' => 'River Overflow & Street Flooding',
-        'elevation' => '4.8m',
-        'river_distance' => '120m',
+        'primary_hazard' => 'Urban Flood & Strong Winds',
+        'elevation' => '4.6m',
+        'river_distance' => '110m',
         'alert_level' => 'Orange Alert',
         'ai_recommendation' => 'Stage 500 food packs and initiate voluntary relocation for vulnerable households.',
         'radius' => 190,
-        'color' => '#B78103' // var(--color-warning)
+        'color' => '#f59e0b'
     ],
-    'Purok 4A' => [
-        'ai_risk_score' => 64,
-        'prone_category' => 'Inland Runoff Sector',
+    'Purok Katipunan' => [
+        'ai_risk_score' => 82,
+        'prone_category' => 'Creek Drainage Corridor',
+        'susceptibility' => 'High',
+        'primary_hazard' => 'Flash Flood & Creek Overflow',
+        'elevation' => '4.9m',
+        'river_distance' => '130m',
+        'alert_level' => 'Orange Alert',
+        'ai_recommendation' => 'Continuous desiltation of creek channels and standby high-capacity pumps.',
+        'radius' => 185,
+        'color' => '#f59e0b'
+    ],
+    'Purok Orchids' => [
+        'ai_risk_score' => 78,
+        'prone_category' => 'Wetland Lowland Fringe',
+        'susceptibility' => 'High',
+        'primary_hazard' => 'High Inundation & Saturated Silt',
+        'elevation' => '5.1m',
+        'river_distance' => '160m',
+        'alert_level' => 'Orange Alert',
+        'ai_recommendation' => 'Preposition sandbags and clear drainage bottlenecks.',
+        'radius' => 180,
+        'color' => '#f59e0b'
+    ],
+    'Purok Ilaya' => [
+        'ai_risk_score' => 76,
+        'prone_category' => 'Upper River Swift Runoff Basin',
+        'susceptibility' => 'High',
+        'primary_hazard' => 'River Swell & Swift Current',
+        'elevation' => '5.5m',
+        'river_distance' => '140m',
+        'alert_level' => 'Orange Alert',
+        'ai_recommendation' => 'Station water rescue spotters and warn riverbank residents.',
+        'radius' => 180,
+        'color' => '#f59e0b'
+    ],
+    'Purok Mahayahay' => [
+        'ai_risk_score' => 65,
+        'prone_category' => 'Interior Residential Basin',
         'susceptibility' => 'Moderate',
-        'primary_hazard' => 'Localized Ponding',
-        'elevation' => '6.5m',
-        'river_distance' => '280m',
+        'primary_hazard' => 'Localized Ponding & Drainage Congestion',
+        'elevation' => '6.2m',
+        'river_distance' => '240m',
         'alert_level' => 'Yellow Alert',
         'ai_recommendation' => 'Keep drainage culverts clear and standby dewatering pumps.',
         'radius' => 170,
-        'color' => '#2F6F73' // var(--color-secondary)
+        'color' => '#2F6F73'
     ],
-    'Purok 6' => [
-        'ai_risk_score' => 52,
-        'prone_category' => 'Estuary Transition Sector',
+    'Purok Sto. Niño' => [
+        'ai_risk_score' => 62,
+        'prone_category' => 'Midland Residential Sector',
         'susceptibility' => 'Moderate',
-        'primary_hazard' => 'Tidal Inflow & Runoff',
-        'elevation' => '5.9m',
-        'river_distance' => '210m',
+        'primary_hazard' => 'Localized Ponding & Heavy Rainfall',
+        'elevation' => '6.8m',
+        'river_distance' => '270m',
         'alert_level' => 'Yellow Alert',
-        'ai_recommendation' => 'Monitor high-tide synchronization with river discharge.',
-        'radius' => 160,
-        'color' => '#2F6F73' // var(--color-secondary)
+        'ai_recommendation' => 'Regular maintenance of neighborhood drainage mains.',
+        'radius' => 170,
+        'color' => '#2F6F73'
     ],
-    'Purok 5B' => [
-        'ai_risk_score' => 28,
-        'prone_category' => 'Elevated Ground (Safe Zone)',
+    'Purok Centro' => [
+        'ai_risk_score' => 58,
+        'prone_category' => 'Barangay Core & Commercial Thoroughfare',
+        'susceptibility' => 'Moderate',
+        'primary_hazard' => 'Urban Flood & Street Runoff',
+        'elevation' => '7.1m',
+        'river_distance' => '300m',
+        'alert_level' => 'Yellow Alert',
+        'ai_recommendation' => 'Traffic diversion protocols during high runoff periods.',
+        'radius' => 165,
+        'color' => '#2F6F73'
+    ],
+    'Purok Kalubihan' => [
+        'ai_risk_score' => 54,
+        'prone_category' => 'Foothill Sloping Transition Sector',
+        'susceptibility' => 'Moderate',
+        'primary_hazard' => 'Slope Failure & Torrential Runoff',
+        'elevation' => '8.5m',
+        'river_distance' => '340m',
+        'alert_level' => 'Yellow Alert',
+        'ai_recommendation' => 'Monitor soil saturation levels and ground fissures.',
+        'radius' => 160,
+        'color' => '#2F6F73'
+    ],
+    'Purok Pag-asa' => [
+        'ai_risk_score' => 38,
+        'prone_category' => 'Elevated Ground (Safe Buffer Zone)',
         'susceptibility' => 'Low',
         'primary_hazard' => 'Low Hazard Zone',
-        'elevation' => '14.2m',
+        'elevation' => '11.2m',
+        'river_distance' => '420m',
+        'alert_level' => 'Normal',
+        'ai_recommendation' => 'Safe refuge sector and emergency relief staging area.',
+        'radius' => 160,
+        'color' => '#2E7D32'
+    ],
+    'Purok Mabuhay' => [
+        'ai_risk_score' => 34,
+        'prone_category' => 'Upper Commercial Flatland',
+        'susceptibility' => 'Low',
+        'primary_hazard' => 'Urban Drainage Overflow',
+        'elevation' => '12.0m',
         'river_distance' => '460m',
         'alert_level' => 'Normal',
-        'ai_recommendation' => 'Safe refuge sector and emergency relief distribution hub.',
-        'radius' => 200,
-        'color' => '#2E7D32' // var(--color-success)
+        'ai_recommendation' => 'Community logistics depot and staging post.',
+        'radius' => 155,
+        'color' => '#2E7D32'
+    ],
+    'Purok Dahlia' => [
+        'ai_risk_score' => 30,
+        'prone_category' => 'Upper Terrace Safe Zone',
+        'susceptibility' => 'Low',
+        'primary_hazard' => 'Low Risk Flatland',
+        'elevation' => '13.5m',
+        'river_distance' => '510m',
+        'alert_level' => 'Normal',
+        'ai_recommendation' => 'Designated evacuation rally point for neighboring sectors.',
+        'radius' => 150,
+        'color' => '#2E7D32'
+    ],
+    'Purok Pine Tree' => [
+        'ai_risk_score' => 25,
+        'prone_category' => 'Upland Natural Sanctuary Ridge',
+        'susceptibility' => 'Low',
+        'primary_hazard' => 'Low Hazard Zone',
+        'elevation' => '16.8m',
+        'river_distance' => '580m',
+        'alert_level' => 'Normal',
+        'ai_recommendation' => 'Optimal high-elevation sanctuary and communications relay point.',
+        'radius' => 150,
+        'color' => '#2E7D32'
     ]
 ];
 
@@ -389,13 +521,17 @@ usort($aiPurokData, fn($a, $b) => $b['ai_risk_score'] <=> $a['ai_risk_score']);
   <div class="kpi-card">
     <div class="kpi-title">Hinaplanon Population</div>
     <div class="kpi-val"><?= number_format($totalHinaplanonPop) ?></div>
-    <div class="kpi-sub"><?= number_format($totalHinaplanonHouseholds) ?> households across 5 puroks</div>
+    <div class="kpi-sub"><?= number_format($totalHinaplanonHouseholds) ?> households across <?= count($aiPurokData) ?> puroks</div>
   </div>
 
   <div class="kpi-card">
     <div class="kpi-title">Critical & High Prone Zones</div>
     <div class="kpi-val" style="color:var(--color-danger);"><?= $criticalPuroksCount + $highPuroksCount ?> Puroks</div>
-    <div class="kpi-sub">Purok 1 & Purok 3A (Mandulog delta)</div>
+    <?php 
+      $critNames = array_slice(array_column(array_filter($aiPurokData, fn($p) => ($p['susceptibility'] ?? '') === 'Critical'), 'name'), 0, 2);
+      $critLabel = !empty($critNames) ? implode(' & ', $critNames) : 'Riverside corridor';
+    ?>
+    <div class="kpi-sub"><?= htmlspecialchars($critLabel) ?> (Mandulog basin)</div>
   </div>
 
   <div class="kpi-card">
@@ -477,7 +613,7 @@ usort($aiPurokData, fn($a, $b) => $b['ai_risk_score'] <=> $a['ai_risk_score']);
   <div class="inspector-card">
     <div class="inspector-header">
       <h3>Purok Susceptibility Ranking</h3>
-      <span style="font-size:9.5px;color:var(--color-text-muted);">5 Puroks</span>
+      <span style="font-size:9.5px;color:var(--color-text-muted);"><?= count($aiPurokData) ?> Puroks</span>
     </div>
 
     <!-- Purok Selection List -->
@@ -501,14 +637,15 @@ usort($aiPurokData, fn($a, $b) => $b['ai_risk_score'] <=> $a['ai_risk_score']);
     </div>
 
     <!-- Inspector Details Box -->
+    <?php $topP = $aiPurokData[0] ?? null; ?>
     <div class="inspector-body">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-border-light);padding-bottom:8px;">
         <div>
-          <div id="inspName" style="font-size:13px;font-weight:700;color:var(--color-primary);">Purok 1</div>
-          <div id="inspCategory" style="font-size:10px;font-weight:600;color:var(--color-danger);">River Delta Inundation Corridor</div>
+          <div id="inspName" style="font-size:13px;font-weight:700;color:var(--color-primary);"><?= clean($topP['name'] ?? 'Purok Riverside 1') ?></div>
+          <div id="inspCategory" style="font-size:10px;font-weight:600;color:<?= $topP['color'] ?? 'var(--color-danger)' ?>;"><?= clean($topP['prone_category'] ?? 'Mandulog Delta Corridor') ?></div>
         </div>
-        <div id="inspScore" style="font-size:16px;font-weight:700;font-family:var(--font-secondary);color:var(--color-danger);">
-          94 <span style="font-size:9px;color:var(--color-text-muted);">SCORE</span>
+        <div id="inspScore" style="font-size:16px;font-weight:700;font-family:var(--font-secondary);color:<?= $topP['color'] ?? 'var(--color-danger)' ?>;">
+          <?= $topP['ai_risk_score'] ?? 96 ?> <span style="font-size:9px;color:var(--color-text-muted);">SCORE</span>
         </div>
       </div>
 
@@ -516,7 +653,7 @@ usort($aiPurokData, fn($a, $b) => $b['ai_risk_score'] <=> $a['ai_risk_score']);
       <div>
         <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--color-text-secondary);">
           <span>River Proximity:</span>
-          <span id="inspRiverDist" style="font-weight:600;color:var(--color-danger);">45m</span>
+          <span id="inspRiverDist" style="font-weight:600;color:var(--color-danger);"><?= clean($topP['river_distance'] ?? '35m') ?></span>
         </div>
         <div class="meter-track">
           <div class="meter-fill" id="meterRiver" style="width:96%;background:var(--color-danger);"></div>
@@ -526,7 +663,7 @@ usort($aiPurokData, fn($a, $b) => $b['ai_risk_score'] <=> $a['ai_risk_score']);
       <div>
         <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--color-text-secondary);">
           <span>Elevation:</span>
-          <span id="inspElevation" style="font-weight:600;">3.2m</span>
+          <span id="inspElevation" style="font-weight:600;"><?= clean($topP['elevation'] ?? '3.1m') ?></span>
         </div>
         <div class="meter-track">
           <div class="meter-fill" id="meterElevation" style="width:85%;background:var(--color-warning);"></div>
@@ -536,7 +673,7 @@ usort($aiPurokData, fn($a, $b) => $b['ai_risk_score'] <=> $a['ai_risk_score']);
       <div>
         <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--color-text-secondary);">
           <span>Population:</span>
-          <span id="inspPop" style="font-weight:600;">2,050 (450 households)</span>
+          <span id="inspPop" style="font-weight:600;"><?= number_format($topP['population'] ?? 2050) ?> (<?= number_format($topP['households'] ?? 450) ?> households)</span>
         </div>
         <div class="meter-track">
           <div class="meter-fill" id="meterPop" style="width:75%;background:var(--color-secondary);"></div>
@@ -549,7 +686,7 @@ usort($aiPurokData, fn($a, $b) => $b['ai_risk_score'] <=> $a['ai_risk_score']);
           Action Recommendation
         </div>
         <div id="inspRecommendation" style="font-size:10.5px;color:var(--color-text);line-height:1.4;">
-          Early evacuation trigger at 1.8m river stage; pre-position watercraft at Sector 1-A.
+          <?= clean($topP['ai_recommendation'] ?? 'Early evacuation trigger upon Red Warning.') ?>
         </div>
       </div>
 

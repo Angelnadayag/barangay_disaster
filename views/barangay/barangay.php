@@ -233,7 +233,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     </div>
     <form id="editBarangayForm" method="POST" action="<?= BASE_URL ?>/backend/functions/barangays/update.php">
       <input type="hidden" name="action" value="update">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="id" value="<?= (int)$barangay['id'] ?>">
       <input type="hidden" name="name" value="<?= clean($barangay['name']) ?>">
       <div class="modal-body" style="padding:18px 20px;display:flex;flex-direction:column;gap:12px;max-height:75vh;overflow-y:auto;">

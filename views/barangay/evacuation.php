@@ -397,7 +397,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <form id="createEvacForm" method="POST" action="<?= BASE_URL ?>/backend/functions/evacuation/create.php">
       <input type="hidden" name="action" value="create">
       <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
 
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;max-height:75vh;overflow-y:auto;padding:18px 20px;">
         <!-- Basic Info -->
@@ -535,7 +535,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <form id="editEvacForm" method="POST" action="<?= BASE_URL ?>/backend/functions/evacuation/update.php">
       <input type="hidden" name="action" value="update">
       <input type="hidden" name="id" id="edit_id">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
 
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;max-height:75vh;overflow-y:auto;padding:18px 20px;">
         <!-- Basic Info -->
@@ -679,7 +679,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <form id="updateOccupancyForm" method="POST" action="<?= BASE_URL ?>/backend/functions/evacuation/update_status.php">
       <input type="hidden" name="action" value="update_status">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="center_id" id="occupancy_center_id">
       
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;padding:18px 20px;">
@@ -729,7 +729,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <form id="deleteEvacForm" method="POST" action="<?= BASE_URL ?>/backend/functions/evacuation/delete.php">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" name="id" id="delete_center_id">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
 
       <div class="modal-body" style="padding:18px 20px;">
         <p style="font-size:12px;color:var(--color-text);line-height:1.5;margin:0;">

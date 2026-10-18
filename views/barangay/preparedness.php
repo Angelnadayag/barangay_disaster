@@ -506,7 +506,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <form id="createActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/create.php">
       <input type="hidden" name="action" value="create">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
 
       <div class="modal-body">
@@ -654,7 +654,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <form id="editActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/update.php">
       <input type="hidden" name="action" value="update">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="activity_id" id="edit_act_id">
 
       <div class="modal-body">
@@ -1045,7 +1045,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <form id="archiveActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/index.php">
       <input type="hidden" name="action" value="archive">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="activity_id" id="archive_act_id">
       <div class="modal-body">
         <p style="font-size:12.5px;color:var(--color-text);line-height:1.5;">
@@ -1119,7 +1119,7 @@ require_once __DIR__ . '/../layouts/header.php';
 
     <form id="evaluateForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/evaluate.php">
       <input type="hidden" name="action" value="evaluate">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="activity_id" id="evalActId">
       <input type="hidden" name="expected_activities" id="evalExpectedActivitiesJson">
       <input type="hidden" name="has_attendee_roster" value="1">
@@ -1296,7 +1296,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <form id="cancelActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/cancel.php"
       onsubmit="return validateCancellationForm();">
       <input type="hidden" name="action" value="cancel">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="activity_id" id="cancel_act_id">
       <div class="modal-body" style="padding:16px 20px;">
         <!-- Alert Banner -->
@@ -1388,7 +1388,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <form id="registerResidentForm" method="POST"
       action="<?= BASE_URL ?>/backend/functions/activities/register_resident.php">
       <input type="hidden" name="action" value="register_resident">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="activity_id" id="reg_act_id">
       <input type="hidden" name="user_id" id="reg_user_id">
 
@@ -2413,7 +2413,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <form method="POST" action="<?= BASE_URL ?>/backend/functions/activities/index.php" style="margin:0;" onsubmit="return confirm('Restore this event back to active events?');">
         <input type="hidden" name="action" value="restore">
         <input type="hidden" name="activity_id" value="${act.id}">
-        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
         <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 9px;color:var(--color-success);border-color:var(--color-success);" title="Restore Event to Active List">
           Restore to Active
         </button>
