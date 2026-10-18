@@ -38,20 +38,17 @@ $pageTitle = "Tactical Hazard Map — Field Ops";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1>Tactical Operations & Hazard Map</h1>
-      <p class="page-header-desc">
-        Field situational overview showing active deployment zones, high-risk riverine corridors, and open evacuation staging areas.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Tactical Operations &amp; Hazard Map</h1>
     </div>
     <div class="page-header-actions">
-      <span class="badge badge-danger" style="display:inline-flex;align-items:center;gap:6px;">
-        <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;animation:pulse 2s infinite;"></span>
-        <?= count($incidents) ?> Active Incident Sectors
+      <span class="badge badge-danger" style="display:inline-flex;align-items:center;gap:6px;font-size:9.5px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+        <?= count($incidents) ?> Active Sectors
       </span>
-      <button class="btn btn-secondary btn-sm" onclick="locateResponder()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      <button class="btn btn-secondary btn-sm" onclick="locateResponder()" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
         Center My Unit
       </button>
     </div>

@@ -320,16 +320,13 @@ require_once __DIR__ . '/../layouts/header.php';
 </style>
 
   <!-- Page Header -->
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1>Tactical Evacuation Routing & Camps</h1>
-      <p class="page-header-desc">
-        Field convoy routing, road passability tracking, and real-time camp headcount management.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Tactical Evacuation Routing &amp; Camps</h1>
     </div>
     <div class="page-header-actions">
-      <button type="button" class="btn btn-secondary btn-sm" onclick="locateResponderGPS()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="locateResponderGPS()" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         Field GPS
       </button>
     </div>

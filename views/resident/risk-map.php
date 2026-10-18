@@ -39,16 +39,13 @@ $pageTitle = "Community Hazard & Shelter Map";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1>Community Hazard & Evacuation Map</h1>
-      <p class="page-header-desc">
-        Explore safe evacuation routes, avoid low-lying flood inundation areas, and find nearest active municipal shelters.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Community Hazard &amp; Evacuation Map</h1>
     </div>
     <div class="page-header-actions">
-      <button class="btn btn-primary btn-sm" onclick="findNearestShelter()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      <button class="btn btn-primary btn-sm" onclick="findNearestShelter()" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
         Locate Nearest Shelter
       </button>
     </div>

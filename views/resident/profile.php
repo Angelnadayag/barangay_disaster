@@ -44,16 +44,13 @@ $pageTitle = "Household Profile & Preparedness Tracker";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;">
     <div class="page-header-title-wrap">
-      <h1>Household Profile & Disaster Readiness</h1>
-      <p class="page-header-desc">
-        Manage your family emergency registration details, track your household 72-hour survival kit, and update credentials.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Household Profile &amp; Settings</h1>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:var(--space-4);align-items:start;">
+  <div class="responsive-split-grid split-50-50">
     <!-- Left Column: Household Details & Security -->
     <div style="display:flex;flex-direction:column;gap:var(--space-4);">
       <!-- Citizen Card -->

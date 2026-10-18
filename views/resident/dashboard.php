@@ -74,229 +74,192 @@ $pageTitle = "Community Safety Dashboard";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header" style="margin-bottom:12px;padding-bottom:8px;">
+  <!-- Page Header -->
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0 0 2px 0;">Barangay <?= clean($barangay['name'] ?? 'Local') ?> Resident Portal</h1>
-      <p class="page-header-desc" style="font-size:10.5px;margin:0;">
-        Real-time community safety advisories, evacuation center vacancies, and emergency assistance channels.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?> Resident Dashboard</h1>
     </div>
     <div class="page-header-actions">
-      <span class="badge badge-<?= ($barangay['risk_level'] ?? '') === 'Critical' ? 'danger' : 'warning' ?>" style="font-size:9.5px;">
-        <?= clean($barangay['risk_level'] ?? 'Moderate') ?> Risk Sector
-      </span>
-      <a href="evacuation.php" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-        Find Evacuation Centers
+      <a href="evacuation.php" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Evacuation Routing
       </a>
     </div>
   </div>
 
-  <!-- Citizen Alert Banner if High Risk or Active Weather -->
-  <div style="background:var(--color-surface);border-left:4px solid var(--color-warning);border-radius:var(--radius-primary, 10px);padding:12px 14px;margin-bottom:var(--space-3);box-shadow:var(--shadow-subtle);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <div style="width:32px;height:32px;border-radius:50%;background:#fef3c7;display:flex;align-items:center;justify-content:center;color:#d97706;flex-shrink:0;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <!-- Concise Status Banner (Only if Elevated Risk) -->
+  <?php if (($barangay['risk_level'] ?? '') === 'Critical' || ($barangay['risk_level'] ?? '') === 'High'): ?>
+    <div style="background:#FFF;border-left:4px solid #ef4444;border-radius:var(--radius-primary, 10px);padding:9px 12px;margin-bottom:var(--space-3);border:1px solid var(--color-border);display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--color-primary);">
+        <span style="color:#ef4444;">⚠️</span>
+        <span>High Inundation Risk Sector — Monitor Evacuation Alerts</span>
       </div>
-      <div>
-        <div style="font-weight:600;font-size:13.5px;color:var(--color-text);">Mandigan River Basin Alert: Code Orange (Heightened Vigilance)</div>
-        <div style="font-size:10.5px;color:var(--color-text-secondary);margin-top:2px;">Residents near riverbanks and low-lying puroks should secure essential documents and prepare 72-hour family go-bags.</div>
-      </div>
+      <a href="risk-map.php" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 9px;">Map View</a>
     </div>
-    <a href="risk-map.php" class="btn btn-secondary btn-sm" style="font-size:11px;padding:6px 12px;">View Elevation Map</a>
-  </div>
+  <?php endif; ?>
 
-  <!-- Summary Cards -->
-  <div class="metrics-grid" style="margin-bottom:var(--space-4);">
+  <!-- Summary Metric Cards (Clean Label & Value Only) -->
+  <div class="metrics-grid" style="margin-bottom:var(--space-3);">
     <div class="metric-card">
-      <div class="metric-label">Barangay Jurisdiction</div>
-      <div class="metric-value" style="font-size:15px;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?></div>
-      <div class="metric-trend text-muted">Population: <?= number_format($barangay['population'] ?? 15000) ?></div>
+      <div class="metric-label">My Barangay</div>
+      <div class="metric-value" style="font-size:14.5px;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?></div>
     </div>
 
     <div class="metric-card">
-      <div class="metric-label">Designated Evacuation Centers</div>
-      <div class="metric-value" style="font-size:16px;"><?= count($localEvacs) ?></div>
-      <div class="metric-trend text-success">Verified Municipal Shelters</div>
+      <div class="metric-label">Open Shelters</div>
+      <div class="metric-value" style="font-size:15px;"><?= count($localEvacs) ?> Verified</div>
     </div>
 
     <div class="metric-card">
-      <div class="metric-label">Active Public Bulletins</div>
-      <div class="metric-value" style="font-size:16px;"><?= count($recentAdvisories) ?></div>
-      <div class="metric-trend text-primary">Issued by ICDRRMO Central</div>
+      <div class="metric-label">Active Advisories</div>
+      <div class="metric-value" style="font-size:15px;"><?= count($recentAdvisories) ?> Bulletins</div>
     </div>
 
     <div class="metric-card">
       <div class="metric-label">Emergency Call Direct</div>
-      <div class="metric-value" style="color:var(--color-danger);font-size:16px;">161</div>
-      <div class="metric-trend text-danger">Toll-Free 24/7 Hotline</div>
+      <div class="metric-value" style="color:var(--color-danger);font-size:15px;">161 (ICDRRMO)</div>
     </div>
   </div>
 
-  <!-- Main Content Grid -->
+  <!-- Main Content Split -->
   <div class="responsive-split-grid split-60-40">
     <!-- Left Column: Safe Shelters & Public Advisories -->
-    <div style="display:flex;flex-direction:column;gap:var(--space-4);">
-      <!-- Evacuation Centers Available -->
+    <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+
+      <!-- Evacuation Centers Available (Mobile-Optimized Clean Cards) -->
       <div class="card" style="margin-bottom:0;">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <h2 class="card-title">Nearest Designated Evacuation Shelters</h2>
-          <a href="evacuation.php" style="font-size:11px;color:var(--color-primary);font-weight:600;">View Directory &rarr;</a>
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Designated Evacuation Shelters</h2>
+          <a href="evacuation.php" style="font-size:11px;color:var(--color-secondary);font-weight:600;">View All &rarr;</a>
         </div>
-        <div class="card-body" style="padding:0;">
+        <div class="card-body" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
           <?php if (empty($localEvacs)): ?>
-            <div style="padding:24px;text-align:center;color:var(--color-text-muted);font-size:12px;">
+            <div style="padding:16px;text-align:center;color:var(--color-text-muted);font-size:10.5px;">
               No open evacuation shelters currently registered for this barangay.
             </div>
           <?php else: ?>
-            <div class="table-responsive">
-              <table class="table" style="font-size:12px;margin-bottom:0;">
-                <thead>
-                  <tr>
-                    <th>Facility Name</th>
-                    <th>Status</th>
-                    <th>Current Occupancy</th>
-                    <th>Key Facilities</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($localEvacs as $ev): 
-                    $pct = $ev['capacity'] > 0 ? round(($ev['current_evacuees'] / $ev['capacity']) * 100) : 0;
-                  ?>
-                    <tr>
-                      <td>
-                        <strong><?= clean($ev['name']) ?></strong>
-                        <div style="font-size:10px;color:var(--color-text-muted);">
-                          <?= clean($ev['barangay_name'] ?? $barangay['name']) ?>
-                        </div>
-                      </td>
-                      <td><?= renderStatusBadge($ev['status']) ?></td>
-                      <td>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                          <div style="flex:1;background:var(--color-border);height:6px;border-radius:3px;overflow:hidden;min-width:60px;">
-                            <div style="width:<?= $pct ?>%;height:100%;background:<?= $pct >= 90 ? 'var(--color-danger)' : 'var(--color-success)' ?>;"></div>
-                          </div>
-                          <span style="font-size:11px;font-weight:600;"><?= $pct ?>%</span>
-                        </div>
-                        <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">
-                          <?= number_format($ev['current_evacuees']) ?> of <?= number_format($ev['capacity']) ?> slots
-                        </div>
-                      </td>
-                      <td>
-                        <div style="display:flex;gap:4px;flex-wrap:wrap;font-size:10px;">
-                          <span class="badge <?= $ev['has_power'] ? 'badge-success' : 'badge-neutral' ?>">Power</span>
-                          <span class="badge <?= $ev['has_water'] ? 'badge-success' : 'badge-neutral' ?>">Water</span>
-                          <span class="badge <?= $ev['has_medical'] ? 'badge-success' : 'badge-neutral' ?>">Med Station</span>
-                        </div>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
+            <?php foreach ($localEvacs as $ev): 
+              $cap = (int)$ev['capacity'];
+              $cur = (int)$ev['current_evacuees'];
+              $pct = $cap > 0 ? round(($cur / $cap) * 100) : 0;
+              $barCol = $pct >= 90 ? 'var(--color-danger)' : ($pct >= 75 ? 'var(--color-warning)' : 'var(--color-success)');
+              $remaining = max(0, $cap - $cur);
+            ?>
+              <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:6px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:170px;">
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <strong style="font-size:12px;color:var(--color-primary);"><?= clean($ev['name']) ?></strong>
+                    <?= renderStatusBadge($ev['status']) ?>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                    <div style="flex:1;max-width:130px;background:#D9E0E3;height:5px;border-radius:3px;overflow:hidden;">
+                      <div style="width:<?= $pct ?>%;height:100%;background:<?= $barCol ?>;"></div>
+                    </div>
+                    <span style="font-size:10px;color:var(--color-text-secondary);font-weight:600;">
+                      <?= $pct ?>% (<?= number_format($remaining) ?> slots available)
+                    </span>
+                  </div>
+                </div>
+                <a href="evacuation.php" class="btn btn-outline btn-sm" style="font-size:10.5px;padding:4px 10px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                  Route
+                </a>
+              </div>
+            <?php endforeach; ?>
           <?php endif; ?>
         </div>
       </div>
 
       <!-- Public Safety Advisories -->
       <div class="card" style="margin-bottom:0;">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <h2 class="card-title">Official Bulletins & Weather Warnings</h2>
-          <a href="notifications.php" style="font-size:11px;color:var(--color-primary);font-weight:600;">All Advisories &rarr;</a>
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Official Bulletins</h2>
+          <a href="notifications.php" style="font-size:11px;color:var(--color-secondary);font-weight:600;">All Bulletins &rarr;</a>
         </div>
         <div class="card-body" style="padding:0;">
           <?php if (empty($recentAdvisories)): ?>
-            <div style="padding:24px;text-align:center;color:var(--color-text-muted);font-size:12px;">
+            <div style="padding:16px;text-align:center;color:var(--color-text-muted);font-size:10.5px;">
               No new public advisories at this time.
             </div>
           <?php else: ?>
             <div class="list-group">
               <?php foreach ($recentAdvisories as $adv): ?>
-                <div style="padding:14px 18px;border-bottom:1px solid var(--color-border);">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                    <div style="display:flex;align-items:center;gap:6px;">
-                      <?= renderStatusBadge($adv['alert_level']) ?>
-                      <strong style="font-size:12px;color:var(--color-text);"><?= clean($adv['title']) ?></strong>
-                    </div>
-                    <span style="font-size:10px;color:var(--color-text-muted);"><?= timeAgo($adv['created_at']) ?></span>
+                <div style="padding:10px 14px;border-bottom:1px solid var(--color-border-light);display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
+                    <?= renderStatusBadge($adv['alert_level']) ?>
+                    <span style="font-size:11px;font-weight:600;color:var(--color-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                      <?= clean($adv['title']) ?>
+                    </span>
                   </div>
-                  <div style="font-size:11px;color:var(--color-text-muted);line-height:1.4;">
-                    <?= nl2br(clean($adv['message'])) ?>
-                  </div>
+                  <span style="font-size:9.5px;color:var(--color-text-muted);white-space:nowrap;">
+                    <?= timeAgo($adv['created_at']) ?>
+                  </span>
                 </div>
               <?php endforeach; ?>
             </div>
           <?php endif; ?>
         </div>
       </div>
+
     </div>
 
-    <!-- Right Column: Emergency Helplines & Go-Bag Readiness -->
-    <div style="display:flex;flex-direction:column;gap:var(--space-4);">
+    <!-- Right Column: Emergency Contacts & Quick Navigation -->
+    <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+
       <!-- Direct Emergency Directory -->
       <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <h2 class="card-title">Emergency Contact Directory</h2>
+        <div class="card-header" style="padding:10px 14px;">
+          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Emergency Hotlines</h2>
         </div>
         <div class="card-body" style="padding:0;">
-          <table class="table" style="font-size:11px;margin-bottom:0;">
+          <table class="table" style="font-size:10.5px;margin-bottom:0;">
             <tbody>
               <tr>
-                <td><strong>ICDRRMO Command Center</strong></td>
-                <td style="text-align:right;"><a href="tel:161" style="font-weight:700;color:var(--color-danger);">161 / (063) 221-1234</a></td>
+                <td style="padding:9px 14px;"><strong>ICDRRMO Command Center</strong></td>
+                <td style="padding:9px 14px;text-align:right;">
+                  <a href="tel:161" style="font-weight:700;color:var(--color-danger);">161 / (063) 221-1234</a>
+                </td>
               </tr>
               <tr>
-                <td><strong>Brgy. <?= clean($barangay['name'] ?? 'Local') ?> Emergency Desk</strong></td>
-                <td style="text-align:right;"><a href="tel:<?= clean($barangay['contact_number'] ?? '09170001111') ?>" style="font-weight:600;color:var(--color-primary);"><?= clean($barangay['contact_number'] ?? '(063) 223-9000') ?></a></td>
+                <td style="padding:9px 14px;"><strong>Brgy. Emergency Desk</strong></td>
+                <td style="padding:9px 14px;text-align:right;">
+                  <a href="tel:<?= clean($barangay['contact_number'] ?? '09170001111') ?>" style="font-weight:600;color:var(--color-primary);">
+                    <?= clean($barangay['contact_number'] ?? '(063) 223-9000') ?>
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:9px 14px;"><strong>National Emergency Hotline</strong></td>
+                <td style="padding:9px 14px;text-align:right;">
+                  <a href="tel:911" style="font-weight:700;color:var(--color-danger);">911</a>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- 72-Hour Survival Go-Bag Checklist -->
+      <!-- Quick Portals -->
       <div class="card" style="margin-bottom:0;">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <h2 class="card-title">Family 72-Hour Go-Bag</h2>
-          <span class="badge badge-success">Preparedness Guide</span>
+        <div class="card-header" style="padding:10px 14px;">
+          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Community Safety Links</h2>
         </div>
-        <div class="card-body" style="font-size:11px;">
-          <p style="color:var(--color-text-muted);margin-bottom:12px;line-height:1.4;">
-            Every household should maintain a packed emergency kit ready to grab upon evacuation notice:
-          </p>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="color:var(--color-success);font-weight:bold;">✓</span>
-              <span><strong>Drinking Water:</strong> 1 gallon per person per day (3-day supply)</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="color:var(--color-success);font-weight:bold;">✓</span>
-              <span><strong>Ready-to-eat Canned Goods:</strong> High calorie, non-perishable</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="color:var(--color-success);font-weight:bold;">✓</span>
-              <span><strong>First Aid & Prescription Meds:</strong> Antiseptics, bandages, maintenance</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="color:var(--color-success);font-weight:bold;">✓</span>
-              <span><strong>Flashlight & Portable AM Radio:</strong> Extra AA batteries</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="color:var(--color-success);font-weight:bold;">✓</span>
-              <span><strong>Waterproof Document Pouch:</strong> IDs, birth certificates, deeds</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="color:var(--color-success);font-weight:bold;">✓</span>
-              <span><strong>Emergency Whistle & Power Bank:</strong> Fully charged for cell phone</span>
-            </div>
-          </div>
-          <div style="margin-top:14px;border-top:1px solid var(--color-border);padding-top:10px;">
-            <a href="events.php" class="btn btn-secondary btn-sm" style="width:100%;text-align:center;">
-              View Community Drills & Schedules
-            </a>
-          </div>
+        <div class="card-body" style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;">
+          <a href="evacuation.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+            <span>Evacuation Centers &amp; Route Map</span>
+            <span>&rarr;</span>
+          </a>
+          <a href="events.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+            <span>Preparedness Events &amp; Drills</span>
+            <span>&rarr;</span>
+          </a>
+          <a href="risk-map.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+            <span>Flood Risk &amp; Hazard Map</span>
+            <span>&rarr;</span>
+          </a>
         </div>
       </div>
+
     </div>
   </div>
 

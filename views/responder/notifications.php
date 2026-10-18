@@ -42,16 +42,13 @@ $pageTitle = "Field Alerts & Dispatches";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1>Operational Alerts & Dispatch Advisories</h1>
-      <p class="page-header-desc">
-        Real-time priority bulletins from Central ICDRRMO, rapid weather shifts, and incident dispatch orders.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Operational Alerts &amp; Dispatch Advisories</h1>
     </div>
     <div class="page-header-actions">
-      <button class="btn btn-secondary btn-sm" onclick="markAllResponderRead()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>
+      <button class="btn btn-secondary btn-sm" onclick="markAllResponderRead()" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
         Acknowledge All
       </button>
     </div>

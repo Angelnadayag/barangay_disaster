@@ -52,12 +52,9 @@ $pageTitle = "Responder Field Dashboard";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header" style="margin-bottom:12px;padding-bottom:8px;">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0 0 2px 0;">Tactical Field Operations Dashboard</h1>
-      <p class="page-header-desc" style="font-size:10.5px;margin:0;">
-        Real-time responder dispatch situational status, priority incident alerts, and safe evacuation logistics.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Tactical Field Operations Dashboard</h1>
     </div>
     <div class="page-header-actions">
       <a href="active-incidents.php" class="btn btn-secondary btn-sm" style="font-size:11px;padding:6px 12px;">Active Incidents</a>
@@ -111,11 +108,8 @@ require_once __DIR__ . '/../layouts/header.php';
   <div class="responsive-split-grid split-50-50">
     <!-- Active Disasters Awaiting Support -->
     <div class="card" style="margin-bottom:0;">
-      <div class="card-header">
-        <div>
-          <h3 class="card-title">Priority Incident Dispatches</h3>
-          <div class="card-subtitle">Active disaster requests requiring on-ground responder presence</div>
-        </div>
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+        <h3 class="card-title" style="margin:0;">Priority Incident Dispatches</h3>
         <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="btn btn-outline btn-sm">All Incidents</a>
       </div>
       <div class="table-responsive">
@@ -160,11 +154,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
     <!-- Evacuation Centers Available -->
     <div class="card" style="margin-bottom:0;">
-      <div class="card-header">
-        <div>
-          <h3 class="card-title">Evacuation Shelters Vacancy Status</h3>
-          <div class="card-subtitle">Live occupancy and road clearance for rescue logistics routing</div>
-        </div>
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+        <h3 class="card-title" style="margin:0;">Evacuation Shelters Vacancy Status</h3>
         <a href="<?= BASE_URL ?>/views/responder/evacuation.php" class="btn btn-outline btn-sm">View All</a>
       </div>
       <div class="table-responsive">

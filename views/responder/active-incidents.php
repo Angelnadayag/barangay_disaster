@@ -45,15 +45,12 @@ $pageTitle = "Active Incidents Dispatch";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1>Active Incidents Dispatch Directory</h1>
-      <p class="page-header-desc">
-        Field situational overview of all reported disaster incidents across Iligan City barangays requiring rescue and resource deployment.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Active Incidents Dispatch Directory</h1>
     </div>
     <div class="page-header-actions">
-      <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="btn btn-outline">
+      <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="btn btn-outline btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon></svg>
         Tactical Map View
       </a>

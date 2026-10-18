@@ -445,15 +445,12 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 </style>
   <!-- Page Header -->
-  <div class="page-header" style="margin-bottom:12px;padding-bottom:8px;">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0 0 2px 0;">Evacuation Routing &amp; Safe Shelters</h1>
-      <p class="page-header-desc" style="font-size:10.5px;margin:0;">
-        Real-time capacity tracking, backup utilities, and instant GPS evacuation routing to designated safe shelters.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Evacuation Routing &amp; Safe Shelters</h1>
     </div>
     <div class="page-header-actions">
-      <button type="button" class="btn btn-secondary btn-sm" onclick="locateUserGPS()" style="font-size:11px;padding:6px 12px;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="locateUserGPS()" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         Update My GPS
       </button>
@@ -467,7 +464,6 @@ require_once __DIR__ . '/../layouts/header.php';
         <span class="gps-status-dot" id="gpsIndicatorDot"></span>
         <span id="gpsStatusText">Location: Brgy. <?= clean($residentBarangay['name']) ?> Area</span>
       </div>
-      <span style="font-size:10px;color:var(--color-text-muted);" id="gpsDistanceHint">Distances calculated live</span>
     </div>
 
     <!-- Mobile View Switcher (List vs Map) -->

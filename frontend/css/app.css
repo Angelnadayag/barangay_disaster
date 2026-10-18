@@ -2348,8 +2348,6 @@ body.citizen-responder-shell h6 {
 
 /* Body text, descriptions, details: strictly 9px to 11px */
 body.citizen-responder-shell p,
-body.citizen-responder-shell .page-header-desc,
-body.citizen-responder-shell .card-subtitle,
 body.citizen-responder-shell .desc,
 body.citizen-responder-shell .meta-text,
 body.citizen-responder-shell .protocol-item,
@@ -2358,6 +2356,12 @@ body.citizen-responder-shell .list-group-item,
 body.citizen-responder-shell .alert-body {
   font-size: 10.5px !important;
   line-height: 1.48 !important;
+}
+
+/* Hide verbose statements & subtitles completely in citizen/responder views */
+body.citizen-responder-shell .page-header-desc,
+body.citizen-responder-shell .card-subtitle {
+  display: none !important;
 }
 
 /* Form controls, inputs, buttons: 11px */

@@ -18,6 +18,20 @@ function formatDate($datetime, $format = 'M d, Y h:i A') {
 }
 }
 
+if (!function_exists('timeAgo')) {
+function timeAgo($datetime) {
+    if (!$datetime || $datetime === '0000-00-00 00:00:00') return '—';
+    $time = strtotime($datetime);
+    if (!$time) return '—';
+    $diff = time() - $time;
+    if ($diff < 60) return 'Just now';
+    if ($diff < 3600) return floor($diff / 60) . 'm ago';
+    if ($diff < 86400) return floor($diff / 3600) . 'h ago';
+    if ($diff < 604800) return floor($diff / 86400) . 'd ago';
+    return date('M d', $time);
+}
+}
+
 // Sanitize string
 if (!function_exists('clean')) {
 function clean($str) {
