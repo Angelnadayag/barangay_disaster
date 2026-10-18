@@ -229,6 +229,18 @@ try {
             }
         }
 
+        // Table: hazard_type_options (Multi-purok hazard scoping)
+        if (in_array('hazard_type_options', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'hazard_type_options', 'purok_id')) {
+                echo "  [+] Adding column `purok_id` to `hazard_type_options`...\n";
+                $pdo->exec("ALTER TABLE `hazard_type_options` ADD COLUMN `purok_id` int(11) DEFAULT NULL AFTER `id`;");
+            }
+            if (!$hasColumn($pdo, 'hazard_type_options', 'barangay_id')) {
+                echo "  [+] Adding column `barangay_id` to `hazard_type_options`...\n";
+                $pdo->exec("ALTER TABLE `hazard_type_options` ADD COLUMN `barangay_id` int(11) DEFAULT NULL AFTER `purok_id`;");
+            }
+        }
+
         // Table: resources (Support custom dynamic categories and supplier_id relationship)
         if (in_array('resources', $existingTables, true)) {
             try {

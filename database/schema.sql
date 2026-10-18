@@ -191,11 +191,16 @@ DROP TABLE IF EXISTS `hazard_type_options`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `hazard_type_options` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `purok_id` int(11) DEFAULT NULL,
+  `barangay_id` int(11) DEFAULT NULL,
   `name` varchar(150) NOT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  KEY `fk_hazard_type_barangay` (`barangay_id`),
+  KEY `idx_purok_hazard` (`purok_id`,`barangay_id`),
+  CONSTRAINT `fk_hazard_type_barangay` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_hazard_type_purok` FOREIGN KEY (`purok_id`) REFERENCES `puroks` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `notification_reads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

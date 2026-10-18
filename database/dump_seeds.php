@@ -4,18 +4,18 @@ require_once __DIR__ . '/../backend/database/Connection.php';
 
 $pdo = getDBConnection();
 $tables = [
-    'agencies',
     'barangays',
+    'puroks',
     'purok_cluster_options',
     'hazard_type_options',
+    'users',
+    'residents',
+    'agencies',
     'resource_categories',
     'resource_brands',
     'resource_suppliers',
     'resources',
     'agency_resources',
-    'users',
-    'residents',
-    'puroks',
     'evacuation_areas',
     'evacuation_center_resources',
     'disaster_reports',

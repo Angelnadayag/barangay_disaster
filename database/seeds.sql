@@ -8,58 +8,6 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-TRUNCATE TABLE `agencies`;
-LOCK TABLES `agencies` WRITE;
-/*!40000 ALTER TABLE `agencies` DISABLE KEYS */;
-INSERT INTO `agencies` (`id`, `name`, `agency_type`, `barangay_id`, `contact_person`, `contact_number`, `email`, `office_address`, `coordinates_lat`, `coordinates_lng`, `status`, `created_at`) VALUES 
-(1,'Iligan City Disaster Risk Reduction & Management Office (ICDRRMO)','ICDRRMO',NULL,'Engr. Armando Castillo (Head of Operations)','161 / (063) 221-1234','operations@icdrrmo.iligan.gov.ph','City Hall Complex, Buhanginan Hill, Pala-o, Iligan City',8.225892,124.251818,'active','2026-10-03 22:46:32'),
-(2,'BDRRMC - Abuno','BDRRMC',1,'Hon. Rolando Cañete','+63 917 111 0001','bdrrmc.abuno@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Abuno, Iligan City',8.184697,124.256959,'active','2026-10-03 22:46:32'),
-(3,'BDRRMC - Acmac-Mariano Badelles Sr.','BDRRMC',2,'Hon. Vicente Badelles','+63 917 111 0002','bdrrmc.acmacmarianobadellessr@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Acmac-Mariano Badelles Sr., Iligan City',8.279906,124.274134,'active','2026-10-03 22:46:32'),
-(4,'BDRRMC - Bagong Silang','BDRRMC',3,'Hon. Maria Teresa Lim','+63 917 111 0003','bdrrmc.bagongsilang@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Bagong Silang, Iligan City',8.241626,124.251969,'active','2026-10-03 22:46:32'),
-(5,'BDRRMC - Bonbonon','BDRRMC',4,'Hon. Mario Macarambon','+63 917 111 0004','bdrrmc.bonbonon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Bonbonon, Iligan City',8.267662,124.290299,'active','2026-10-03 22:46:32'),
-(6,'BDRRMC - Bunawan','BDRRMC',5,'Hon. Nestor Quijano','+63 917 111 0005','bdrrmc.bunawan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Bunawan, Iligan City',8.303333,124.303922,'active','2026-10-03 22:46:32'),
-(7,'BDRRMC - Buru-un','BDRRMC',6,'Hon. Salvador Mendoza','+63 917 111 0006','bdrrmc.buruun@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Buru-un, Iligan City',8.188072,124.172216,'active','2026-10-03 22:46:32'),
-(8,'BDRRMC - Dalipuga','BDRRMC',7,'Hon. Roberto Echavez','+63 917 111 0007','bdrrmc.dalipuga@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Dalipuga, Iligan City',8.305960,124.258587,'active','2026-10-03 22:46:32'),
-(9,'BDRRMC - Del Carmen','BDRRMC',8,'Hon. Carmen Valderrama','+63 917 111 0008','bdrrmc.delcarmen@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Del Carmen, Iligan City',8.232228,124.258058,'active','2026-10-03 22:46:32'),
-(10,'BDRRMC - Digkilaan','BDRRMC',9,'Hon. Arsenio Balgos','+63 917 111 0009','bdrrmc.digkilaan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Digkilaan, Iligan City',8.313922,124.372466,'active','2026-10-03 22:46:32'),
-(11,'BDRRMC - Ditucalan','BDRRMC',10,'Hon. Eduardo Ramos','+63 917 111 0010','bdrrmc.ditucalan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Ditucalan, Iligan City',8.176033,124.192768,'active','2026-10-03 22:46:32'),
-(12,'BDRRMC - Dulag','BDRRMC',11,'Hon. Teodoro Maglangit','+63 917 111 0011','bdrrmc.dulag@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Dulag, Iligan City',8.205348,124.368826,'active','2026-10-03 22:46:32'),
-(13,'BDRRMC - Hinaplanon','BDRRMC',12,'Hon. Rodrigo Almonte','+63 917 234 5678','bdrrmc.hinaplanon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Hinaplanon, Iligan City',8.246596,124.259474,'active','2026-10-03 22:46:32'),
-(14,'BDRRMC - Hindang','BDRRMC',13,'Hon. Alejandro Gomez','+63 917 111 0013','bdrrmc.hindang@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Hindang, Iligan City',8.303563,124.353225,'active','2026-10-03 22:46:32'),
-(15,'BDRRMC - Kabacsanan','BDRRMC',14,'Hon. Bonifacio Capistrano','+63 917 111 0014','bdrrmc.kabacsanan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Kabacsanan, Iligan City',8.281250,124.308865,'active','2026-10-03 22:46:32'),
-(16,'BDRRMC - Kalilangan','BDRRMC',15,'Hon. Datu Ali Marohom','+63 917 111 0015','bdrrmc.kalilangan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Kalilangan, Iligan City',8.154576,124.391046,'active','2026-10-03 22:46:32'),
-(17,'BDRRMC - Kiwalan','BDRRMC',16,'Hon. Felipe Tan','+63 917 111 0016','bdrrmc.kiwalan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Kiwalan, Iligan City',8.281893,124.266195,'active','2026-10-03 22:46:32'),
-(18,'BDRRMC - Lanipao','BDRRMC',17,'Hon. Bernardo Silvosa','+63 917 111 0017','bdrrmc.lanipao@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Lanipao, Iligan City',8.227227,124.340547,'active','2026-10-03 22:46:32'),
-(19,'BDRRMC - Luinab','BDRRMC',18,'Hon. Jaime Fernandez','+63 917 111 0018','bdrrmc.luinab@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Luinab, Iligan City',8.247049,124.267966,'active','2026-10-03 22:46:32'),
-(20,'BDRRMC - Mahayahay','BDRRMC',19,'Hon. Ernesto Sotto','+63 917 111 0019','bdrrmc.mahayahay@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Mahayahay, Iligan City',8.224316,124.238313,'active','2026-10-03 22:46:32'),
-(21,'BDRRMC - Mainit','BDRRMC',20,'Hon. Gabriel Alonto','+63 917 111 0020','bdrrmc.mainit@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Mainit, Iligan City',8.297810,124.387679,'active','2026-10-03 22:46:32'),
-(22,'BDRRMC - Mandulog','BDRRMC',21,'Hon. Usman Macapado','+63 917 111 0021','bdrrmc.mandulog@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Mandulog, Iligan City',8.244349,124.306129,'active','2026-10-03 22:46:32'),
-(23,'BDRRMC - Maria Cristina','BDRRMC',22,'Hon. Cristopher Cruz','+63 917 111 0022','bdrrmc.mariacristina@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Maria Cristina, Iligan City',8.198912,124.193998,'active','2026-10-03 22:46:32'),
-(24,'BDRRMC - Pala-o (Palao)','BDRRMC',23,'Hon. Fatima Macapagal','+63 920 567 8901','bdrrmc.palao(palao)@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Pala-o (Palao), Iligan City',8.229264,124.254059,'active','2026-10-03 22:46:32'),
-(25,'BDRRMC - Puga-an','BDRRMC',24,'Hon. Guillermo Yap','+63 917 111 0024','bdrrmc.pugaan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Puga-an, Iligan City',8.228983,124.274746,'active','2026-10-03 22:46:32'),
-(26,'BDRRMC - Poblacion','BDRRMC',25,'Hon. Arthur Villamor','+63 917 111 0025','bdrrmc.poblacion@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Poblacion, Iligan City',8.228898,124.234013,'active','2026-10-03 22:46:32'),
-(27,'BDRRMC - Rogongon','BDRRMC',26,'Hon. Sultan Datu Dianalan','+63 917 111 0026','bdrrmc.rogongon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Rogongon, Iligan City',8.238865,124.411368,'active','2026-10-03 22:46:32'),
-(28,'BDRRMC - San Miguel','BDRRMC',27,'Hon. Danilo Villanueva','+63 917 111 0027','bdrrmc.sanmiguel@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. San Miguel, Iligan City',8.238596,124.248663,'active','2026-10-03 22:46:32'),
-(29,'BDRRMC - San Roque','BDRRMC',28,'Hon. Carmelo Perez','+63 922 789 0123','bdrrmc.sanroque@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. San Roque, Iligan City',8.257546,124.261743,'active','2026-10-03 22:46:32'),
-(30,'BDRRMC - Santa Elena','BDRRMC',29,'Hon. Grace Villafuerte','+63 923 890 1234','bdrrmc.santaelena@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santa Elena, Iligan City',8.195303,124.226301,'active','2026-10-03 22:46:32'),
-(31,'BDRRMC - Santa Filomena','BDRRMC',30,'Hon. Filomena Roxas','+63 917 111 0030','bdrrmc.santafilomena@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santa Filomena, Iligan City',8.269375,124.260689,'active','2026-10-03 22:46:32'),
-(32,'BDRRMC - Santiago','BDRRMC',31,'Hon. Emmanuel Dy','+63 917 111 0031','bdrrmc.santiago@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santiago, Iligan City',8.250560,124.244460,'active','2026-10-03 22:46:32'),
-(33,'BDRRMC - Santo Rosario','BDRRMC',32,'Hon. Rosario Mercado','+63 917 111 0032','bdrrmc.santorosario@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santo Rosario, Iligan City',8.242852,124.252966,'active','2026-10-03 22:46:32'),
-(34,'BDRRMC - Saray (Saray-Tibanga)','BDRRMC',33,'Hon. Francisco Pimentel','+63 917 111 0033','bdrrmc.saray(saraytibanga)@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Saray (Saray-Tibanga), Iligan City',8.235098,124.237157,'active','2026-10-03 22:46:32'),
-(35,'BDRRMC - Suarez','BDRRMC',34,'Hon. Benjamin Tan','+63 921 678 9012','bdrrmc.suarez@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Suarez, Iligan City',8.191592,124.217092,'active','2026-10-03 22:46:32'),
-(36,'BDRRMC - Tambacan','BDRRMC',35,'Hon. Danilo Cabahug','+63 919 456 7890','bdrrmc.tambacan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tambacan, Iligan City',8.223634,124.234526,'active','2026-10-03 22:46:32'),
-(37,'BDRRMC - Tibanga','BDRRMC',36,'Hon. Alberto Celdran','+63 917 111 0036','bdrrmc.tibanga@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tibanga, Iligan City',8.239938,124.240781,'active','2026-10-03 22:46:32'),
-(38,'BDRRMC - Tipanoy','BDRRMC',37,'Hon. Rodolfo Abellanosa','+63 917 111 0037','bdrrmc.tipanoy@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tipanoy, Iligan City',8.198544,124.250993,'active','2026-10-03 22:46:32'),
-(39,'BDRRMC - Tomas Cabili','BDRRMC',38,'Hon. Maria Elena Santos','+63 918 345 6789','bdrrmc.tomascabili@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tomas Cabili, Iligan City',8.215800,124.238900,'active','2026-10-03 22:46:32'),
-(40,'BDRRMC - Tominobo Proper','BDRRMC',39,'Hon. Manuel Padilla','+63 917 111 0039','bdrrmc.tominoboproper@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tominobo Proper, Iligan City',8.204500,124.232000,'active','2026-10-03 22:46:32'),
-(41,'BDRRMC - Tominobo Upper','BDRRMC',40,'Hon. Rogelio Soriano','+63 917 111 0040','bdrrmc.tominoboupper@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tominobo Upper, Iligan City',8.172752,124.224325,'active','2026-10-03 22:46:32'),
-(42,'BDRRMC - Ubaldo Laya','BDRRMC',41,'Hon. Lope Belmonte','+63 917 111 0041','bdrrmc.ubaldolaya@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Ubaldo Laya, Iligan City',8.223500,124.246500,'active','2026-10-03 22:46:32'),
-(43,'BDRRMC - Upper Hinaplanon','BDRRMC',42,'Hon. Daniel Quibranza','+63 917 111 0042','bdrrmc.upperhinaplanon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Upper Hinaplanon, Iligan City',8.255802,124.268887,'active','2026-10-03 22:46:32'),
-(44,'BDRRMC - Villa Verde','BDRRMC',43,'Hon. Oscar Montemayor','+63 917 111 0043','bdrrmc.villaverde@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Villa Verde, Iligan City',8.232672,124.242997,'active','2026-10-03 22:46:32'),
-(45,'BDRRMC - Panoroganan','BDRRMC',44,'Hon. Sultan Omar Disomimba','+63 917 111 0044','bdrrmc.panoroganan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Panoroganan, Iligan City',8.174503,124.424734,'active','2026-10-03 22:46:32');
-/*!40000 ALTER TABLE `agencies` ENABLE KEYS */;
-UNLOCK TABLES;
-
 TRUNCATE TABLE `barangays`;
 LOCK TABLES `barangays` WRITE;
 /*!40000 ALTER TABLE `barangays` DISABLE KEYS */;
@@ -109,6 +57,45 @@ INSERT INTO `barangays` (`id`, `name`, `city`, `status`, `contact_person`, `cont
 (43,'Villa Verde','Iligan City','active','Hon. Oscar Montemayor','+63 917 111 0043',9100,2010,'Low',500,8.232672,124.242997,'2026-10-03 22:46:32'),
 (44,'Panoroganan','Iligan City','active','Hon. Sultan Omar Disomimba','+63 917 111 0044',3100,670,'Low',4200,8.174503,124.424734,'2026-10-03 22:46:32');
 /*!40000 ALTER TABLE `barangays` ENABLE KEYS */;
+UNLOCK TABLES;
+
+TRUNCATE TABLE `puroks`;
+LOCK TABLES `puroks` WRITE;
+/*!40000 ALTER TABLE `puroks` DISABLE KEYS */;
+INSERT INTO `puroks` (`id`, `barangay_id`, `name`, `hazard_types`, `risk_level`, `households`, `population`, `coordinates_lat`, `coordinates_lng`, `status`) VALUES 
+(1,12,'Purok Riverside 1','Flash Flood, Mandulog River Overflow','Critical',450,2050,8.246800,124.258800,'active'),
+(2,12,'Purok Riverside 2','Flash Flood, River Inundation','Critical',520,2350,8.248200,124.260500,'active'),
+(3,12,'Purok Sambag','Flash Flood, Riverbank Erosion','Critical',430,1940,8.249800,124.262000,'active'),
+(4,12,'Purok Baybay','Coastal Storm Surge, Tidal Overflow','Critical',480,2150,8.251500,124.254200,'active'),
+(5,12,'Purok San Miguel','Urban Flood, Strong Winds','High',680,3010,8.245500,124.259800,'active'),
+(6,12,'Purok Katipunan','Flash Flood, Creek Overflow','High',390,1720,8.249000,124.258000,'active'),
+(7,12,'Purok Orchids','High Inundation Zone, Saturated Silt','High',360,1610,8.242000,124.260500,'active'),
+(8,12,'Purok Ilaya','River Swell, Swift Current','High',400,1800,8.250500,124.266200,'active'),
+(9,12,'Purok Mahayahay','Localized Ponding, Drainage Congestion','Moderate',410,1850,8.244800,124.261000,'active'),
+(10,12,'Purok Sto. Niño','Localized Ponding, Heavy Rainfall','Moderate',510,2280,8.243500,124.257500,'active'),
+(11,12,'Purok Centro','Urban Flood, High Density Congestion','Moderate',620,2780,8.246200,124.261800,'active'),
+(12,12,'Purok Kalubihan','Slope Failure, Torrential Runoff','Moderate',310,1390,8.252000,124.264500,'active'),
+(13,12,'Purok Pag-asa','Low Hazard Zone','Low',350,1540,8.247200,124.262500,'active'),
+(14,12,'Purok Mabuhay','Urban Drainage Overflow','Low',320,1420,8.244000,124.263800,'active'),
+(15,12,'Purok Dahlia','Low Risk Flatland','Low',290,1300,8.243000,124.266000,'active'),
+(16,12,'Purok Pine Tree','Low Hazard Zone','Low',280,1240,8.254000,124.267000,'active'),
+(17,38,'Purok 1 Baybay','Coastal Storm Surge, Tidal Overflow','High',600,2700,8.214800,124.237200,'active'),
+(18,38,'Purok 3 Highway','Traffic Hazard, Urban Flood','Moderate',850,3800,8.216500,124.239500,'active'),
+(19,38,'Purok Seaside 2','Coastal Wave Runup','High',510,2300,8.213800,124.236500,'active'),
+(20,35,'Purok Gumamela','Riverbank Erosion, Flash Flood','Critical',490,2200,8.224200,124.234000,'active'),
+(21,35,'Purok Santan','Iligan River Overtopping','Critical',530,2400,8.223000,124.234800,'active'),
+(22,35,'Purok Rosal','High Inundation Zone','High',420,1900,8.223800,124.235500,'active'),
+(23,23,'Purok Dahlia','Low Risk Flatland','Low',320,1400,8.229500,124.254800,'active'),
+(24,23,'Purok Orchid','Moderate Creek Ponding','Moderate',410,1820,8.228800,124.253200,'active'),
+(25,25,'Purok Centro Commercial','Urban Drainage Overflow','Moderate',550,2500,8.229200,124.234500,'active'),
+(26,25,'Purok Riverside Poblacion','Riverine Inundation','High',380,1750,8.228200,124.233500,'active'),
+(27,21,'Purok Mandulog Bridge Area','Extreme Flash Flood, Debris Flow','Critical',580,2600,8.244800,124.305200,'active'),
+(28,21,'Purok Upland Crossing','Slope Failure, Landslide','High',430,1920,8.245500,124.307500,'active'),
+(29,6,'Purok Timoga Spring','Coastal Inundation, Flash Flood','High',620,2800,8.187800,124.171800,'active'),
+(30,6,'Purok Mimbalot Waterfall','Rockfall, Torrential Overflow','High',480,2100,8.188800,124.173500,'active'),
+(31,42,'Purok Upper Mandulog 1','River Swell, Swift Current','High',540,2420,8.256200,124.269200,'active'),
+(32,42,'Purok Hillside','Localized Sloping Runoff','Moderate',390,1750,8.255200,124.267500,'active');
+/*!40000 ALTER TABLE `puroks` ENABLE KEYS */;
 UNLOCK TABLES;
 
 TRUNCATE TABLE `purok_cluster_options`;
@@ -164,6 +151,147 @@ INSERT INTO `hazard_type_options` (`id`, `purok_id`, `barangay_id`, `name`, `cre
 (38,1,12,'Wildfires','2026-10-12 22:41:56'),
 (39,1,12,'Fire','2026-10-12 22:41:59');
 /*!40000 ALTER TABLE `hazard_type_options` ENABLE KEYS */;
+UNLOCK TABLES;
+
+TRUNCATE TABLE `users`;
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+INSERT INTO `users` (`id`, `username`, `password`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `gender`, `age`, `image`, `role`, `agency_id`, `position`, `availability`, `barangay_id`, `purok`, `status`, `created_at`, `last_login`) VALUES 
+(1,'icdrrmo_admin','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Engr.','Armando Castillo','Engr. Armando Castillo','armando.castillo@icdrrmo.iligan.gov.ph','+63 917 100 2000','Male',48,NULL,'icdrrmo',1,'Operations Head / Director','Available',NULL,NULL,'active','2026-10-03 22:46:32','2026-10-18 20:35:41'),
+(2,'brgy_hinaplanon','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hon.','Rodrigo Almonte','Hon. Rodrigo Almonte','captain.almonte@hinaplanon.iligan.gov.ph','+63 917 234 5678','Male',52,NULL,'barangay_head',13,'Barangay Captain / BDRRMC Chairman','Available',12,NULL,'active','2026-10-03 22:46:32','2026-10-18 17:01:57'),
+(3,'brgy_tomas_cabili','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hon.','Maria Elena Santos','Hon. Maria Elena Santos','captain.santos@tomascabili.iligan.gov.ph','+63 918 345 6789','Female',45,NULL,'barangay_head',39,'Barangay Captain / BDRRMC Chairman','Available',38,NULL,'active','2026-10-03 22:46:32','2026-10-12 22:13:48'),
+(4,'responder_kurt','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Kurt','Christian Morales','Kurt Christian Morales','kurt.rescuer@iligan.gov.ph','+63 929 111 2233','Male',29,NULL,'responder',13,'Team Alpha Rescue','Available',12,'Purok Riverside 1','active','2026-10-03 22:46:32','2026-10-04 00:35:25'),
+(5,'responder_sarah','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Sarah','Jane Del Fierro','Sarah Jane Del Fierro','sarah.medic@iligan.gov.ph','+63 929 333 4455','Female',31,NULL,'responder',13,'Emergency Medical Team','Available',12,'Purok San Miguel','active','2026-10-03 22:46:32','2026-10-03 22:46:32'),
+(6,'responder_mark','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Mark','Anthony Reyes','Mark Anthony Reyes','mark.reyes@iligan.gov.ph','+63 929 444 5566','Male',33,NULL,'responder',13,'Water Search & Rescue Lead','Available',12,'Purok Riverside 2','active','2026-10-18 22:36:33',NULL),
+(7,'responder_elena','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Elena','Marie Gomez','Elena Marie Gomez','elena.gomez@iligan.gov.ph','+63 929 555 6677','Female',28,NULL,'responder',13,'Disaster Triage Specialist','Available',12,'Purok Centro','active','2026-10-18 22:36:33',NULL),
+(8,'brgy_tambacan','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hon.','Danilo Cabahug','Hon. Danilo Cabahug','captain.cabahug@tambacan.iligan.gov.ph','+63 919 456 7890','Male',50,NULL,'barangay_head',36,'Barangay Captain / BDRRMC Chairman','Available',35,NULL,'active','2026-10-18 22:36:33',NULL),
+(9,'resident_carlo','$2y$10$F5ZiTga9zwkbWlIo7gECR.CFcuOyAEOPRTP93FvMEavdT9g8YhBIG','Carlo','Mendoza','Carlo Mendoza','carlo.mendoza@gmail.com','09171234567','Male',29,NULL,'resident',NULL,NULL,'Available',1,'Purok Riverside 1','active','2026-10-18 18:49:52',NULL);
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
+
+TRUNCATE TABLE `residents`;
+LOCK TABLES `residents` WRITE;
+/*!40000 ALTER TABLE `residents` DISABLE KEYS */;
+INSERT INTO `residents` (`id`, `username`, `password`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `gender`, `age`, `image`, `barangay_id`, `purok`, `status`, `created_at`, `last_login`) VALUES 
+(1,'angelnadayag','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Angel','Nadayag','Angel Nadayag','angelnadayag@gmail.com','09701965951','Female',25,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
+(2,'carlo_mendoza','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Carlo','Mendoza','Carlo Mendoza','carlo.mendoza@gmail.com','09358889901','Male',34,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
+(3,'lorna_bautista','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Lorna','Bautista','Lorna Bautista','lorna.bautista@yahoo.com','09367778812','Female',42,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
+(4,'juan_delacruz','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Juan','Dela Cruz','Juan Dela Cruz','juan.delacruz@gmail.com','09171234501','Male',48,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
+(5,'mariaclara_santos','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Maria Clara','Santos','Maria Clara Santos','mclara.santos@gmail.com','09171234502','Female',38,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
+(6,'jose_mercado','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Jose Rizalino','Mercado','Jose Rizalino Mercado','j.mercado@gmail.com','09171234503','Male',52,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
+(7,'corazon_tan','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Corazon','Aquino-Tan','Corazon Aquino-Tan','cora.tan@yahoo.com','09171234504','Female',61,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
+(8,'antonio_luna','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Antonio','Luna','Antonio Luna','antonio.luna@gmail.com','09171234505','Male',44,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
+(9,'teresa_magbanua','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Teresa','Magbanua','Teresa Magbanua','teresa.m@gmail.com','09171234506','Female',29,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
+(10,'danilo_villanueva','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Danilo','Villanueva','Danilo Villanueva','danilo.v@gmail.com','09171234507','Male',41,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
+(11,'remedios_ramos','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Remedios','Ramos','Remedios Ramos','remedios.ramos@yahoo.com','09171234508','Female',55,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
+(12,'rodrigo_f','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rodrigo','Fernandez','Rodrigo Fernandez','rodrigo.f@gmail.com','09171234509','Male',36,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
+(13,'grace_poetan','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Grace','Poe-Tan','Grace Poe-Tan','grace.tan@gmail.com','09171234510','Female',33,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
+(14,'benjamin_a','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Benjamin','Alcantara','Benjamin Alcantara','benjamin.alcantara@yahoo.com','09171234511','Male',59,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
+(15,'carmen_v','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Carmen','Valderrama','Carmen Valderrama','carmen.v@gmail.com','09171234512','Female',47,NULL,12,'Purok Mabuhay','active','2026-10-18 22:37:08',NULL),
+(16,'alberto_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Alberto','Celdran','Alberto Celdran','alberto.celdran@gmail.com','09171234513','Male',50,NULL,12,'Purok Dahlia','active','2026-10-18 22:37:08',NULL),
+(17,'filomena_r','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Filomena','Roxas','Filomena Roxas','filomena.roxas@yahoo.com','09171234514','Female',63,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL),
+(18,'emmanuel_dy','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Emmanuel','Dy','Emmanuel Dy','emmanuel.dy@gmail.com','09171234515','Male',31,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
+(19,'rosario_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rosario','Mercado','Rosario Mercado','rosario.mercado@gmail.com','09171234516','Female',46,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
+(20,'francisco_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Francisco','Pimentel','Francisco Pimentel','francisco.p@yahoo.com','09171234517','Male',54,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
+(21,'elena_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Elena','Santos','Elena Santos','elena.santos@gmail.com','09171234518','Female',27,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
+(22,'manuel_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Manuel','Padilla','Manuel Padilla','manuel.padilla@gmail.com','09171234519','Male',39,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
+(23,'rogelio_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rogelio','Soriano','Rogelio Soriano','rogelio.soriano@yahoo.com','09171234520','Male',43,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
+(24,'lope_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Lope','Belmonte','Lope Belmonte','lope.belmonte@gmail.com','09171234521','Male',65,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
+(25,'daniel_q','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Daniel','Quibranza','Daniel Quibranza','daniel.quibranza@gmail.com','09171234522','Male',49,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
+(26,'oscar_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Oscar','Montemayor','Oscar Montemayor','oscar.montemayor@yahoo.com','09171234523','Male',57,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
+(27,'omar_disomimba','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Sultan','Omar Disomimba','Sultan Omar Disomimba','omar.disomimba@gmail.com','09171234524','Male',51,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
+(28,'fatima_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Fatima','Macapagal','Fatima Macapagal','fatima.macapagal@gmail.com','09171234525','Female',32,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
+(29,'guillermo_y','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Guillermo','Yap','Guillermo Yap','guillermo.yap@yahoo.com','09171234526','Male',40,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
+(30,'arthur_v','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Arthur','Villamor','Arthur Villamor','arthur.villamor@gmail.com','09171234527','Male',48,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
+(31,'danilo_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Danilo','Sotto','Danilo Sotto','danilo.sotto@gmail.com','09171234528','Male',35,NULL,12,'Purok Mabuhay','active','2026-10-18 22:37:08',NULL),
+(32,'carmelo_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Carmelo','Perez','Carmelo Perez','carmelo.perez@yahoo.com','09171234529','Male',53,NULL,12,'Purok Dahlia','active','2026-10-18 22:37:08',NULL),
+(33,'gabriel_a','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Gabriel','Alonto','Gabriel Alonto','gabriel.alonto@gmail.com','09171234530','Male',46,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL),
+(34,'usman_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Usman','Macapado','Usman Macapado','usman.macapado@gmail.com','09171234531','Male',62,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
+(35,'cristopher_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Cristopher','Cruz','Cristopher Cruz','cristopher.cruz@yahoo.com','09171234532','Male',30,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
+(36,'eduardo_r','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Eduardo','Ramos','Eduardo Ramos','eduardo.ramos@gmail.com','09171234533','Male',44,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
+(37,'teodoro_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Teodoro','Maglangit','Teodoro Maglangit','teodoro.maglangit@gmail.com','09171234534','Male',56,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
+(38,'alejandro_g','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Alejandro','Gomez','Alejandro Gomez','alejandro.gomez@yahoo.com','09171234535','Male',37,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
+(39,'bonifacio_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Bonifacio','Capistrano','Bonifacio Capistrano','bonifacio.capistrano@gmail.com','09171234536','Male',60,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
+(40,'ali_marohom','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Datu Ali','Marohom','Datu Ali Marohom','ali.marohom@gmail.com','09171234537','Male',45,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
+(41,'felipe_t','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Felipe','Tan','Felipe Tan','felipe.tan@yahoo.com','09171234538','Male',58,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
+(42,'bernardo_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Bernardo','Silvosa','Bernardo Silvosa','bernardo.silvosa@gmail.com','09171234539','Male',42,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
+(43,'jaime_f','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Jaime','Fernandez','Jaime Fernandez','jaime.fernandez@gmail.com','09171234540','Male',38,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
+(44,'ernesto_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Ernesto','Sotto','Ernesto Sotto','ernesto.sotto@yahoo.com','09171234541','Male',52,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
+(45,'nestor_q','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Nestor','Quijano','Nestor Quijano','nestor.quijano@gmail.com','09171234542','Male',47,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
+(46,'salvador_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Salvador','Mendoza','Salvador Mendoza','salvador.mendoza@gmail.com','09171234543','Male',64,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
+(47,'roberto_e','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Roberto','Echavez','Roberto Echavez','roberto.echavez@yahoo.com','09171234544','Male',50,NULL,12,'Purok Mabuhay','active','2026-10-18 22:37:08',NULL),
+(48,'arsenio_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Arsenio','Balgos','Arsenio Balgos','arsenio.balgos@gmail.com','09171234545','Male',41,NULL,12,'Purok Dahlia','active','2026-10-18 22:37:08',NULL),
+(49,'mario_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Mario','Macarambon','Mario Macarambon','mario.macarambon@gmail.com','09171234546','Male',36,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL),
+(50,'vicente_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Vicente','Badelles','Vicente Badelles','vicente.badelles@yahoo.com','09171234547','Male',55,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL);
+INSERT INTO `residents` (`id`, `username`, `password`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `gender`, `age`, `image`, `barangay_id`, `purok`, `status`, `created_at`, `last_login`) VALUES 
+(51,'mariateresa_l','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Maria Teresa','Lim','Maria Teresa Lim','teresa.lim@gmail.com','09171234548','Female',49,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
+(52,'rolando_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rolando','Cañete','Rolando Cañete','rolando.canete@gmail.com','09171234549','Male',58,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
+(53,'beatrice_a','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Beatrice','Almonte','Beatrice Almonte','beatrice.almonte@gmail.com','09171234550','Female',24,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
+(54,'christian_dr','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Christian','Delos Reyes','Christian Delos Reyes','christian.dr@yahoo.com','09171234551','Male',28,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
+(55,'divina_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Divina','Pastrano','Divina Pastrano','divina.pastrano@gmail.com','09171234552','Female',39,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
+(56,'esperanza_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Esperanza','Salcedo','Esperanza Salcedo','esperanza.salcedo@gmail.com','09171234553','Female',66,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
+(57,'ferdinand_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Ferdinand','Castillo','Ferdinand Castillo','ferdinand.castillo@yahoo.com','09171234554','Male',37,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
+(58,'gemma_t','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Gemma','Torralba','Gemma Torralba','gemma.torralba@gmail.com','09171234555','Female',43,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
+(59,'hernan_dt','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hernan','Dela Torre','Hernan Dela Torre','hernan.delatorre@gmail.com','09171234556','Male',51,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
+(60,'imelda_v','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Imelda','Valdez','Imelda Valdez','imelda.valdez@yahoo.com','09171234557','Female',58,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
+(61,'jocelyn_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Jocelyn','Suarez','Jocelyn Suarez','jocelyn.suarez@gmail.com','09171234558','Female',31,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
+(62,'karlo_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Karlo','Magno','Karlo Magno','karlo.magno@gmail.com','09171234559','Male',26,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
+(63,'leila_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Leila','Benitez','Leila Benitez','leila.benitez@yahoo.com','09171234560','Female',35,NULL,12,'Purok Mabuhay','pending','2026-10-18 22:37:08',NULL),
+(64,'melchor_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Melchor','Panganiban','Melchor Panganiban','melchor.panganiban@gmail.com','09171234561','Male',46,NULL,12,'Purok Dahlia','inactive','2026-10-18 22:37:08',NULL),
+(65,'nenita_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Nenita','Corpuz','Nenita Corpuz','nenita.corpuz@gmail.com','09171234562','Female',62,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL);
+/*!40000 ALTER TABLE `residents` ENABLE KEYS */;
+UNLOCK TABLES;
+
+TRUNCATE TABLE `agencies`;
+LOCK TABLES `agencies` WRITE;
+/*!40000 ALTER TABLE `agencies` DISABLE KEYS */;
+INSERT INTO `agencies` (`id`, `name`, `agency_type`, `barangay_id`, `contact_person`, `contact_number`, `email`, `office_address`, `coordinates_lat`, `coordinates_lng`, `status`, `created_at`) VALUES 
+(1,'Iligan City Disaster Risk Reduction & Management Office (ICDRRMO)','ICDRRMO',NULL,'Engr. Armando Castillo (Head of Operations)','161 / (063) 221-1234','operations@icdrrmo.iligan.gov.ph','City Hall Complex, Buhanginan Hill, Pala-o, Iligan City',8.225892,124.251818,'active','2026-10-03 22:46:32'),
+(2,'BDRRMC - Abuno','BDRRMC',1,'Hon. Rolando Cañete','+63 917 111 0001','bdrrmc.abuno@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Abuno, Iligan City',8.184697,124.256959,'active','2026-10-03 22:46:32'),
+(3,'BDRRMC - Acmac-Mariano Badelles Sr.','BDRRMC',2,'Hon. Vicente Badelles','+63 917 111 0002','bdrrmc.acmacmarianobadellessr@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Acmac-Mariano Badelles Sr., Iligan City',8.279906,124.274134,'active','2026-10-03 22:46:32'),
+(4,'BDRRMC - Bagong Silang','BDRRMC',3,'Hon. Maria Teresa Lim','+63 917 111 0003','bdrrmc.bagongsilang@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Bagong Silang, Iligan City',8.241626,124.251969,'active','2026-10-03 22:46:32'),
+(5,'BDRRMC - Bonbonon','BDRRMC',4,'Hon. Mario Macarambon','+63 917 111 0004','bdrrmc.bonbonon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Bonbonon, Iligan City',8.267662,124.290299,'active','2026-10-03 22:46:32'),
+(6,'BDRRMC - Bunawan','BDRRMC',5,'Hon. Nestor Quijano','+63 917 111 0005','bdrrmc.bunawan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Bunawan, Iligan City',8.303333,124.303922,'active','2026-10-03 22:46:32'),
+(7,'BDRRMC - Buru-un','BDRRMC',6,'Hon. Salvador Mendoza','+63 917 111 0006','bdrrmc.buruun@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Buru-un, Iligan City',8.188072,124.172216,'active','2026-10-03 22:46:32'),
+(8,'BDRRMC - Dalipuga','BDRRMC',7,'Hon. Roberto Echavez','+63 917 111 0007','bdrrmc.dalipuga@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Dalipuga, Iligan City',8.305960,124.258587,'active','2026-10-03 22:46:32'),
+(9,'BDRRMC - Del Carmen','BDRRMC',8,'Hon. Carmen Valderrama','+63 917 111 0008','bdrrmc.delcarmen@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Del Carmen, Iligan City',8.232228,124.258058,'active','2026-10-03 22:46:32'),
+(10,'BDRRMC - Digkilaan','BDRRMC',9,'Hon. Arsenio Balgos','+63 917 111 0009','bdrrmc.digkilaan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Digkilaan, Iligan City',8.313922,124.372466,'active','2026-10-03 22:46:32'),
+(11,'BDRRMC - Ditucalan','BDRRMC',10,'Hon. Eduardo Ramos','+63 917 111 0010','bdrrmc.ditucalan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Ditucalan, Iligan City',8.176033,124.192768,'active','2026-10-03 22:46:32'),
+(12,'BDRRMC - Dulag','BDRRMC',11,'Hon. Teodoro Maglangit','+63 917 111 0011','bdrrmc.dulag@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Dulag, Iligan City',8.205348,124.368826,'active','2026-10-03 22:46:32'),
+(13,'BDRRMC - Hinaplanon','BDRRMC',12,'Hon. Rodrigo Almonte','+63 917 234 5678','bdrrmc.hinaplanon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Hinaplanon, Iligan City',8.246596,124.259474,'active','2026-10-03 22:46:32'),
+(14,'BDRRMC - Hindang','BDRRMC',13,'Hon. Alejandro Gomez','+63 917 111 0013','bdrrmc.hindang@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Hindang, Iligan City',8.303563,124.353225,'active','2026-10-03 22:46:32'),
+(15,'BDRRMC - Kabacsanan','BDRRMC',14,'Hon. Bonifacio Capistrano','+63 917 111 0014','bdrrmc.kabacsanan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Kabacsanan, Iligan City',8.281250,124.308865,'active','2026-10-03 22:46:32'),
+(16,'BDRRMC - Kalilangan','BDRRMC',15,'Hon. Datu Ali Marohom','+63 917 111 0015','bdrrmc.kalilangan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Kalilangan, Iligan City',8.154576,124.391046,'active','2026-10-03 22:46:32'),
+(17,'BDRRMC - Kiwalan','BDRRMC',16,'Hon. Felipe Tan','+63 917 111 0016','bdrrmc.kiwalan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Kiwalan, Iligan City',8.281893,124.266195,'active','2026-10-03 22:46:32'),
+(18,'BDRRMC - Lanipao','BDRRMC',17,'Hon. Bernardo Silvosa','+63 917 111 0017','bdrrmc.lanipao@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Lanipao, Iligan City',8.227227,124.340547,'active','2026-10-03 22:46:32'),
+(19,'BDRRMC - Luinab','BDRRMC',18,'Hon. Jaime Fernandez','+63 917 111 0018','bdrrmc.luinab@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Luinab, Iligan City',8.247049,124.267966,'active','2026-10-03 22:46:32'),
+(20,'BDRRMC - Mahayahay','BDRRMC',19,'Hon. Ernesto Sotto','+63 917 111 0019','bdrrmc.mahayahay@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Mahayahay, Iligan City',8.224316,124.238313,'active','2026-10-03 22:46:32'),
+(21,'BDRRMC - Mainit','BDRRMC',20,'Hon. Gabriel Alonto','+63 917 111 0020','bdrrmc.mainit@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Mainit, Iligan City',8.297810,124.387679,'active','2026-10-03 22:46:32'),
+(22,'BDRRMC - Mandulog','BDRRMC',21,'Hon. Usman Macapado','+63 917 111 0021','bdrrmc.mandulog@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Mandulog, Iligan City',8.244349,124.306129,'active','2026-10-03 22:46:32'),
+(23,'BDRRMC - Maria Cristina','BDRRMC',22,'Hon. Cristopher Cruz','+63 917 111 0022','bdrrmc.mariacristina@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Maria Cristina, Iligan City',8.198912,124.193998,'active','2026-10-03 22:46:32'),
+(24,'BDRRMC - Pala-o (Palao)','BDRRMC',23,'Hon. Fatima Macapagal','+63 920 567 8901','bdrrmc.palao(palao)@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Pala-o (Palao), Iligan City',8.229264,124.254059,'active','2026-10-03 22:46:32'),
+(25,'BDRRMC - Puga-an','BDRRMC',24,'Hon. Guillermo Yap','+63 917 111 0024','bdrrmc.pugaan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Puga-an, Iligan City',8.228983,124.274746,'active','2026-10-03 22:46:32'),
+(26,'BDRRMC - Poblacion','BDRRMC',25,'Hon. Arthur Villamor','+63 917 111 0025','bdrrmc.poblacion@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Poblacion, Iligan City',8.228898,124.234013,'active','2026-10-03 22:46:32'),
+(27,'BDRRMC - Rogongon','BDRRMC',26,'Hon. Sultan Datu Dianalan','+63 917 111 0026','bdrrmc.rogongon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Rogongon, Iligan City',8.238865,124.411368,'active','2026-10-03 22:46:32'),
+(28,'BDRRMC - San Miguel','BDRRMC',27,'Hon. Danilo Villanueva','+63 917 111 0027','bdrrmc.sanmiguel@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. San Miguel, Iligan City',8.238596,124.248663,'active','2026-10-03 22:46:32'),
+(29,'BDRRMC - San Roque','BDRRMC',28,'Hon. Carmelo Perez','+63 922 789 0123','bdrrmc.sanroque@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. San Roque, Iligan City',8.257546,124.261743,'active','2026-10-03 22:46:32'),
+(30,'BDRRMC - Santa Elena','BDRRMC',29,'Hon. Grace Villafuerte','+63 923 890 1234','bdrrmc.santaelena@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santa Elena, Iligan City',8.195303,124.226301,'active','2026-10-03 22:46:32'),
+(31,'BDRRMC - Santa Filomena','BDRRMC',30,'Hon. Filomena Roxas','+63 917 111 0030','bdrrmc.santafilomena@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santa Filomena, Iligan City',8.269375,124.260689,'active','2026-10-03 22:46:32'),
+(32,'BDRRMC - Santiago','BDRRMC',31,'Hon. Emmanuel Dy','+63 917 111 0031','bdrrmc.santiago@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santiago, Iligan City',8.250560,124.244460,'active','2026-10-03 22:46:32'),
+(33,'BDRRMC - Santo Rosario','BDRRMC',32,'Hon. Rosario Mercado','+63 917 111 0032','bdrrmc.santorosario@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Santo Rosario, Iligan City',8.242852,124.252966,'active','2026-10-03 22:46:32'),
+(34,'BDRRMC - Saray (Saray-Tibanga)','BDRRMC',33,'Hon. Francisco Pimentel','+63 917 111 0033','bdrrmc.saray(saraytibanga)@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Saray (Saray-Tibanga), Iligan City',8.235098,124.237157,'active','2026-10-03 22:46:32'),
+(35,'BDRRMC - Suarez','BDRRMC',34,'Hon. Benjamin Tan','+63 921 678 9012','bdrrmc.suarez@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Suarez, Iligan City',8.191592,124.217092,'active','2026-10-03 22:46:32'),
+(36,'BDRRMC - Tambacan','BDRRMC',35,'Hon. Danilo Cabahug','+63 919 456 7890','bdrrmc.tambacan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tambacan, Iligan City',8.223634,124.234526,'active','2026-10-03 22:46:32'),
+(37,'BDRRMC - Tibanga','BDRRMC',36,'Hon. Alberto Celdran','+63 917 111 0036','bdrrmc.tibanga@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tibanga, Iligan City',8.239938,124.240781,'active','2026-10-03 22:46:32'),
+(38,'BDRRMC - Tipanoy','BDRRMC',37,'Hon. Rodolfo Abellanosa','+63 917 111 0037','bdrrmc.tipanoy@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tipanoy, Iligan City',8.198544,124.250993,'active','2026-10-03 22:46:32'),
+(39,'BDRRMC - Tomas Cabili','BDRRMC',38,'Hon. Maria Elena Santos','+63 918 345 6789','bdrrmc.tomascabili@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tomas Cabili, Iligan City',8.215800,124.238900,'active','2026-10-03 22:46:32'),
+(40,'BDRRMC - Tominobo Proper','BDRRMC',39,'Hon. Manuel Padilla','+63 917 111 0039','bdrrmc.tominoboproper@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tominobo Proper, Iligan City',8.204500,124.232000,'active','2026-10-03 22:46:32'),
+(41,'BDRRMC - Tominobo Upper','BDRRMC',40,'Hon. Rogelio Soriano','+63 917 111 0040','bdrrmc.tominoboupper@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Tominobo Upper, Iligan City',8.172752,124.224325,'active','2026-10-03 22:46:32'),
+(42,'BDRRMC - Ubaldo Laya','BDRRMC',41,'Hon. Lope Belmonte','+63 917 111 0041','bdrrmc.ubaldolaya@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Ubaldo Laya, Iligan City',8.223500,124.246500,'active','2026-10-03 22:46:32'),
+(43,'BDRRMC - Upper Hinaplanon','BDRRMC',42,'Hon. Daniel Quibranza','+63 917 111 0042','bdrrmc.upperhinaplanon@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Upper Hinaplanon, Iligan City',8.255802,124.268887,'active','2026-10-03 22:46:32'),
+(44,'BDRRMC - Villa Verde','BDRRMC',43,'Hon. Oscar Montemayor','+63 917 111 0043','bdrrmc.villaverde@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Villa Verde, Iligan City',8.232672,124.242997,'active','2026-10-03 22:46:32'),
+(45,'BDRRMC - Panoroganan','BDRRMC',44,'Hon. Sultan Omar Disomimba','+63 917 111 0044','bdrrmc.panoroganan@iligan.gov.ph','Barangay Disaster Operations Desk, Brgy. Panoroganan, Iligan City',8.174503,124.424734,'active','2026-10-03 22:46:32');
+/*!40000 ALTER TABLE `agencies` ENABLE KEYS */;
 UNLOCK TABLES;
 
 TRUNCATE TABLE `resource_categories`;
@@ -912,134 +1040,6 @@ INSERT INTO `agency_resources` (`id`, `agency_id`, `resource_id`, `total_quantit
 /*!40000 ALTER TABLE `agency_resources` ENABLE KEYS */;
 UNLOCK TABLES;
 
-TRUNCATE TABLE `users`;
-LOCK TABLES `users` WRITE;
-/*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` (`id`, `username`, `password`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `gender`, `age`, `image`, `role`, `agency_id`, `position`, `availability`, `barangay_id`, `purok`, `status`, `created_at`, `last_login`) VALUES 
-(1,'icdrrmo_admin','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Engr.','Armando Castillo','Engr. Armando Castillo','armando.castillo@icdrrmo.iligan.gov.ph','+63 917 100 2000','Male',48,NULL,'icdrrmo',1,'Operations Head / Director','Available',NULL,NULL,'active','2026-10-03 22:46:32','2026-10-18 20:35:41'),
-(2,'brgy_hinaplanon','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hon.','Rodrigo Almonte','Hon. Rodrigo Almonte','captain.almonte@hinaplanon.iligan.gov.ph','+63 917 234 5678','Male',52,NULL,'barangay_head',13,'Barangay Captain / BDRRMC Chairman','Available',12,NULL,'active','2026-10-03 22:46:32','2026-10-18 17:01:57'),
-(3,'brgy_tomas_cabili','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hon.','Maria Elena Santos','Hon. Maria Elena Santos','captain.santos@tomascabili.iligan.gov.ph','+63 918 345 6789','Female',45,NULL,'barangay_head',39,'Barangay Captain / BDRRMC Chairman','Available',38,NULL,'active','2026-10-03 22:46:32','2026-10-12 22:13:48'),
-(4,'responder_kurt','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Kurt','Christian Morales','Kurt Christian Morales','kurt.rescuer@iligan.gov.ph','+63 929 111 2233','Male',29,NULL,'responder',13,'Team Alpha Rescue','Available',12,'Purok Riverside 1','active','2026-10-03 22:46:32','2026-10-04 00:35:25'),
-(5,'responder_sarah','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Sarah','Jane Del Fierro','Sarah Jane Del Fierro','sarah.medic@iligan.gov.ph','+63 929 333 4455','Female',31,NULL,'responder',13,'Emergency Medical Team','Available',12,'Purok San Miguel','active','2026-10-03 22:46:32','2026-10-03 22:46:32'),
-(6,'responder_mark','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Mark','Anthony Reyes','Mark Anthony Reyes','mark.reyes@iligan.gov.ph','+63 929 444 5566','Male',33,NULL,'responder',13,'Water Search & Rescue Lead','Available',12,'Purok Riverside 2','active','2026-10-18 22:36:33',NULL),
-(7,'responder_elena','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Elena','Marie Gomez','Elena Marie Gomez','elena.gomez@iligan.gov.ph','+63 929 555 6677','Female',28,NULL,'responder',13,'Disaster Triage Specialist','Available',12,'Purok Centro','active','2026-10-18 22:36:33',NULL),
-(8,'brgy_tambacan','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hon.','Danilo Cabahug','Hon. Danilo Cabahug','captain.cabahug@tambacan.iligan.gov.ph','+63 919 456 7890','Male',50,NULL,'barangay_head',36,'Barangay Captain / BDRRMC Chairman','Available',35,NULL,'active','2026-10-18 22:36:33',NULL),
-(9,'resident_carlo','$2y$10$F5ZiTga9zwkbWlIo7gECR.CFcuOyAEOPRTP93FvMEavdT9g8YhBIG','Carlo','Mendoza','Carlo Mendoza','carlo.mendoza@gmail.com','09171234567','Male',29,NULL,'resident',NULL,NULL,'Available',1,'Purok Riverside 1','active','2026-10-18 18:49:52',NULL);
-/*!40000 ALTER TABLE `users` ENABLE KEYS */;
-UNLOCK TABLES;
-
-TRUNCATE TABLE `residents`;
-LOCK TABLES `residents` WRITE;
-/*!40000 ALTER TABLE `residents` DISABLE KEYS */;
-INSERT INTO `residents` (`id`, `username`, `password`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `gender`, `age`, `image`, `barangay_id`, `purok`, `status`, `created_at`, `last_login`) VALUES 
-(1,'angelnadayag','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Angel','Nadayag','Angel Nadayag','angelnadayag@gmail.com','09701965951','Female',25,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
-(2,'carlo_mendoza','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Carlo','Mendoza','Carlo Mendoza','carlo.mendoza@gmail.com','09358889901','Male',34,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
-(3,'lorna_bautista','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Lorna','Bautista','Lorna Bautista','lorna.bautista@yahoo.com','09367778812','Female',42,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
-(4,'juan_delacruz','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Juan','Dela Cruz','Juan Dela Cruz','juan.delacruz@gmail.com','09171234501','Male',48,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
-(5,'mariaclara_santos','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Maria Clara','Santos','Maria Clara Santos','mclara.santos@gmail.com','09171234502','Female',38,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
-(6,'jose_mercado','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Jose Rizalino','Mercado','Jose Rizalino Mercado','j.mercado@gmail.com','09171234503','Male',52,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
-(7,'corazon_tan','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Corazon','Aquino-Tan','Corazon Aquino-Tan','cora.tan@yahoo.com','09171234504','Female',61,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
-(8,'antonio_luna','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Antonio','Luna','Antonio Luna','antonio.luna@gmail.com','09171234505','Male',44,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
-(9,'teresa_magbanua','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Teresa','Magbanua','Teresa Magbanua','teresa.m@gmail.com','09171234506','Female',29,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
-(10,'danilo_villanueva','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Danilo','Villanueva','Danilo Villanueva','danilo.v@gmail.com','09171234507','Male',41,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
-(11,'remedios_ramos','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Remedios','Ramos','Remedios Ramos','remedios.ramos@yahoo.com','09171234508','Female',55,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
-(12,'rodrigo_f','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rodrigo','Fernandez','Rodrigo Fernandez','rodrigo.f@gmail.com','09171234509','Male',36,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
-(13,'grace_poetan','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Grace','Poe-Tan','Grace Poe-Tan','grace.tan@gmail.com','09171234510','Female',33,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
-(14,'benjamin_a','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Benjamin','Alcantara','Benjamin Alcantara','benjamin.alcantara@yahoo.com','09171234511','Male',59,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
-(15,'carmen_v','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Carmen','Valderrama','Carmen Valderrama','carmen.v@gmail.com','09171234512','Female',47,NULL,12,'Purok Mabuhay','active','2026-10-18 22:37:08',NULL),
-(16,'alberto_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Alberto','Celdran','Alberto Celdran','alberto.celdran@gmail.com','09171234513','Male',50,NULL,12,'Purok Dahlia','active','2026-10-18 22:37:08',NULL),
-(17,'filomena_r','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Filomena','Roxas','Filomena Roxas','filomena.roxas@yahoo.com','09171234514','Female',63,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL),
-(18,'emmanuel_dy','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Emmanuel','Dy','Emmanuel Dy','emmanuel.dy@gmail.com','09171234515','Male',31,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
-(19,'rosario_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rosario','Mercado','Rosario Mercado','rosario.mercado@gmail.com','09171234516','Female',46,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
-(20,'francisco_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Francisco','Pimentel','Francisco Pimentel','francisco.p@yahoo.com','09171234517','Male',54,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
-(21,'elena_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Elena','Santos','Elena Santos','elena.santos@gmail.com','09171234518','Female',27,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
-(22,'manuel_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Manuel','Padilla','Manuel Padilla','manuel.padilla@gmail.com','09171234519','Male',39,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
-(23,'rogelio_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rogelio','Soriano','Rogelio Soriano','rogelio.soriano@yahoo.com','09171234520','Male',43,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
-(24,'lope_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Lope','Belmonte','Lope Belmonte','lope.belmonte@gmail.com','09171234521','Male',65,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
-(25,'daniel_q','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Daniel','Quibranza','Daniel Quibranza','daniel.quibranza@gmail.com','09171234522','Male',49,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
-(26,'oscar_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Oscar','Montemayor','Oscar Montemayor','oscar.montemayor@yahoo.com','09171234523','Male',57,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
-(27,'omar_disomimba','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Sultan','Omar Disomimba','Sultan Omar Disomimba','omar.disomimba@gmail.com','09171234524','Male',51,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
-(28,'fatima_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Fatima','Macapagal','Fatima Macapagal','fatima.macapagal@gmail.com','09171234525','Female',32,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
-(29,'guillermo_y','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Guillermo','Yap','Guillermo Yap','guillermo.yap@yahoo.com','09171234526','Male',40,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
-(30,'arthur_v','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Arthur','Villamor','Arthur Villamor','arthur.villamor@gmail.com','09171234527','Male',48,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
-(31,'danilo_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Danilo','Sotto','Danilo Sotto','danilo.sotto@gmail.com','09171234528','Male',35,NULL,12,'Purok Mabuhay','active','2026-10-18 22:37:08',NULL),
-(32,'carmelo_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Carmelo','Perez','Carmelo Perez','carmelo.perez@yahoo.com','09171234529','Male',53,NULL,12,'Purok Dahlia','active','2026-10-18 22:37:08',NULL),
-(33,'gabriel_a','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Gabriel','Alonto','Gabriel Alonto','gabriel.alonto@gmail.com','09171234530','Male',46,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL),
-(34,'usman_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Usman','Macapado','Usman Macapado','usman.macapado@gmail.com','09171234531','Male',62,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL),
-(35,'cristopher_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Cristopher','Cruz','Cristopher Cruz','cristopher.cruz@yahoo.com','09171234532','Male',30,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
-(36,'eduardo_r','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Eduardo','Ramos','Eduardo Ramos','eduardo.ramos@gmail.com','09171234533','Male',44,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
-(37,'teodoro_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Teodoro','Maglangit','Teodoro Maglangit','teodoro.maglangit@gmail.com','09171234534','Male',56,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
-(38,'alejandro_g','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Alejandro','Gomez','Alejandro Gomez','alejandro.gomez@yahoo.com','09171234535','Male',37,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
-(39,'bonifacio_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Bonifacio','Capistrano','Bonifacio Capistrano','bonifacio.capistrano@gmail.com','09171234536','Male',60,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
-(40,'ali_marohom','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Datu Ali','Marohom','Datu Ali Marohom','ali.marohom@gmail.com','09171234537','Male',45,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
-(41,'felipe_t','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Felipe','Tan','Felipe Tan','felipe.tan@yahoo.com','09171234538','Male',58,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
-(42,'bernardo_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Bernardo','Silvosa','Bernardo Silvosa','bernardo.silvosa@gmail.com','09171234539','Male',42,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
-(43,'jaime_f','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Jaime','Fernandez','Jaime Fernandez','jaime.fernandez@gmail.com','09171234540','Male',38,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
-(44,'ernesto_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Ernesto','Sotto','Ernesto Sotto','ernesto.sotto@yahoo.com','09171234541','Male',52,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
-(45,'nestor_q','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Nestor','Quijano','Nestor Quijano','nestor.quijano@gmail.com','09171234542','Male',47,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
-(46,'salvador_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Salvador','Mendoza','Salvador Mendoza','salvador.mendoza@gmail.com','09171234543','Male',64,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
-(47,'roberto_e','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Roberto','Echavez','Roberto Echavez','roberto.echavez@yahoo.com','09171234544','Male',50,NULL,12,'Purok Mabuhay','active','2026-10-18 22:37:08',NULL),
-(48,'arsenio_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Arsenio','Balgos','Arsenio Balgos','arsenio.balgos@gmail.com','09171234545','Male',41,NULL,12,'Purok Dahlia','active','2026-10-18 22:37:08',NULL),
-(49,'mario_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Mario','Macarambon','Mario Macarambon','mario.macarambon@gmail.com','09171234546','Male',36,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL),
-(50,'vicente_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Vicente','Badelles','Vicente Badelles','vicente.badelles@yahoo.com','09171234547','Male',55,NULL,12,'Purok Riverside 1','active','2026-10-18 22:37:08',NULL);
-INSERT INTO `residents` (`id`, `username`, `password`, `first_name`, `last_name`, `full_name`, `email`, `phone`, `gender`, `age`, `image`, `barangay_id`, `purok`, `status`, `created_at`, `last_login`) VALUES 
-(51,'mariateresa_l','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Maria Teresa','Lim','Maria Teresa Lim','teresa.lim@gmail.com','09171234548','Female',49,NULL,12,'Purok Riverside 2','active','2026-10-18 22:37:08',NULL),
-(52,'rolando_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Rolando','Cañete','Rolando Cañete','rolando.canete@gmail.com','09171234549','Male',58,NULL,12,'Purok Sambag','active','2026-10-18 22:37:08',NULL),
-(53,'beatrice_a','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Beatrice','Almonte','Beatrice Almonte','beatrice.almonte@gmail.com','09171234550','Female',24,NULL,12,'Purok Baybay','active','2026-10-18 22:37:08',NULL),
-(54,'christian_dr','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Christian','Delos Reyes','Christian Delos Reyes','christian.dr@yahoo.com','09171234551','Male',28,NULL,12,'Purok San Miguel','active','2026-10-18 22:37:08',NULL),
-(55,'divina_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Divina','Pastrano','Divina Pastrano','divina.pastrano@gmail.com','09171234552','Female',39,NULL,12,'Purok Katipunan','active','2026-10-18 22:37:08',NULL),
-(56,'esperanza_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Esperanza','Salcedo','Esperanza Salcedo','esperanza.salcedo@gmail.com','09171234553','Female',66,NULL,12,'Purok Orchids','active','2026-10-18 22:37:08',NULL),
-(57,'ferdinand_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Ferdinand','Castillo','Ferdinand Castillo','ferdinand.castillo@yahoo.com','09171234554','Male',37,NULL,12,'Purok Ilaya','active','2026-10-18 22:37:08',NULL),
-(58,'gemma_t','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Gemma','Torralba','Gemma Torralba','gemma.torralba@gmail.com','09171234555','Female',43,NULL,12,'Purok Mahayahay','active','2026-10-18 22:37:08',NULL),
-(59,'hernan_dt','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Hernan','Dela Torre','Hernan Dela Torre','hernan.delatorre@gmail.com','09171234556','Male',51,NULL,12,'Purok Sto. Niño','active','2026-10-18 22:37:08',NULL),
-(60,'imelda_v','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Imelda','Valdez','Imelda Valdez','imelda.valdez@yahoo.com','09171234557','Female',58,NULL,12,'Purok Centro','active','2026-10-18 22:37:08',NULL),
-(61,'jocelyn_s','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Jocelyn','Suarez','Jocelyn Suarez','jocelyn.suarez@gmail.com','09171234558','Female',31,NULL,12,'Purok Kalubihan','active','2026-10-18 22:37:08',NULL),
-(62,'karlo_m','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Karlo','Magno','Karlo Magno','karlo.magno@gmail.com','09171234559','Male',26,NULL,12,'Purok Pag-asa','active','2026-10-18 22:37:08',NULL),
-(63,'leila_b','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Leila','Benitez','Leila Benitez','leila.benitez@yahoo.com','09171234560','Female',35,NULL,12,'Purok Mabuhay','pending','2026-10-18 22:37:08',NULL),
-(64,'melchor_p','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Melchor','Panganiban','Melchor Panganiban','melchor.panganiban@gmail.com','09171234561','Male',46,NULL,12,'Purok Dahlia','inactive','2026-10-18 22:37:08',NULL),
-(65,'nenita_c','$2y$10$05YsJXrRv.0Cs5LXV.vqU.ZO19JXh2XjI/CnnIzuAoVqmQML9eCV2','Nenita','Corpuz','Nenita Corpuz','nenita.corpuz@gmail.com','09171234562','Female',62,NULL,12,'Purok Pine Tree','active','2026-10-18 22:37:08',NULL);
-/*!40000 ALTER TABLE `residents` ENABLE KEYS */;
-UNLOCK TABLES;
-
-TRUNCATE TABLE `puroks`;
-LOCK TABLES `puroks` WRITE;
-/*!40000 ALTER TABLE `puroks` DISABLE KEYS */;
-INSERT INTO `puroks` (`id`, `barangay_id`, `name`, `hazard_types`, `risk_level`, `households`, `population`, `coordinates_lat`, `coordinates_lng`, `status`) VALUES 
-(1,12,'Purok Riverside 1','Flash Flood, Mandulog River Overflow','Critical',450,2050,8.246800,124.258800,'active'),
-(2,12,'Purok Riverside 2','Flash Flood, River Inundation','Critical',520,2350,8.248200,124.260500,'active'),
-(3,12,'Purok Sambag','Flash Flood, Riverbank Erosion','Critical',430,1940,8.249800,124.262000,'active'),
-(4,12,'Purok Baybay','Coastal Storm Surge, Tidal Overflow','Critical',480,2150,8.251500,124.254200,'active'),
-(5,12,'Purok San Miguel','Urban Flood, Strong Winds','High',680,3010,8.245500,124.259800,'active'),
-(6,12,'Purok Katipunan','Flash Flood, Creek Overflow','High',390,1720,8.249000,124.258000,'active'),
-(7,12,'Purok Orchids','High Inundation Zone, Saturated Silt','High',360,1610,8.242000,124.260500,'active'),
-(8,12,'Purok Ilaya','River Swell, Swift Current','High',400,1800,8.250500,124.266200,'active'),
-(9,12,'Purok Mahayahay','Localized Ponding, Drainage Congestion','Moderate',410,1850,8.244800,124.261000,'active'),
-(10,12,'Purok Sto. Niño','Localized Ponding, Heavy Rainfall','Moderate',510,2280,8.243500,124.257500,'active'),
-(11,12,'Purok Centro','Urban Flood, High Density Congestion','Moderate',620,2780,8.246200,124.261800,'active'),
-(12,12,'Purok Kalubihan','Slope Failure, Torrential Runoff','Moderate',310,1390,8.252000,124.264500,'active'),
-(13,12,'Purok Pag-asa','Low Hazard Zone','Low',350,1540,8.247200,124.262500,'active'),
-(14,12,'Purok Mabuhay','Urban Drainage Overflow','Low',320,1420,8.244000,124.263800,'active'),
-(15,12,'Purok Dahlia','Low Risk Flatland','Low',290,1300,8.243000,124.266000,'active'),
-(16,12,'Purok Pine Tree','Low Hazard Zone','Low',280,1240,8.254000,124.267000,'active'),
-(17,38,'Purok 1 Baybay','Coastal Storm Surge, Tidal Overflow','High',600,2700,8.214800,124.237200,'active'),
-(18,38,'Purok 3 Highway','Traffic Hazard, Urban Flood','Moderate',850,3800,8.216500,124.239500,'active'),
-(19,38,'Purok Seaside 2','Coastal Wave Runup','High',510,2300,8.213800,124.236500,'active'),
-(20,35,'Purok Gumamela','Riverbank Erosion, Flash Flood','Critical',490,2200,8.224200,124.234000,'active'),
-(21,35,'Purok Santan','Iligan River Overtopping','Critical',530,2400,8.223000,124.234800,'active'),
-(22,35,'Purok Rosal','High Inundation Zone','High',420,1900,8.223800,124.235500,'active'),
-(23,23,'Purok Dahlia','Low Risk Flatland','Low',320,1400,8.229500,124.254800,'active'),
-(24,23,'Purok Orchid','Moderate Creek Ponding','Moderate',410,1820,8.228800,124.253200,'active'),
-(25,25,'Purok Centro Commercial','Urban Drainage Overflow','Moderate',550,2500,8.229200,124.234500,'active'),
-(26,25,'Purok Riverside Poblacion','Riverine Inundation','High',380,1750,8.228200,124.233500,'active'),
-(27,21,'Purok Mandulog Bridge Area','Extreme Flash Flood, Debris Flow','Critical',580,2600,8.244800,124.305200,'active'),
-(28,21,'Purok Upland Crossing','Slope Failure, Landslide','High',430,1920,8.245500,124.307500,'active'),
-(29,6,'Purok Timoga Spring','Coastal Inundation, Flash Flood','High',620,2800,8.187800,124.171800,'active'),
-(30,6,'Purok Mimbalot Waterfall','Rockfall, Torrential Overflow','High',480,2100,8.188800,124.173500,'active'),
-(31,42,'Purok Upper Mandulog 1','River Swell, Swift Current','High',540,2420,8.256200,124.269200,'active'),
-(32,42,'Purok Hillside','Localized Sloping Runoff','Moderate',390,1750,8.255200,124.267500,'active');
-/*!40000 ALTER TABLE `puroks` ENABLE KEYS */;
-UNLOCK TABLES;
-
 TRUNCATE TABLE `evacuation_areas`;
 LOCK TABLES `evacuation_areas` WRITE;
 /*!40000 ALTER TABLE `evacuation_areas` DISABLE KEYS */;
@@ -1452,15 +1452,15 @@ INSERT INTO `sms_logs` (`id`, `phone`, `recipient_name`, `message`, `status`, `a
 (1,'09701965951','angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new community event has been scheduled in your barangay:\nEvent: asdqwe\nVenue: asdasd\nStart: Oct 07, 2026 12:00 PM\nEnd: Oct 07, 2026 03:00 PM\nLead Facilitator: asdasdasd\nDetails: asdasd\nPlease be guided accordingly. Thank you!','sent',NULL,'event_created',5,'2026-10-06 12:22:23'),
 (2,'09701965951','angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: ffff\nVenue: fff\nStart: Oct 07, 2026 12:00 PM\nEnd: Oct 07, 2026 03:00 PM\nLead Facilitator: fff\nDetails: ffff\nPlease be guided accordingly. Thank you!','sent',NULL,'event_created',6,'2026-10-06 12:35:05'),
 (3,'09701965951','angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: zzz\nVenue: zzzz\nStart: Oct 07, 2026 12:00 PM\nEnd: Oct 07, 2026 03:00 PM\nLead Facilitator: zzz\nDetails: zzzz\nPlease be guided accordingly. Thank you!','sent',NULL,'event_created',7,'2026-10-06 12:38:07'),
-(4,+639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new community event has been scheduled in your barangay:\nEvent: asdqwe\nVenue: asdasd\nStart: Oct 07, 2026 12:00 PM\nEnd: Oct 07, 2026 03:00 PM\nLead Facilitator: asdasdasd\nDetails: asdasd\nPlease be guided accordingly. Thank you!','simulated (No API Key)','Notice: SMS Gateway API Key is not yet configured in backend/config/config.php (SMS_API_KEY). Message was logged into database successfully.','event_created',5,'2026-10-06 12:43:38'),
-(5,+639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: eee\nVenue: eeee\nStart: Oct 07, 2026 01:00 PM\nEnd: Oct 07, 2026 04:00 PM\nLead Facilitator: eee\nDetails: eeee\nPlease be guided accordingly. Thank you!','failed','Your account has not yet been approved for sending messages. Please either top-up your account or wait for your account to be approved. If your account has not been approved within 2 business days, please email support@semaphore.co','event_created',8,'2026-10-06 13:22:06'),
-(6,+639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: asasas\nVenue: asasas\nStart: Oct 07, 2026 01:00 PM\nEnd: Oct 07, 2026 04:00 PM\nLead Facilitator: asas\nDetails: asasas\nPlease be guided accordingly. Thank you!','failed','Your account has not yet been approved for sending messages. Please either top-up your account or wait for your account to be approved. If your account has not been approved within 2 business days, please email support@semaphore.co','event_created',9,'2026-10-06 13:31:57'),
-(7,+639701965951,'angel nadayag','Test SMS advisory from Barangay Disaster System','simulated (TextBee Key needed)','TextBee Free Gateway selected. Please register at https://app.textbee.dev, install the TextBee Android app, and paste your TEXTBEE_API_KEY into .env.','test',1,'2026-10-06 13:48:08'),
-(8,+639701965951,'angel nadayag','Test SMS advisory from Barangay Disaster System','failed','{\"success\":false,\"error\":\"No enabled device found. Enable a device or pass a deviceId.\"}','test',1,'2026-10-06 13:57:05'),
-(9,+639701965951,'angel nadayag','Test SMS advisory from Barangay Disaster System','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac493f82597187c9cc0f683\",\"recipientCount\":1}}','test',1,'2026-10-06 14:23:52'),
-(10,+639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: yyy\nVenue: yyy\nStart: Oct 07, 2026 02:00 PM\nEnd: Oct 07, 2026 05:00 PM\nLead Facilitator: yyy\nDetails: yyy\nPlease be guided accordingly. Thank you!','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac494b72597187c9cc19261\",\"recipientCount\":1}}','event_created',10,'2026-10-06 14:27:04'),
-(11,+639701965951,'angel nadayag','BARANGAY DISASTER RISK REDUCTION AND MANAGEMENT COMMITTEE (Hinaplanon)\nHi angel nadayag!\nYou are registered for: Community Earthquake & Evacuation Drill\nVenue: Barangay Covered Court\nStart: Oct 07, 2026 09:00 AM\nEnd: Oct 07, 2026 12:00 PM\nLead Facilitator: Barangay Disaster Team\nDetails: Community disaster preparedness and safety orientation.\nThank you for participating!','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac4963c2597187c9cc2cd20\",\"recipientCount\":1}}','event',1,'2026-10-06 14:33:32'),
-(12,+639701965951,'angel nadayag','BARANGAY DISASTER RISK REDUCTION AND MANAGEMENT COMMITTEE (Hinaplanon)\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: sample\nVenue: sample1\nStart: Oct 07, 2026 02:00 PM\nEnd: Oct 07, 2026 05:00 PM\nLead Facilitator: sample1\nDetails: sample1\nPlease be guided accordingly. Thank you!','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac496972597187c9cc311a7\",\"recipientCount\":1}}','event_created',11,'2026-10-06 14:35:04');
+(4,639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new community event has been scheduled in your barangay:\nEvent: asdqwe\nVenue: asdasd\nStart: Oct 07, 2026 12:00 PM\nEnd: Oct 07, 2026 03:00 PM\nLead Facilitator: asdasdasd\nDetails: asdasd\nPlease be guided accordingly. Thank you!','simulated (No API Key)','Notice: SMS Gateway API Key is not yet configured in backend/config/config.php (SMS_API_KEY). Message was logged into database successfully.','event_created',5,'2026-10-06 12:43:38'),
+(5,639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: eee\nVenue: eeee\nStart: Oct 07, 2026 01:00 PM\nEnd: Oct 07, 2026 04:00 PM\nLead Facilitator: eee\nDetails: eeee\nPlease be guided accordingly. Thank you!','failed','Your account has not yet been approved for sending messages. Please either top-up your account or wait for your account to be approved. If your account has not been approved within 2 business days, please email support@semaphore.co','event_created',8,'2026-10-06 13:22:06'),
+(6,639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: asasas\nVenue: asasas\nStart: Oct 07, 2026 01:00 PM\nEnd: Oct 07, 2026 04:00 PM\nLead Facilitator: asas\nDetails: asasas\nPlease be guided accordingly. Thank you!','failed','Your account has not yet been approved for sending messages. Please either top-up your account or wait for your account to be approved. If your account has not been approved within 2 business days, please email support@semaphore.co','event_created',9,'2026-10-06 13:31:57'),
+(7,639701965951,'angel nadayag','Test SMS advisory from Barangay Disaster System','simulated (TextBee Key needed)','TextBee Free Gateway selected. Please register at https://app.textbee.dev, install the TextBee Android app, and paste your TEXTBEE_API_KEY into .env.','test',1,'2026-10-06 13:48:08'),
+(8,639701965951,'angel nadayag','Test SMS advisory from Barangay Disaster System','failed','{\"success\":false,\"error\":\"No enabled device found. Enable a device or pass a deviceId.\"}','test',1,'2026-10-06 13:57:05'),
+(9,639701965951,'angel nadayag','Test SMS advisory from Barangay Disaster System','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac493f82597187c9cc0f683\",\"recipientCount\":1}}','test',1,'2026-10-06 14:23:52'),
+(10,639701965951,'angel nadayag','BARANGAY DISASTER ADVISORY\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: yyy\nVenue: yyy\nStart: Oct 07, 2026 02:00 PM\nEnd: Oct 07, 2026 05:00 PM\nLead Facilitator: yyy\nDetails: yyy\nPlease be guided accordingly. Thank you!','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac494b72597187c9cc19261\",\"recipientCount\":1}}','event_created',10,'2026-10-06 14:27:04'),
+(11,639701965951,'angel nadayag','BARANGAY DISASTER RISK REDUCTION AND MANAGEMENT COMMITTEE (Hinaplanon)\nHi angel nadayag!\nYou are registered for: Community Earthquake & Evacuation Drill\nVenue: Barangay Covered Court\nStart: Oct 07, 2026 09:00 AM\nEnd: Oct 07, 2026 12:00 PM\nLead Facilitator: Barangay Disaster Team\nDetails: Community disaster preparedness and safety orientation.\nThank you for participating!','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac4963c2597187c9cc2cd20\",\"recipientCount\":1}}','event',1,'2026-10-06 14:33:32'),
+(12,639701965951,'angel nadayag','BARANGAY DISASTER RISK REDUCTION AND MANAGEMENT COMMITTEE (Hinaplanon)\nHi angel nadayag!\nA new event has been scheduled in your barangay:\nEvent: sample\nVenue: sample1\nStart: Oct 07, 2026 02:00 PM\nEnd: Oct 07, 2026 05:00 PM\nLead Facilitator: sample1\nDetails: sample1\nPlease be guided accordingly. Thank you!','sent','{\"data\":{\"success\":true,\"message\":\"SMS added to queue for processing\",\"smsBatchId\":\"6ac496972597187c9cc311a7\",\"recipientCount\":1}}','event_created',11,'2026-10-06 14:35:04');
 /*!40000 ALTER TABLE `sms_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
