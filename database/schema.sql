@@ -186,15 +186,105 @@ CREATE TABLE `evacuation_center_resources` (
   CONSTRAINT `evacuation_center_resources_ibfk_1` FOREIGN KEY (`evacuation_area_id`) REFERENCES `evacuation_areas` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `financial_aid_allocations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `financial_aid_allocations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `allocation_code` varchar(50) NOT NULL,
+  `program_name` varchar(150) NOT NULL,
+  `disaster_type` varchar(50) DEFAULT NULL,
+  `barangay_id` int(11) NOT NULL,
+  `total_budget` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `amount_per_beneficiary` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `disbursed_budget` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `remaining_budget` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `funding_source` varchar(150) NOT NULL DEFAULT 'LGU Calamity Fund (QRF)',
+  `target_beneficiaries` int(11) NOT NULL DEFAULT 0,
+  `status` enum('Active','Completed','Archived') NOT NULL DEFAULT 'Active',
+  `added_type` enum('ai_recommended','added_by_admin') NOT NULL DEFAULT 'ai_recommended',
+  `notes` text DEFAULT NULL,
+  `allocated_by` int(11) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `allocation_code` (`allocation_code`),
+  KEY `barangay_id` (`barangay_id`),
+  KEY `allocated_by` (`allocated_by`),
+  CONSTRAINT `financial_aid_allocations_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `financial_aid_allocations_ibfk_2` FOREIGN KEY (`allocated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `financial_aid_distributions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `financial_aid_distributions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `allocation_id` int(11) NOT NULL,
+  `barangay_id` int(11) NOT NULL,
+  `resident_id` int(11) DEFAULT NULL,
+  `beneficiary_name` varchar(150) NOT NULL,
+  `purok` varchar(100) NOT NULL,
+  `phone` varchar(30) NOT NULL,
+  `amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `claim_status` enum('Pending','Claimed','Unclaimed') NOT NULL DEFAULT 'Pending',
+  `claim_date` datetime DEFAULT NULL,
+  `reference_no` varchar(50) DEFAULT NULL,
+  `sms_status` varchar(30) DEFAULT 'not_sent',
+  `disbursed_by` int(11) DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `reference_no` (`reference_no`),
+  KEY `allocation_id` (`allocation_id`),
+  KEY `barangay_id` (`barangay_id`),
+  KEY `resident_id` (`resident_id`),
+  KEY `disbursed_by` (`disbursed_by`),
+  CONSTRAINT `financial_aid_distributions_ibfk_1` FOREIGN KEY (`allocation_id`) REFERENCES `financial_aid_allocations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `financial_aid_distributions_ibfk_2` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `financial_aid_distributions_ibfk_3` FOREIGN KEY (`resident_id`) REFERENCES `residents` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `financial_aid_distributions_ibfk_4` FOREIGN KEY (`disbursed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `financial_aid_audits`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `financial_aid_audits` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `allocation_id` int(11) DEFAULT NULL,
+  `distribution_id` int(11) DEFAULT NULL,
+  `barangay_id` int(11) NOT NULL,
+  `action` varchar(50) NOT NULL,
+  `details` text NOT NULL,
+  `amount` decimal(12,2) DEFAULT NULL,
+  `actor_id` int(11) DEFAULT NULL,
+  `actor_name` varchar(100) NOT NULL,
+  `actor_role` varchar(50) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `allocation_id` (`allocation_id`),
+  KEY `distribution_id` (`distribution_id`),
+  KEY `barangay_id` (`barangay_id`),
+  KEY `actor_id` (`actor_id`),
+  CONSTRAINT `financial_aid_audits_ibfk_1` FOREIGN KEY (`allocation_id`) REFERENCES `financial_aid_allocations` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `financial_aid_audits_ibfk_2` FOREIGN KEY (`distribution_id`) REFERENCES `financial_aid_distributions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `financial_aid_audits_ibfk_3` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `financial_aid_audits_ibfk_4` FOREIGN KEY (`actor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `hazard_type_options`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `hazard_type_options` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `purok_id` int(11) DEFAULT NULL,
+  `barangay_id` int(11) DEFAULT NULL,
   `name` varchar(150) NOT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
+  KEY `purok_id` (`purok_id`),
+  KEY `barangay_id` (`barangay_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `notification_reads`;
