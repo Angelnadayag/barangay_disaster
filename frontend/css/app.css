@@ -2738,5 +2738,286 @@ body.citizen-responder-shell .tac-date-day {
   flex-wrap: wrap;
 }
 
+/* ==========================================================================
+   Evacuation Routing Component (Home Page Scroll-Down Section)
+   Mobile-First, strictly 9-11px details, 14-16px headings, anti-slop
+   ========================================================================== */
+.evac-routing-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 10px);
+  margin-top: var(--space-4, 16px);
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--color-border-light, #E2E8F0);
+}
+
+.evac-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evac-section-title {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: var(--color-primary, #17324D) !important;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.evac-filter-deck {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evac-filter-pills {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.evac-filter-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.evac-pill-btn {
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border, #D9E0E3);
+  background: var(--color-surface, #FFFFFF);
+  color: var(--color-text-secondary, #66737D);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+.evac-pill-btn.active,
+.evac-pill-btn:hover {
+  background: var(--color-primary, #17324D);
+  border-color: var(--color-primary, #17324D);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.evac-content-split {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 901px) {
+  .evac-content-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.evac-shelters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.evac-shelter-card {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.evac-shelter-card:hover {
+  border-color: var(--color-secondary, #2F6F73);
+}
+.evac-shelter-card.active-routed {
+  border: 2px solid var(--color-primary, #17324D);
+  background: #FDFEFE;
+}
+
+.evac-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.evac-card-title {
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  color: var(--color-primary, #17324D) !important;
+  line-height: 1.25;
+  margin: 0 !important;
+}
+
+.evac-card-subtitle {
+  font-size: 10px;
+  color: var(--color-text-secondary, #66737D);
+  margin-top: 1px;
+}
+
+.evac-occupancy-wrap {
+  background: var(--color-surface-subtle, #F0F3F4);
+  border: 1px solid var(--color-border-light, #E7EDF0);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+
+.evac-progress-bar-bg {
+  width: 100%;
+  height: 5px;
+  background: #D9E0E3;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 3px;
+}
+
+.evac-progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.evac-amenities-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 9.5px;
+}
+
+.evac-utility-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.evac-utility-badge.avail {
+  background: #EAF4EB;
+  color: #2E7D32;
+  border-color: #BCE3C1;
+}
+.evac-utility-badge.unavail {
+  background: var(--color-surface-subtle, #F0F3F4);
+  color: var(--color-text-muted, #8A96A0);
+  border-color: var(--color-border-light, #E7EDF0);
+}
+
+.evac-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--color-border-light, #E7EDF0);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.evac-route-btn {
+  background: var(--color-primary, #17324D) !important;
+  color: #FFFFFF !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  padding: 5px 12px !important;
+  border: 1px solid #102336 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  text-decoration: none !important;
+}
+.evac-route-btn:hover {
+  background: #214364 !important;
+}
+
+.evac-map-wrapper {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.evac-map-header {
+  padding: 8px 12px;
+  background: var(--color-surface-subtle, #F0F3F4);
+  border-bottom: 1px solid var(--color-border-light, #E2E8F0);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-primary, #17324D);
+}
+
+.evac-live-map-box {
+  width: 100%;
+  height: 380px;
+}
+@media (min-width: 901px) {
+  .evac-live-map-box {
+    height: 470px;
+  }
+}
+
+.evac-route-sheet {
+  background: #FFFFFF;
+  border-top: 1px solid var(--color-border, #D9E0E3);
+  padding: 10px 12px;
+  display: none;
+}
+.evac-route-sheet.active {
+  display: block;
+}
+
+.route-stat-box {
+  background: var(--color-surface-subtle, #F0F3F4);
+  border: 1px solid var(--color-border-light, #E7EDF0);
+  border-radius: 6px;
+  padding: 6px;
+  text-align: center;
+}
+.route-stat-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  line-height: 1.1;
+}
+.route-stat-lbl {
+  font-size: 9px;
+  color: var(--color-text-secondary, #66737D);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+
 
 

@@ -45,6 +45,50 @@ if (empty($localEvacs)) {
     $localEvacs = $evacStmt2->fetchAll();
 }
 
+// Fetch all evacuation areas for the interactive routing section on scroll-down
+$allEvacStmt = $db->query("
+    SELECT ea.*, 
+           ea.capacity_individuals AS capacity, 
+           ea.current_evacuees_count AS current_evacuees,
+           ea.has_electricity AS has_power, 
+           ea.has_potable_water AS has_water, 
+           ea.has_medical_station AS has_medical,
+           ea.location_address AS location_details,
+           ea.coordinates_lat AS latitude,
+           ea.coordinates_lng AS longitude,
+           b.name AS barangay_name, 
+           b.risk_level AS brgy_risk
+    FROM evacuation_areas ea
+    JOIN barangays b ON ea.barangay_id = b.id
+    ORDER BY (ea.barangay_id = {$barangayId}) DESC, FIELD(ea.status, 'Open / Active', 'Open', 'Standby', 'At Capacity', 'Closed'), ea.name ASC
+");
+$allEvacAreas = $allEvacStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// JSON for Leaflet routing map markers
+$evacMarkersJson = [];
+foreach ($allEvacAreas as $ea) {
+    if (!empty($ea['latitude']) && !empty($ea['longitude'])) {
+        $evacMarkersJson[] = [
+            'id' => (int)$ea['id'],
+            'brgy_id' => (int)$ea['barangay_id'],
+            'name' => $ea['name'],
+            'barangay' => $ea['barangay_name'],
+            'lat' => (float)$ea['latitude'],
+            'lng' => (float)$ea['longitude'],
+            'status' => $ea['status'],
+            'capacity' => (int)$ea['capacity'],
+            'current' => (int)$ea['current_evacuees'],
+            'power' => (bool)$ea['has_power'],
+            'water' => (bool)$ea['has_water'],
+            'medical' => (bool)$ea['has_medical'],
+            'address' => $ea['location_details'] ?? $ea['location_address'] ?? '',
+            'officer' => $ea['contact_officer'] ?? '',
+            'phone' => $ea['contact_number'] ?? '',
+            'accessibility' => $ea['accessibility'] ?? 'All Vehicles'
+        ];
+    }
+}
+
 // Latest Public Advisories
 $notifStmt = $db->prepare("
     SELECT n.*, b.name AS barangay_name 
@@ -114,19 +158,23 @@ foreach ($scheduleEvents as $ev) {
     ];
 }
 
-$pageTitle = "Community Safety Dashboard";
+$pageTitle = "Community Safety Home";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
+
+<!-- Leaflet GIS Map Dependencies for Evacuation Routing -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Page Header -->
   <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?> Resident Dashboard</h1>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?> Resident Home</h1>
     </div>
     <div class="page-header-actions">
-      <a href="evacuation.php" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+      <a href="#evacuation-routing" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-        Evacuation Routing
+        Evacuation Routing &darr;
       </a>
     </div>
   </div>
@@ -138,7 +186,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <span style="color:#ef4444;">⚠️</span>
         <span>High Inundation Risk Sector — Monitor Evacuation Alerts</span>
       </div>
-      <a href="risk-map.php" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 9px;">Map View</a>
+      <a href="#evacuation-routing" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 9px;">Map View &darr;</a>
     </div>
   <?php endif; ?>
 
@@ -223,7 +271,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <div class="card" style="margin-bottom:0;">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
           <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Designated Evacuation Shelters</h2>
-          <a href="evacuation.php" style="font-size:11px;color:var(--color-secondary);font-weight:600;">View All &rarr;</a>
+          <a href="#evacuation-routing" style="font-size:11px;color:var(--color-secondary);font-weight:600;">View Map &amp; All &darr;</a>
         </div>
         <div class="card-body" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
           <?php if (empty($localEvacs)): ?>
@@ -253,7 +301,7 @@ require_once __DIR__ . '/../layouts/header.php';
                     </span>
                   </div>
                 </div>
-                <a href="evacuation.php" class="btn btn-outline btn-sm" style="font-size:10.5px;padding:4px 10px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">
+                <a href="#evacuation-routing" onclick="plotEvacuationRoute(<?= (int)$ev['id'] ?>)" class="btn btn-outline btn-sm" style="font-size:10.5px;padding:4px 10px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
                   Route
                 </a>
@@ -338,16 +386,16 @@ require_once __DIR__ . '/../layouts/header.php';
           <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Community Safety Links</h2>
         </div>
         <div class="card-body" style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;">
-          <a href="evacuation.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+          <a href="#evacuation-routing" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
             <span>Evacuation Centers &amp; Route Map</span>
-            <span>&rarr;</span>
+            <span>&darr;</span>
           </a>
           <a href="events.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
             <span>Preparedness Events &amp; Drills</span>
             <span>&rarr;</span>
           </a>
-          <a href="risk-map.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
-            <span>Flood Risk &amp; Hazard Map</span>
+          <a href="notifications.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+            <span>Safety Advisories &amp; Bulletins</span>
             <span>&rarr;</span>
           </a>
         </div>
@@ -355,6 +403,165 @@ require_once __DIR__ . '/../layouts/header.php';
 
     </div>
   </div>
+
+  <!-- Evacuation Routing & Safe Shelters (Scroll-Down Section) -->
+  <section class="evac-routing-section" id="evacuation-routing">
+    <div class="evac-section-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h2 class="evac-section-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-secondary);">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+          </svg>
+          Evacuation Routing &amp; Safe Shelters Directory
+        </h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button type="button" class="btn btn-secondary btn-sm" id="resGpsLocateBtn" style="font-size:10px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          Locate Me
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Deck -->
+    <div class="evac-filter-deck">
+      <div class="evac-filter-pills">
+        <button type="button" class="evac-pill-btn active" data-res-filter="all">All Shelters (<?= count($allEvacAreas) ?>)</button>
+        <button type="button" class="evac-pill-btn" data-res-filter="local">My Barangay (Brgy. <?= clean($barangay['name'] ?? 'Local') ?>)</button>
+        <button type="button" class="evac-pill-btn" data-res-filter="open">Open / Active</button>
+        <button type="button" class="evac-pill-btn" data-res-filter="standby">Standby</button>
+      </div>
+    </div>
+
+    <!-- Content Split: Shelters List + Interactive Map -->
+    <div class="evac-content-split">
+      <!-- Shelters Cards List -->
+      <div class="evac-shelters-list" id="resShelterCardsWrap">
+        <?php foreach ($allEvacAreas as $center): 
+          $cap = (int)$center['capacity'];
+          $current = (int)$center['current_evacuees'];
+          $pct = $cap > 0 ? min(100, round(($current / $cap) * 100)) : 0;
+          $remaining = max(0, $cap - $current);
+          $isFull = ($center['status'] === 'At Capacity' || $pct >= 100);
+          $barColor = $isFull ? 'var(--color-danger, #C62828)' : ($pct >= 75 ? 'var(--color-warning, #B78103)' : 'var(--color-success, #2E7D32)');
+          $isMyBrgy = ((int)$center['barangay_id'] === $barangayId);
+        ?>
+          <div class="evac-shelter-card"
+               id="res-shelter-card-<?= (int)$center['id'] ?>"
+               data-id="<?= (int)$center['id'] ?>"
+               data-brgy-id="<?= (int)$center['barangay_id'] ?>"
+               data-status="<?= clean($center['status']) ?>"
+               data-lat="<?= (float)$center['latitude'] ?>"
+               data-lng="<?= (float)$center['longitude'] ?>">
+            <div class="evac-card-head">
+              <div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <h3 class="evac-card-title"><?= clean($center['name']) ?></h3>
+                  <?php if ($isMyBrgy): ?>
+                    <span class="badge badge-primary" style="font-size:9px;padding:1px 5px;">Local</span>
+                  <?php endif; ?>
+                </div>
+                <div class="evac-card-subtitle">
+                  Brgy. <?= clean($center['barangay_name']) ?> &bull; <?= clean($center['center_type'] ?? 'Evacuation Center') ?>
+                </div>
+              </div>
+              <div>
+                <?= renderStatusBadge($center['status']) ?>
+              </div>
+            </div>
+
+            <!-- Distance and Address -->
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;">
+              <span style="color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px;">
+                <?= clean($center['location_details'] ?? $center['location_address'] ?? 'Designated Safe Center') ?>
+              </span>
+              <span class="badge badge-neutral shelter-dist-badge" id="res-dist-badge-<?= (int)$center['id'] ?>" style="font-size:9.5px;font-weight:700;">
+                -- km
+              </span>
+            </div>
+
+            <!-- Occupancy bar -->
+            <div class="evac-occupancy-wrap">
+              <div style="display:flex;justify-content:space-between;font-size:10px;">
+                <span style="font-weight:600;">Load</span>
+                <span style="font-weight:700;color:<?= $barColor ?>;">
+                  <?= number_format($current) ?> / <?= number_format($cap) ?> (<?= $pct ?>%)
+                </span>
+              </div>
+              <div class="evac-progress-bar-bg">
+                <div class="evac-progress-bar-fill" style="width:<?= $pct ?>%;background:<?= $barColor ?>;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--color-text-muted);margin-top:2px;">
+                <span>Slots: <?= number_format($remaining) ?></span>
+                <span>Convoy: <?= clean($center['accessibility'] ?? 'All Vehicles') ?></span>
+              </div>
+            </div>
+
+            <!-- Amenities -->
+            <div class="evac-amenities-row">
+              <span class="evac-utility-badge <?= $center['has_power'] ? 'avail' : 'unavail' ?>">
+                <?= $center['has_power'] ? '✓ Power' : '✕ No Power' ?>
+              </span>
+              <span class="evac-utility-badge <?= $center['has_water'] ? 'avail' : 'unavail' ?>">
+                <?= $center['has_water'] ? '✓ Water' : '✕ Water Truck' ?>
+              </span>
+              <span class="evac-utility-badge <?= $center['has_medical'] ? 'avail' : 'unavail' ?>">
+                <?= $center['has_medical'] ? '✓ Medical' : '✕ No Clinic' ?>
+              </span>
+            </div>
+
+            <!-- Actions -->
+            <div class="evac-card-actions">
+              <?php if (!empty($center['contact_number'])): ?>
+                <a href="tel:<?= clean($center['contact_number']) ?>" class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px;">
+                  📞 <?= clean($center['contact_officer'] ?: 'Contact') ?>
+                </a>
+              <?php else: ?>
+                <span style="font-size:9.5px;color:var(--color-text-muted);">Hotline 161</span>
+              <?php endif; ?>
+              <button type="button" class="evac-route-btn" onclick="plotEvacuationRoute(<?= (int)$center['id'] ?>)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                Route
+              </button>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+
+      <!-- Live Evacuation Route Map -->
+      <div class="evac-map-wrapper">
+        <div class="evac-map-header">
+          <span>Live Evacuation Routing Map</span>
+          <span style="font-size:9.5px;color:var(--color-text-muted);">OSM / Leaflet</span>
+        </div>
+        <div id="homeEvacMap" class="evac-live-map-box"></div>
+        <div id="homeRouteSheet" class="evac-route-sheet">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div>
+              <span class="badge badge-success" style="font-size:9px;padding:2px 5px;">Active Route</span>
+              <h4 id="sheetTargetName" style="font-size:13px;font-weight:700;color:var(--color-primary);margin:2px 0 1px 0;">Selected Shelter</h4>
+              <div id="sheetTargetAddress" style="font-size:10px;color:var(--color-text-secondary);">—</div>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="clearHomeRoute()" style="padding:3px 7px;font-size:9.5px;">Close Route</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+            <div class="route-stat-box">
+              <div class="route-stat-val" id="sheetDistVal">0.0 km</div>
+              <div class="route-stat-lbl">Distance</div>
+            </div>
+            <div class="route-stat-box">
+              <div class="route-stat-val" id="sheetWalkVal">0 min</div>
+              <div class="route-stat-lbl">Walk</div>
+            </div>
+            <div class="route-stat-box">
+              <div class="route-stat-val" id="sheetDriveVal">0 min</div>
+              <div class="route-stat-lbl">Drive</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
 <script>
 (function() {
@@ -638,6 +845,216 @@ require_once __DIR__ . '/../layouts/header.php';
   const selParts = initDateStr.split('-');
   renderCalendar(parseInt(selParts[0], 10), parseInt(selParts[1], 10) - 1);
   selectDate(initDateStr);
+})();
+
+// Evacuation Map & Live Routing Engine (Resident Home)
+(function() {
+  const evacShelters = <?= json_encode($evacMarkersJson) ?>;
+  const residentBrgyLat = <?= (float)($barangay['coordinates_lat'] ?? 8.246596) ?>;
+  const residentBrgyLng = <?= (float)($barangay['coordinates_lng'] ?? 124.259474) ?>;
+  const myBrgyId = <?= (int)$barangayId ?>;
+
+  let userCoords = [residentBrgyLat, residentBrgyLng];
+  let map = null;
+  let userMarker = null;
+  let shelterMarkers = {};
+  let activeRouteLine = null;
+
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  function updateAllDistanceBadges() {
+    evacShelters.forEach(s => {
+      const dist = calculateDistance(userCoords[0], userCoords[1], s.lat, s.lng);
+      const el = document.getElementById(`res-dist-badge-${s.id}`);
+      if (el) el.textContent = `${dist.toFixed(1)} km`;
+    });
+  }
+
+  function initMap() {
+    const mapContainer = document.getElementById('homeEvacMap');
+    if (!mapContainer || typeof L === 'undefined') return;
+
+    map = L.map('homeEvacMap', {
+      center: userCoords,
+      zoom: 14,
+      zoomControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    // User location marker
+    const userIcon = L.divIcon({
+      className: 'user-pin',
+      html: '<div style="background:#17324D;color:#FFF;width:24px;height:24px;border-radius:50%;border:2px solid #FFF;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,0.3);">📍</div>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+    userMarker = L.marker(userCoords, { icon: userIcon }).addTo(map)
+      .bindPopup('<strong>Your Location</strong><br>Default: Brgy. <?= clean($barangay['name'] ?? 'Center') ?>');
+
+    // Add Shelter markers
+    evacShelters.forEach(s => {
+      const pinColor = (s.status === 'Open / Active' || s.status === 'Open') ? '#2E7D32' : ((s.status === 'Standby') ? '#B78103' : '#C62828');
+      const shelterIcon = L.divIcon({
+        className: 'shelter-pin',
+        html: `<div style="background:${pinColor};color:#FFF;width:22px;height:22px;border-radius:50%;border:2px solid #FFF;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;box-shadow:0 2px 5px rgba(0,0,0,0.25);">🏛️</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+
+      const m = L.marker([s.lat, s.lng], { icon: shelterIcon }).addTo(map);
+      m.bindPopup(`
+        <div style="font-size:11px;padding:2px 0;">
+          <strong style="color:#17324D;">${s.name}</strong><br>
+          <span style="font-size:9.5px;color:#666;">Brgy. ${s.barangay}</span><br>
+          <div style="margin-top:4px;">
+            <button onclick="plotEvacuationRoute(${s.id})" style="background:#17324D;color:#FFF;border:none;border-radius:4px;font-size:9.5px;padding:3px 8px;cursor:pointer;">Plot Route &rarr;</button>
+          </div>
+        </div>
+      `);
+      shelterMarkers[s.id] = m;
+    });
+
+    updateAllDistanceBadges();
+  }
+
+  window.plotEvacuationRoute = function(shelterId) {
+    const s = evacShelters.find(item => item.id === shelterId);
+    if (!s || !map) return;
+
+    // Highlight card
+    document.querySelectorAll('#resShelterCardsWrap .evac-shelter-card').forEach(c => c.classList.remove('active-routed'));
+    const targetCard = document.getElementById(`res-shelter-card-${shelterId}`);
+    if (targetCard) {
+      targetCard.classList.add('active-routed');
+      targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Clear previous line
+    if (activeRouteLine) {
+      map.removeLayer(activeRouteLine);
+    }
+
+    // Draw route polyline
+    const latlngs = [userCoords, [s.lat, s.lng]];
+    activeRouteLine = L.polyline(latlngs, {
+      color: '#2F6F73',
+      weight: 4,
+      dashArray: '6, 6',
+      opacity: 0.9
+    }).addTo(map);
+
+    map.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+
+    // Open popup
+    if (shelterMarkers[shelterId]) {
+      shelterMarkers[shelterId].openPopup();
+    }
+
+    // Update bottom sheet
+    const distKm = calculateDistance(userCoords[0], userCoords[1], s.lat, s.lng);
+    const walkMin = Math.round((distKm / 4.5) * 60);
+    const driveMin = Math.max(1, Math.round((distKm / 30) * 60));
+
+    const sheet = document.getElementById('homeRouteSheet');
+    if (sheet) {
+      sheet.classList.add('active');
+      document.getElementById('sheetTargetName').textContent = s.name;
+      document.getElementById('sheetTargetAddress').textContent = `${s.address} (Brgy. ${s.barangay})`;
+      document.getElementById('sheetDistVal').textContent = `${distKm.toFixed(1)} km`;
+      document.getElementById('sheetWalkVal').textContent = `${walkMin} min`;
+      document.getElementById('sheetDriveVal').textContent = `${driveMin} min`;
+    }
+  };
+
+  window.clearHomeRoute = function() {
+    if (activeRouteLine && map) {
+      map.removeLayer(activeRouteLine);
+      activeRouteLine = null;
+    }
+    const sheet = document.getElementById('homeRouteSheet');
+    if (sheet) sheet.classList.remove('active');
+    document.querySelectorAll('#resShelterCardsWrap .evac-shelter-card').forEach(c => c.classList.remove('active-routed'));
+    if (map) map.setView(userCoords, 14);
+  };
+
+  // Filter pills
+  document.querySelectorAll('[data-res-filter]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-res-filter]').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const filter = this.getAttribute('data-res-filter');
+
+      document.querySelectorAll('#resShelterCardsWrap .evac-shelter-card').forEach(card => {
+        const brgyId = parseInt(card.getAttribute('data-brgy-id'), 10);
+        const status = card.getAttribute('data-status');
+        let show = true;
+
+        if (filter === 'local') {
+          show = (brgyId === myBrgyId);
+        } else if (filter === 'open') {
+          show = (status === 'Open / Active' || status === 'Open');
+        } else if (filter === 'standby') {
+          show = (status === 'Standby');
+        }
+
+        card.style.display = show ? 'flex' : 'none';
+      });
+    });
+  });
+
+  // GPS Locate Button
+  const locateBtn = document.getElementById('resGpsLocateBtn');
+  if (locateBtn) {
+    locateBtn.addEventListener('click', function() {
+      if (!navigator.geolocation) {
+        if (typeof showToast === 'function') showToast('Geolocation is not supported by your browser.', 'danger');
+        return;
+      }
+      locateBtn.disabled = true;
+      locateBtn.textContent = 'Locating...';
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          userCoords = [pos.coords.latitude, pos.coords.longitude];
+          if (userMarker && map) {
+            userMarker.setLatLng(userCoords);
+            userMarker.setPopupContent('<strong>Current GPS Position</strong>');
+            map.setView(userCoords, 15);
+          }
+          updateAllDistanceBadges();
+          locateBtn.disabled = false;
+          locateBtn.textContent = 'GPS Active';
+          if (typeof showToast === 'function') showToast('Location updated via GPS.', 'success');
+        },
+        err => {
+          locateBtn.disabled = false;
+          locateBtn.textContent = 'Locate Me';
+          if (typeof showToast === 'function') showToast('Could not retrieve GPS location.', 'danger');
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
+  }
+
+  // Init on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMap);
+  } else {
+    initMap();
+  }
 })();
 </script>
 

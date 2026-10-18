@@ -50,9 +50,9 @@ require_once __DIR__ . '/../layouts/header.php';
       <h1 style="font-size:16px;font-weight:700;margin:0;">Active Incidents Dispatch Directory</h1>
     </div>
     <div class="page-header-actions">
-      <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="btn btn-outline btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon></svg>
-        Tactical Map View
+      <a href="<?= BASE_URL ?>/views/responder/dashboard.php#evacuation-routing" class="btn btn-outline btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Evacuation Map View
       </a>
     </div>
   </div>
