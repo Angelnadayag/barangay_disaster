@@ -14,22 +14,38 @@ $db = getDBConnection();
 
 $returnUrl = $_POST['return_url'] ?? ($_SERVER['HTTP_REFERER'] ?? (BASE_URL . '/views/icdrrmo/notifications.php'));
 
-$stmt = $db->prepare("
-    INSERT IGNORE INTO notification_reads (notification_id, user_id, read_at)
-    SELECT n.id, ?, NOW()
-    FROM notifications n
-    WHERE (
-        n.target_role = 'all'
-        OR n.target_role = ?
-        OR (n.target_barangay_id IS NOT NULL AND n.target_barangay_id = ?)
-        OR n.target_user_id = ?
-    )
-");
-$stmt->execute([
-    $user['id'],
-    $user['role'],
-    $user['barangay_id'],
-    $user['id']
-]);
+if (in_array($user['role'] ?? '', ['resident', 'responder'], true)) {
+    $stmt = $db->prepare("
+        INSERT IGNORE INTO notification_reads (notification_id, user_id, read_at)
+        SELECT n.id, ?, NOW()
+        FROM notifications n
+        WHERE n.target_barangay_id = ?
+          AND (n.target_role IN ('all', ?) OR n.target_user_id = ?)
+    ");
+    $stmt->execute([
+        $user['id'],
+        (int)($user['barangay_id'] ?? 0),
+        $user['role'],
+        $user['id']
+    ]);
+} else {
+    $stmt = $db->prepare("
+        INSERT IGNORE INTO notification_reads (notification_id, user_id, read_at)
+        SELECT n.id, ?, NOW()
+        FROM notifications n
+        WHERE (
+            n.target_role = 'all'
+            OR n.target_role = ?
+            OR (n.target_barangay_id IS NOT NULL AND n.target_barangay_id = ?)
+            OR n.target_user_id = ?
+        )
+    ");
+    $stmt->execute([
+        $user['id'],
+        $user['role'],
+        $user['barangay_id'],
+        $user['id']
+    ]);
+}
 
 redirectWithFlash($returnUrl, 'success', 'All notifications marked as read.');

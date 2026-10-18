@@ -289,9 +289,12 @@ if ($fRole === 'resident' || $fRole === 'responder'):
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <span>Events</span>
     </a>
-    <a href="<?= BASE_URL ?>/views/<?= $fRole ?>/notifications.php" class="bottom-nav-item <?= $fCurrentPage === 'notifications.php' ? 'active' : '' ?>">
+    <a href="<?= BASE_URL ?>/views/<?= $fRole ?>/notifications.php" class="bottom-nav-item <?= $fCurrentPage === 'notifications.php' ? 'active' : '' ?>" style="position:relative;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       <span>Notification</span>
+      <?php if (!empty($unreadCount) && $unreadCount > 0): ?>
+        <span style="position:absolute;top:6px;right:calc(50% - 14px);width:7px;height:7px;background:#ef4444;border-radius:50%;border:1px solid #FFF;"></span>
+      <?php endif; ?>
     </a>
   </nav>
 <?php endif; ?>

@@ -89,18 +89,31 @@ foreach ($allEvacAreas as $ea) {
     }
 }
 
-// Latest Public Advisories
+// Latest Barangay Notifications & Announcements (Strictly scoped to resident's barangay)
 $notifStmt = $db->prepare("
-    SELECT n.*, b.name AS barangay_name 
+    SELECT n.*, b.name AS barangay_name, u.full_name AS sender_name, nr.id AS is_read
     FROM notifications n
     LEFT JOIN barangays b ON n.target_barangay_id = b.id
-    WHERE n.target_role IN ('all', 'resident')
-       OR n.target_barangay_id = ?
-    ORDER BY n.alert_level = 'Critical' DESC, n.created_at DESC
-    LIMIT 4
+    LEFT JOIN users u ON n.created_by = u.id
+    LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+    WHERE n.target_barangay_id = ?
+      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
+    ORDER BY (nr.id IS NULL) DESC, FIELD(n.alert_level, 'urgent', 'warning', 'informational'), n.created_at DESC
+    LIMIT 6
 ");
-$notifStmt->execute([$barangayId]);
-$recentAdvisories = $notifStmt->fetchAll();
+$notifStmt->execute([(int)$user['id'], $barangayId, (int)$user['id']]);
+$recentNotices = $notifStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Metrics for Resident Dashboard Header
+$activeAidCount = (int)$db->query("SELECT COUNT(*) FROM financial_aid_allocations WHERE barangay_id = {$barangayId} AND status = 'Active'")->fetchColumn();
+$openSheltersCount = count(array_filter($localEvacs, fn($e) => in_array($e['status'], ['Open / Active', 'Open'])));
+$unreadNoticesCount = (int)$db->query("
+    SELECT COUNT(*) FROM notifications n 
+    LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = {$user['id']}
+    WHERE n.target_barangay_id = {$barangayId} 
+      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
+      AND nr.id IS NULL
+")->fetchColumn();
 
 // Fetch Preparedness Schedule Drills / Events for Resident
 $actStmt = $db->prepare("
@@ -126,6 +139,8 @@ if (empty($scheduleEvents)) {
     ");
     $scheduleEvents = $actStmt2->fetchAll(PDO::FETCH_ASSOC);
 }
+
+$scheduledDrillsCount = count(array_filter($scheduleEvents, fn($e) => $e['status'] === 'Scheduled'));
 
 // User RSVP status
 $myRsvps = [];
@@ -166,16 +181,219 @@ require_once __DIR__ . '/../layouts/header.php';
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-  <!-- Page Header -->
-  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?> Resident Home</h1>
+<style>
+/* Resident Dashboard Enhancements */
+.resident-welcome-card {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  padding: 14px 18px;
+  margin-bottom: var(--space-3, 12px);
+  box-shadow: 0 1px 3px rgba(23, 50, 77, 0.04);
+}
+.resident-welcome-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.resident-welcome-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  margin: 0 0 2px 0;
+}
+.resident-welcome-sub {
+  font-size: 10.5px;
+  color: var(--color-text-secondary, #2F6F73);
+  font-weight: 500;
+}
+
+.resident-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.resident-stat-pill {
+  background: var(--color-surface-subtle, #F7F8F7);
+  border: 1px solid var(--color-border-light, #E2E8F0);
+  border-radius: 8px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.resident-stat-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #EBF3F5;
+  color: var(--color-secondary, #2F6F73);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.resident-stat-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  line-height: 1.2;
+}
+.resident-stat-lbl {
+  font-size: 9.5px;
+  color: var(--color-text-muted, #66737D);
+  margin-top: 1px;
+}
+
+/* Announcements & Notices Section */
+.resident-notices-card {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  margin-bottom: var(--space-3, 12px);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(23, 50, 77, 0.04);
+}
+.resident-notices-header {
+  padding: 10px 14px;
+  background: var(--color-surface, #FFFFFF);
+  border-bottom: 1px solid var(--color-border-light, #E2E8F0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.resident-notices-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.res-notice-tab-btn {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #D9E0E3);
+  background: var(--color-surface-subtle, #F7F8F7);
+  color: var(--color-text, #24313A);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.res-notice-tab-btn:hover {
+  background: #EBF3F5;
+  color: var(--color-primary, #17324D);
+}
+.res-notice-tab-btn.active {
+  background: var(--color-primary, #17324D);
+  color: #FFFFFF;
+  border-color: var(--color-primary, #17324D);
+}
+
+.resident-notices-body {
+  padding: 12px 14px;
+}
+.resident-notices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 10px;
+}
+.resident-notice-card {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: 8px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.resident-notice-card:hover {
+  border-color: var(--color-secondary, #2F6F73);
+  box-shadow: 0 2px 8px rgba(23, 50, 77, 0.05);
+}
+.resident-notice-card.is-unread {
+  background: #FCFDFD;
+  border-left: 3.5px solid var(--color-secondary, #2F6F73);
+}
+.res-tag-pill {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.2px;
+}
+.res-tag-financial { background: #E8F5E9; color: #1B5E20; }
+.res-tag-resources { background: #E3F2FD; color: #0D47A1; }
+.res-tag-events    { background: #F3E5F5; color: #6A1B9A; }
+.res-tag-advisory  { background: #FFF3E0; color: #E65100; }
+</style>
+
+  <!-- Resident Overview Card -->
+  <div class="resident-welcome-card">
+    <div class="resident-welcome-top">
+      <div>
+        <h1 class="resident-welcome-title">Mabuhay, <?= clean($user['full_name']) ?></h1>
+        <div class="resident-welcome-sub">
+          Resident of <?= clean($user['purok'] ?? 'Purok Mahayahay') ?>, Brgy. <?= clean($barangay['name'] ?? 'Hinaplanon') ?> &bull; Emergency Hotline 161
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <a href="#evacuation-routing" class="btn btn-primary btn-sm" style="font-size:10.5px;padding:5px 11px;display:inline-flex;align-items:center;gap:4px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          Evacuation Routing &darr;
+        </a>
+        <a href="notifications.php" class="btn btn-secondary btn-sm" style="font-size:10.5px;padding:5px 11px;display:inline-flex;align-items:center;gap:4px;">
+          Notices Feed
+          <?php if ($unreadNoticesCount > 0): ?>
+            <span style="background:#ef4444;color:#FFF;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;"><?= $unreadNoticesCount ?></span>
+          <?php endif; ?>
+        </a>
+      </div>
     </div>
-    <div class="page-header-actions">
-      <a href="#evacuation-routing" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-        Evacuation Routing &darr;
-      </a>
+
+    <!-- 4 Stat Pills -->
+    <div class="resident-stat-grid">
+      <div class="resident-stat-pill">
+        <div class="resident-stat-icon">🛡️</div>
+        <div>
+          <div class="resident-stat-val"><?= clean($barangay['risk_level'] ?? 'Normal') ?> Risk</div>
+          <div class="resident-stat-lbl">Barangay Sector Status</div>
+        </div>
+      </div>
+
+      <div class="resident-stat-pill">
+        <div class="resident-stat-icon">💰</div>
+        <div>
+          <div class="resident-stat-val"><?= $activeAidCount ?> Program<?= $activeAidCount === 1 ? '' : 's' ?></div>
+          <div class="resident-stat-lbl">Active Financial Aid</div>
+        </div>
+      </div>
+
+      <div class="resident-stat-pill">
+        <div class="resident-stat-icon">🏛️</div>
+        <div>
+          <div class="resident-stat-val"><?= $openSheltersCount ?> Shelter<?= $openSheltersCount === 1 ? '' : 's' ?> Open</div>
+          <div class="resident-stat-lbl">Designated Evacuation Centers</div>
+        </div>
+      </div>
+
+      <div class="resident-stat-pill">
+        <div class="resident-stat-icon">📅</div>
+        <div>
+          <div class="resident-stat-val"><?= $scheduledDrillsCount ?> Scheduled</div>
+          <div class="resident-stat-lbl">Preparedness Drills</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -184,11 +402,153 @@ require_once __DIR__ . '/../layouts/header.php';
     <div style="background:#FFF;border-left:4px solid #ef4444;border-radius:var(--radius-primary, 10px);padding:9px 12px;margin-bottom:var(--space-3);border:1px solid var(--color-border);display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <div style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--color-primary);">
         <span style="color:#ef4444;">⚠️</span>
-        <span>High Inundation Risk Sector — Monitor Evacuation Alerts</span>
+        <span>High Inundation Risk Sector — Monitor Evacuation Alerts and Safe Shelters</span>
       </div>
       <a href="#evacuation-routing" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 9px;">Map View &darr;</a>
     </div>
   <?php endif; ?>
+
+  <!-- Barangay Advisories & Community Aid Announcements (Displayed Prominently) -->
+  <div class="resident-notices-card" id="residentNoticesWidget">
+    <div class="resident-notices-header">
+      <h2 class="resident-notices-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-secondary);">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        Barangay Advisories &amp; Aid Announcements
+      </h2>
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+        <button type="button" class="res-notice-tab-btn active" onclick="filterResidentNotices('all', this)">All Recent</button>
+        <button type="button" class="res-notice-tab-btn" onclick="filterResidentNotices('financial_aid', this)">💰 Financial Aid</button>
+        <button type="button" class="res-notice-tab-btn" onclick="filterResidentNotices('resources', this)">📦 Relief Goods</button>
+        <button type="button" class="res-notice-tab-btn" onclick="filterResidentNotices('events', this)">📅 Barangay Events</button>
+        <a href="notifications.php" style="font-size:10px;color:var(--color-secondary);font-weight:600;margin-left:6px;text-decoration:none;">View All &rarr;</a>
+      </div>
+    </div>
+
+    <div class="resident-notices-body">
+      <?php if (empty($recentNotices)): ?>
+        <div style="padding:24px 14px;text-align:center;color:var(--color-text-muted);font-size:11px;background:var(--color-surface-subtle);border-radius:8px;border:1px dashed var(--color-border);">
+          No active public advisories or aid announcements posted for Brgy. <?= clean($barangay['name'] ?? 'Local') ?>. All systems normal.
+        </div>
+      <?php else: ?>
+        <div class="resident-notices-grid">
+          <?php foreach ($recentNotices as $n): 
+            $isRead = !empty($n['is_read']);
+            $mod = $n['related_module'] ?? '';
+            $tLower = strtolower($n['title']);
+            
+            if ($mod === 'financial_aid' || strpos($tLower, 'financial aid') !== false || strpos($tLower, 'ayuda') !== false || strpos($tLower, 'cash assistance') !== false) {
+                $category = 'financial_aid';
+                $pillClass = 'res-tag-financial';
+                $pillIcon = '💰';
+                $pillText = 'Financial Aid';
+                $btnText = 'Aid Details';
+                $btnLink = 'notifications.php?tab=financial_aid';
+            } elseif ($mod === 'resources' || strpos($tLower, 'resource') !== false || strpos($tLower, 'relief') !== false || strpos($tLower, 'supplies') !== false) {
+                $category = 'resources';
+                $pillClass = 'res-tag-resources';
+                $pillIcon = '📦';
+                $pillText = 'Relief Supplies';
+                $btnText = 'Shelters & Relief';
+                $btnLink = '#evacuation-routing';
+            } elseif ($mod === 'events' || $mod === 'preparedness' || strpos($tLower, 'event') !== false || strpos($tLower, 'drill') !== false) {
+                $category = 'events';
+                $pillClass = 'res-tag-events';
+                $pillIcon = '📅';
+                $pillText = 'Barangay Drill';
+                $btnText = 'Drill Schedule';
+                $btnLink = 'events.php';
+            } else {
+                $category = 'advisories';
+                $pillClass = 'res-tag-advisory';
+                $pillIcon = '⚠️';
+                $pillText = 'Advisory';
+                $btnText = 'View Notice';
+                $btnLink = 'notifications.php';
+            }
+          ?>
+            <div class="resident-notice-card <?= !$isRead ? 'is-unread' : '' ?>" id="dashNotice<?= (int)$n['id'] ?>" data-notice-category="<?= $category ?>">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:6px;">
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <span class="res-tag-pill <?= $pillClass ?>">
+                      <?= $pillIcon ?> <?= $pillText ?>
+                    </span>
+                    <?= renderStatusBadge($n['alert_level']) ?>
+                    <?php if (!$isRead): ?>
+                      <span class="badge badge-info dash-new-badge" style="font-size:8.5px;padding:1px 4px;">NEW</span>
+                    <?php endif; ?>
+                  </div>
+                  <span style="font-size:9.5px;color:var(--color-text-muted);white-space:nowrap;"><?= timeAgo($n['created_at']) ?></span>
+                </div>
+
+                <div style="font-size:12px;font-weight:700;color:var(--color-primary);margin:0 0 4px 0;line-height:1.3;">
+                  <?= clean($n['title']) ?>
+                </div>
+
+                <div style="font-size:10px;color:var(--color-text-secondary);line-height:1.45;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">
+                  <?= clean($n['message']) ?>
+                </div>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px dashed var(--color-border-light);font-size:9.5px;color:var(--color-text-muted);">
+                <span>By: <?= clean($n['sender_name'] ?: 'Barangay Head') ?></span>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <?php if (!$isRead): ?>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="markNoticeRead(<?= (int)$n['id'] ?>, this)" style="padding:1px 5px;font-size:9px;">
+                      Mark Read
+                    </button>
+                  <?php endif; ?>
+                  <a href="<?= $btnLink ?>" class="btn btn-outline btn-sm" style="padding:1px 6px;font-size:9px;text-decoration:none;">
+                    <?= $btnText ?> &rarr;
+                  </a>
+                </div>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <script>
+  function filterResidentNotices(category, btn) {
+    const cards = document.querySelectorAll('.resident-notice-card');
+    const btns = document.querySelectorAll('.res-notice-tab-btn');
+    btns.forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    cards.forEach(card => {
+      const cardCat = card.getAttribute('data-notice-category');
+      if (category === 'all' || cardCat === category) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  async function markNoticeRead(id, btn) {
+    try {
+      await fetch('<?= BASE_URL ?>/backend/functions/notifications/mark_read.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'id=' + encodeURIComponent(id)
+      });
+      btn.outerHTML = '<span style="color:var(--color-success);font-weight:600;font-size:9px;">✓ Read</span>';
+      const card = document.getElementById('dashNotice' + id);
+      if (card) {
+        card.classList.remove('is-unread');
+        const badge = card.querySelector('.dash-new-badge');
+        if (badge) badge.remove();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  </script>
 
   <!-- Preparedness Schedule (Calendar Style - Displayed First) -->
   <div class="prep-calendar-card" id="residentCalendarWidget">

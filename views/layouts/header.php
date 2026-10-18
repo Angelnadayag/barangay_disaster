@@ -17,23 +17,39 @@ $currentUser = getCurrentUser();
 $db = getDBConnection();
 
 // Fetch unread notifications count for this user
-$notifCountStmt = $db->prepare("
-    SELECT COUNT(*) FROM notifications n
-    LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
-    WHERE nr.id IS NULL
-    AND (
-        n.target_role = 'all' 
-        OR n.target_role = ? 
-        OR (n.target_barangay_id IS NOT NULL AND n.target_barangay_id = ?)
-        OR n.target_user_id = ?
-    )
-");
-$notifCountStmt->execute([
-    $currentUser['id'],
-    $currentUser['role'],
-    $currentUser['barangay_id'],
-    $currentUser['id']
-]);
+if (in_array($currentUser['role'] ?? '', ['resident', 'responder'], true)) {
+    $notifCountStmt = $db->prepare("
+        SELECT COUNT(*) FROM notifications n
+        LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+        WHERE nr.id IS NULL
+          AND n.target_barangay_id = ?
+          AND (n.target_role IN ('all', ?) OR n.target_user_id = ?)
+    ");
+    $notifCountStmt->execute([
+        $currentUser['id'],
+        (int)($currentUser['barangay_id'] ?? 0),
+        $currentUser['role'],
+        $currentUser['id']
+    ]);
+} else {
+    $notifCountStmt = $db->prepare("
+        SELECT COUNT(*) FROM notifications n
+        LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+        WHERE nr.id IS NULL
+        AND (
+            n.target_role = 'all' 
+            OR n.target_role = ? 
+            OR (n.target_barangay_id IS NOT NULL AND n.target_barangay_id = ?)
+            OR n.target_user_id = ?
+        )
+    ");
+    $notifCountStmt->execute([
+        $currentUser['id'],
+        $currentUser['role'],
+        $currentUser['barangay_id'] ?? null,
+        $currentUser['id']
+    ]);
+}
 $unreadCount = (int)$notifCountStmt->fetchColumn();
 
 // Role-based profile link
@@ -105,7 +121,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
       <nav class="topbar-desktop-nav">
         <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Home</a>
         <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events</a>
-        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">Notification</a>
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>" style="display:inline-flex;align-items:center;gap:5px;">
+          <span>Notification</span>
+          <?php if ($unreadCount > 0): ?>
+            <span style="display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#FFF;border-radius:10px;font-size:9.5px;font-weight:700;padding:1px 6px;line-height:1.2;min-width:16px;"><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
+          <?php endif; ?>
+        </a>
       </nav>
     <?php endif; ?>
 

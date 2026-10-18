@@ -107,6 +107,18 @@ try {
     $notifMsg = "Active disaster incident ($disasterType - $severity) reported by Brgy. $bName ($purokName). Status is Ongoing.";
     $notifStmt->execute([$barangayId, "Active Incident: $trackingCode", $notifMsg, $alertLevel, $requestId]);
 
+    // Notify Local Responders in this Barangay
+    try {
+        $respNotifStmt = $db->prepare("
+            INSERT INTO notifications (target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at)
+            VALUES ('responder', ?, ?, ?, ?, 'disaster_request', ?, ?, NOW())
+        ");
+        $respNotifMsg = "Incident dispatch: {$disasterType} ({$severity}) reported at {$purokName}, Brgy. {$bName}. Field units advised to monitor and coordinate.";
+        $respNotifStmt->execute([$barangayId, "Incident Dispatch: {$trackingCode}", $respNotifMsg, $alertLevel, $requestId, $user['id']]);
+    } catch (Throwable $e) {
+        error_log("Failed to insert responder notification: " . $e->getMessage());
+    }
+
     logSystemEvent('CREATE_DISASTER_REQUEST', 'Disaster Reports', "Submitted active disaster report $trackingCode for Brgy. $bName ($disasterType - Ongoing)");
 
     if ($isAjax) {

@@ -135,6 +135,20 @@ try {
 
         logSystemEvent('ALLOCATE_FINANCIAL_AID', 'Financial Aid', "Allocated ₱{$totalBudget} to {$barangayName} ({$allocationCode})");
 
+        // Notify residents of the targeted barangay
+        try {
+            $notifTitle = "Financial Aid Program: {$programName}";
+            $notifMsg = "Barangay {$barangayName} has announced emergency financial assistance under {$programName} (Purok: {$targetPurok}). Total Program Fund: ₱" . number_format($totalBudget, 2) . " (₱" . number_format($amountPerBeneficiary, 2) . " per qualified family). Ref: {$allocationCode}.";
+            $notifStmt = $db->prepare("
+                INSERT INTO notifications (
+                    target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at
+                ) VALUES ('resident', ?, ?, ?, 'informational', 'financial_aid', ?, ?, NOW())
+            ");
+            $notifStmt->execute([$barangayId, $notifTitle, $notifMsg, $allocationId, $user['id']]);
+        } catch (Throwable $e) {
+            error_log("Failed to insert financial aid notification: " . $e->getMessage());
+        }
+
         if ($isAjax) {
             jsonResponse(['success' => true, 'message' => "Financial aid allocation {$allocationCode} successfully created for Barangay {$barangayName}."]);
         }

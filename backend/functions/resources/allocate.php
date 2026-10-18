@@ -210,7 +210,7 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
             $user['id']
         ]);
 
-        // 7. Dispatch Notification to Barangay Head
+        // 7. Dispatch Notification to Barangay Head & Residents
         $db->prepare("
             INSERT INTO notifications (
                 target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
@@ -218,6 +218,16 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
         ")->execute([
             $barangayId,
             "ICDRRMO has directly allocated and dispatched {$quantity} {$centralRes['unit']} of {$centralRes['name']} to Hinaplanon ({$purokName}) ({$trackingCode}).",
+            $requestId
+        ]);
+
+        $db->prepare("
+            INSERT INTO notifications (
+                target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
+            ) VALUES ('resident', ?, 'Relief Resources Dispatched', ?, 'informational', 'resources', ?, NOW())
+        ")->execute([
+            $barangayId,
+            "Relief supplies update: {$quantity} {$centralRes['unit']} of {$centralRes['name']} allocated for {$purokName}, Brgy. {$barangay['name']} ({$trackingCode}).",
             $requestId
         ]);
 
@@ -442,6 +452,16 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
             $rec['request_id']
         ]);
 
+        $db->prepare("
+            INSERT INTO notifications (
+                target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
+            ) VALUES ('resident', ?, 'Relief Package Dispatched', ?, 'informational', 'resources', ?, NOW())
+        ")->execute([
+            $rec['barangay_id'],
+            "Relief package of {$allocatedCount} essential supply items dispatched for incident relief in Brgy. {$rec['barangay_name']}.",
+            $rec['request_id']
+        ]);
+
         logSystemEvent(
             'BATCH_RESOURCE_ALLOCATION',
             'Resources',
@@ -630,7 +650,7 @@ else {
                 $user['id']
             ]);
 
-            // Notify Barangay Head
+            // Notify Barangay Head & Residents
             $db->prepare("
                 INSERT INTO notifications (
                     target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
@@ -638,6 +658,16 @@ else {
             ")->execute([
                 $item['barangay_id'],
                 "ICDRRMO has allocated {$allocQty} {$item['unit']} of {$item['resource_name']} for Incident {$item['tracking_code']}.",
+                $item['request_id']
+            ]);
+
+            $db->prepare("
+                INSERT INTO notifications (
+                    target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
+                ) VALUES ('resident', ?, 'Relief Allocation Dispatched', ?, 'informational', 'resources', ?, NOW())
+            ")->execute([
+                $item['barangay_id'],
+                "Emergency relief update: {$allocQty} {$item['unit']} of {$item['resource_name']} allocated to Brgy. {$item['barangay_name']}.",
                 $item['request_id']
             ]);
 
