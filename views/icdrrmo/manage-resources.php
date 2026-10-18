@@ -74,33 +74,41 @@ $resStmt = $db->prepare($resSql);
 $resStmt->execute($resParams);
 $resourcesList = $resStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Beneficiary Barangays List
-$barangaysList = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Beneficiary Barangays List (Strictly Hinaplanon)
+$barangaysList = $db->query("SELECT id, name FROM barangays WHERE id = 12 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+if (empty($barangaysList)) {
+    $barangaysList = [['id' => 12, 'name' => 'Hinaplanon']];
+}
 
-// Allocations to Barangays (Enhanced with real-time Central Depot stock & target IDs)
+// Hinaplanon Puroks List
+$hinaplanonPuroks = $db->query("SELECT id, name FROM puroks WHERE barangay_id = 12 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Allocations to Barangays (Strictly Hinaplanon)
 $allocStmt = $db->query("
     SELECT ri.*, res.id AS central_resource_id, res.code, res.name AS resource_name, res.unit, res.category,
            res.available_quantity AS depot_available_quantity,
-           r.recommendation_code, dr.tracking_code, dr.disaster_type, dr.severity,
+           r.recommendation_code, dr.tracking_code, dr.disaster_type, dr.severity, dr.purok_name,
            b.name AS barangay_name, b.id AS target_barangay_id, r.reviewed_at
     FROM recommended_items ri
     JOIN resources res ON ri.resource_id = res.id
     JOIN recommendations r ON ri.recommendation_id = r.id
     JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     JOIN barangays b ON dr.barangay_id = b.id
+    WHERE dr.barangay_id = 12
     ORDER BY (ri.status = 'Pending') DESC, ri.id DESC
 ");
 $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Pending Recommendation Batches (Awaiting Allocation Dispatches)
+// Pending Recommendation Batches (Strictly Hinaplanon)
 $pendingRecBatches = $db->query("
-    SELECT r.id AS rec_id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity,
+    SELECT r.id AS rec_id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity, dr.purok_name,
            b.name AS barangay_name, COUNT(ri.id) AS pending_items_count
     FROM recommendations r
     JOIN disaster_reports dr ON r.disaster_request_id = dr.id
     JOIN barangays b ON dr.barangay_id = b.id
     JOIN recommended_items ri ON ri.recommendation_id = r.id AND ri.status = 'Pending'
-    GROUP BY r.id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity, b.name
+    WHERE dr.barangay_id = 12
+    GROUP BY r.id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity, dr.purok_name, b.name
     ORDER BY r.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -115,8 +123,8 @@ $trxStmt = $db->query("
 ");
 $transactions = $trxStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Barangay Requisition Requests
-$pendingRequestsCount = (int)$db->query("SELECT COUNT(*) FROM barangay_resource_requests WHERE status = 'Pending'")->fetchColumn();
+// Barangay Requisition Requests (Strictly Hinaplanon)
+$pendingRequestsCount = (int)$db->query("SELECT COUNT(*) FROM barangay_resource_requests WHERE status = 'Pending' AND barangay_id = 12")->fetchColumn();
 $reqStmt = $db->query("
     SELECT brr.*, b.name AS barangay_name, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name,
            res.name AS central_res_name, res.available_quantity AS central_res_avail, res.unit AS central_res_unit
@@ -125,6 +133,7 @@ $reqStmt = $db->query("
     LEFT JOIN users u ON brr.requested_by = u.id
     LEFT JOIN users rev ON brr.reviewed_by = rev.id
     LEFT JOIN resources res ON brr.resource_id = res.id
+    WHERE brr.barangay_id = 12
     ORDER BY (brr.status = 'Pending') DESC, brr.created_at DESC
 ");
 $barangayRequests = $reqStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -151,8 +160,11 @@ if (empty($suppliersList)) {
 
 $conditions = ['New', 'Good', 'Fair', 'Poor', 'Expired'];
 
-// Fetch all barangays for filter dropdown
-$allBarangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch barangays: strictly Hinaplanon
+$allBarangays = $db->query("SELECT id, name FROM barangays WHERE id = 12 ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+if (empty($allBarangays)) {
+    $allBarangays = [['id' => 12, 'name' => 'Hinaplanon']];
+}
 
 // Static Master Resources Catalog for instant direct selection (Diretso nalang)
 $staticCatalog = getStaticResourcesCatalog();
@@ -162,30 +174,20 @@ foreach ($staticCatalog as $cItem) {
     $catalogByCategory[$cat][] = $cItem;
 }
 
-// Barangay Stockroom & Inventory History tracking logic
-$selectedBarangayId = isset($_GET['barangay_id']) && is_numeric($_GET['barangay_id']) ? (int)$_GET['barangay_id'] : 0;
-$selectedBarangay = null;
-if ($selectedBarangayId > 0) {
-    $bStmt = $db->prepare("SELECT * FROM barangays WHERE id = ?");
-    $bStmt->execute([$selectedBarangayId]);
-    $selectedBarangay = $bStmt->fetch(PDO::FETCH_ASSOC);
-    if (!$selectedBarangay) {
-        $selectedBarangayId = 0;
-    }
-}
+// Barangay Stockroom & Inventory History tracking logic - Strictly Hinaplanon (ID 12)
+$selectedBarangayId = 12;
+$selectedBarangay = ['id' => 12, 'name' => 'Hinaplanon'];
+$filterPurok = trim($_GET['purok'] ?? '');
 
-// 1. Current Barangay Resources Query (Column 1 Table via agency_resources junction table)
+// 1. Current Barangay Resources Query (Hinaplanon Local Stockroom via agency_resources)
 $bResSql = "SELECT ar.*, r.code, r.name, r.category, r.unit, r.brand, r.is_perishable, b.name AS barangay_name, b.id AS barangay_id
             FROM agency_resources ar 
             JOIN resources r ON ar.resource_id = r.id
             JOIN agencies a ON ar.agency_id = a.id
             JOIN barangays b ON a.barangay_id = b.id
-            WHERE (ar.status != 'archived' OR ar.status IS NULL)";
+            WHERE (ar.status != 'archived' OR ar.status IS NULL)
+            AND b.id = 12";
 $bResParams = [];
-if ($selectedBarangayId > 0) {
-    $bResSql .= " AND b.id = ?";
-    $bResParams[] = $selectedBarangayId;
-}
 if (!empty($filterCategory)) {
     $bResSql .= " AND r.category = ?";
     $bResParams[] = $filterCategory;
@@ -197,30 +199,29 @@ if (!empty($search)) {
     $bResParams[] = $like;
     $bResParams[] = $like;
 }
-$bResSql .= " ORDER BY b.name ASC, r.name ASC";
+$bResSql .= " ORDER BY r.name ASC";
 $bResStmt = $db->prepare($bResSql);
 $bResStmt->execute($bResParams);
 $barangayCurrentResources = $bResStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// 2. Inventory History & Movements Query (Column 2 Table)
+// 2. Inventory History & Movements Query (Strictly Hinaplanon & Purok allocations)
 $bTrxSql = "SELECT rt.*, res.code, res.name AS resource_name, res.unit, res.category, 
-                   COALESCE(b.name, '') AS barangay_name, b.id AS barangay_id,
+                   COALESCE(b.name, 'Hinaplanon') AS barangay_name, 12 AS barangay_id,
                    u.full_name AS performed_by_name
             FROM resource_transactions rt
             JOIN resources res ON rt.resource_id = res.id
             LEFT JOIN barangays b ON res.barangay_id = b.id
-            LEFT JOIN users u ON rt.performed_by = u.id";
+            LEFT JOIN users u ON rt.performed_by = u.id
+            WHERE (res.barangay_id = 12 
+                   OR (rt.reference_type = 'disaster_request' AND rt.reference_id IN (SELECT id FROM disaster_reports WHERE barangay_id = 12))
+                   OR (rt.reference_type = 'barangay_requisition' AND rt.reference_id IN (SELECT id FROM barangay_resource_requests WHERE barangay_id = 12))
+                   OR rt.remarks LIKE '%Hinaplanon%')";
 $bTrxParams = [];
-if ($selectedBarangayId > 0 && !empty($selectedBarangay)) {
-    $bTrxSql .= " WHERE (res.barangay_id = ? 
-                   OR (rt.reference_type = 'disaster_request' AND rt.reference_id IN (SELECT id FROM disaster_reports WHERE barangay_id = ?))
-                   OR (rt.reference_type = 'barangay_requisition' AND rt.reference_id IN (SELECT id FROM barangay_resource_requests WHERE barangay_id = ?))
-                   OR rt.remarks LIKE ?)";
-    $bTrxParams = [$selectedBarangayId, $selectedBarangayId, $selectedBarangayId, "%{$selectedBarangay['name']}%"];
-} else {
-    $bTrxSql .= " WHERE (res.barangay_id IS NOT NULL 
-                   OR rt.reference_type IN ('disaster_request', 'barangay_requisition', 'icdrrmo_allocation')
-                   OR rt.remarks LIKE '%Brgy%')";
+
+if (!empty($filterPurok)) {
+    $bTrxSql .= " AND (rt.remarks LIKE ? OR rt.reference_id IN (SELECT id FROM disaster_reports WHERE barangay_id = 12 AND purok_name = ?))";
+    $bTrxParams[] = "%{$filterPurok}%";
+    $bTrxParams[] = $filterPurok;
 }
 if (!empty($filterCategory)) {
     $bTrxSql .= " AND res.category = ?";
@@ -504,12 +505,10 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
 
         <!-- Group 1 (Left): Track Barangay -> Category Filter -> Stock Levels -> Condition -->
         <div class="filter-group" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <select onchange="if(this.value){ window.location.href='<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays&barangay_id=' + this.value; }" class="form-control" style="width:180px;background:#F8FAFC;" title="Monitor Barangay Local Inventory">
-            <option value="">Track Barangay Stock...</option>
-            <?php foreach ($allBarangays as $b): ?>
-              <option value="<?= $b['id'] ?>">Brgy. <?= clean($b['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
+          <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays" class="btn btn-outline btn-sm" style="font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:5px;background:#F8FAFC;padding:7px 12px;" title="Monitor Barangay Hinaplanon Stockroom">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            Brgy. Hinaplanon Stock
+          </a>
 
           <select name="category" class="form-control" style="width:170px;">
             <option value="">All Categories</option>
@@ -698,7 +697,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         <thead>
           <tr>
             <th>Disaster Request</th>
-            <th>Beneficiary Barangay</th>
+            <th>Target Purok (Hinaplanon)</th>
             <th>Resource Commodity</th>
             <th>Category</th>
             <th>Recommended</th>
@@ -710,7 +709,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         </thead>
         <tbody id="allocationsTableBody">
           <?php if (empty($allocations)): ?>
-            <tr id="noAllocationsRow"><td colspan="9" style="text-align:center;padding:28px;">No resource allocations recorded yet.</td></tr>
+            <tr id="noAllocationsRow"><td colspan="9" style="text-align:center;padding:28px;">No resource allocations recorded yet for Hinaplanon.</td></tr>
           <?php else: ?>
             <?php foreach ($allocations as $a): ?>
               <tr id="alloc-row-<?= $a['id'] ?>"
@@ -724,12 +723,16 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
                   data-depot-avail="<?= (int)$a['depot_available_quantity'] ?>"
                   data-tracking-code="<?= clean($a['tracking_code']) ?>"
                   data-barangay-name="<?= clean($a['barangay_name']) ?>"
+                  data-purok-name="<?= clean($a['purok_name'] ?? 'All Puroks') ?>"
                   data-status="<?= clean($a['status']) ?>">
                 <td>
                   <div style="font-weight:700;color:var(--color-primary);font-size:11px;"><?= clean($a['tracking_code']) ?></div>
                   <div style="font-size:9px;color:var(--color-text-muted);"><?= clean($a['disaster_type']) ?> &bull; <?= clean($a['severity']) ?></div>
                 </td>
-                <td style="font-weight:600;font-size:12px;">Brgy. <?= clean($a['barangay_name']) ?></td>
+                <td style="font-size:11px;">
+                  <div style="font-weight:700;color:var(--color-primary);"><?= !empty($a['purok_name']) ? clean($a['purok_name']) : 'All Puroks' ?></div>
+                  <div style="font-size:9.5px;color:var(--color-text-muted);">Brgy. <?= clean($a['barangay_name']) ?></div>
+                </td>
                 <td>
                   <div style="font-weight:600;color:#0F172A;"><?= clean($a['resource_name']) ?></div>
                   <div style="font-size:9px;color:var(--color-text-muted);"><?= clean($a['code']) ?></div>
@@ -927,13 +930,13 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         <div style="display:flex;align-items:center;gap:6px;">
           <label style="font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin:0;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-            Barangay:
+            Target Purok (Hinaplanon):
           </label>
-          <select name="barangay_id" class="form-control" onchange="this.form.submit()" style="font-weight:600;min-width:220px;border-color:var(--color-primary);background:#F8FAFC;">
-            <option value="">-- All Barangays (Overview) --</option>
-            <?php foreach ($allBarangays as $b): ?>
-              <option value="<?= $b['id'] ?>" <?= $selectedBarangayId == $b['id'] ? 'selected' : '' ?>>
-                Brgy. <?= clean($b['name']) ?>
+          <select name="purok" class="form-control" onchange="this.form.submit()" style="font-weight:600;min-width:200px;border-color:var(--color-primary);background:#F8FAFC;font-size:11px;">
+            <option value="">-- All Hinaplanon Puroks --</option>
+            <?php foreach ($hinaplanonPuroks as $p): ?>
+              <option value="<?= clean($p['name']) ?>" <?= $filterPurok === $p['name'] ? 'selected' : '' ?>>
+                <?= clean($p['name']) ?>
               </option>
             <?php endforeach; ?>
           </select>
@@ -952,16 +955,14 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <button type="submit" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 14px;">Apply Filter</button>
-        <?php if ($selectedBarangayId > 0 || !empty($filterCategory) || !empty($search)): ?>
+        <?php if (!empty($filterPurok) || !empty($filterCategory) || !empty($search)): ?>
           <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays" class="btn btn-outline btn-sm" style="font-size:11px;color:var(--color-text-muted);">Reset</a>
         <?php endif; ?>
 
-        <?php if ($selectedBarangayId > 0): ?>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="openDirectAllocationModalWithBarangay(<?= $selectedBarangayId ?>)" style="margin-left:auto;font-size:11px;display:inline-flex;align-items:center;gap:5px;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-            Allocate to Brgy. <?= clean($selectedBarangay['name']) ?>
-          </button>
-        <?php endif; ?>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openDirectAllocationModalWithBarangay(12)" style="margin-left:auto;font-size:11px;display:inline-flex;align-items:center;gap:5px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          Allocate Resources to Hinaplanon Puroks
+        </button>
       </form>
     </div>
   </div>
@@ -974,13 +975,11 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
       </div>
       <div>
         <div style="font-weight:700;font-size:14px;color:#1E3A8A;display:flex;align-items:center;gap:8px;">
-          <?= $selectedBarangayId > 0 ? 'Barangay ' . clean($selectedBarangay['name']) . ' Stockroom' : 'All Barangays Inventory Overview' ?>
-          <?php if ($selectedBarangayId > 0): ?>
-            <span class="badge badge-primary" style="font-size:9.5px;">Barangay ID: <?= $selectedBarangayId ?></span>
-          <?php endif; ?>
+          Barangay Hinaplanon Stockroom & Purok Allocations
+          <span class="badge badge-primary" style="font-size:9.5px;">Brgy. Hinaplanon (ID: 12)</span>
         </div>
         <div style="font-size:11.5px;color:#3B82F6;margin-top:2px;">
-          Real-time tracking of on-hand local reserves and corresponding supply movement audit history.
+          Real-time tracking of on-hand local reserves in Hinaplanon and supply allocations across its puroks.
         </div>
       </div>
     </div>
@@ -1887,26 +1886,33 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Beneficiary Barangay <span style="color:var(--color-danger)">*</span></label>
-            <select id="directAllocBarangay" class="form-control" required>
-              <option value="">-- Select Barangay --</option>
-              <?php foreach ($barangaysList as $b): ?>
-                <option value="<?= $b['id'] ?>">Brgy. <?= clean($b['name']) ?></option>
-              <?php endforeach; ?>
+            <select id="directAllocBarangay" class="form-control" required style="background:#F8FAFC;">
+              <option value="12" selected>Brgy. Hinaplanon</option>
             </select>
           </div>
 
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Disaster / Allocation Profile <span style="color:var(--color-danger)">*</span></label>
-            <select id="directAllocDisasterType" class="form-control" required>
-              <option value="Typhoon">Typhoon Pre-positioning</option>
-              <option value="Flood">Flood Relief Assistance</option>
-              <option value="Flash Flood">Flash Flood Emergency</option>
-              <option value="Landslide">Landslide Evacuation Support</option>
-              <option value="Storm Surge">Storm Surge Coastal Response</option>
-              <option value="Fire">Fire Incident Relief</option>
-              <option value="Earthquake">Earthquake Standby Supply</option>
+            <label class="form-label">Allocate to Purok (Hinaplanon) <span style="color:var(--color-danger)">*</span></label>
+            <select id="directAllocPurok" class="form-control" required>
+              <option value="All Puroks">All Puroks (Hinaplanon)</option>
+              <?php foreach ($hinaplanonPuroks as $p): ?>
+                <option value="<?= clean($p['name']) ?>"><?= clean($p['name']) ?></option>
+              <?php endforeach; ?>
             </select>
           </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Disaster / Allocation Profile <span style="color:var(--color-danger)">*</span></label>
+          <select id="directAllocDisasterType" class="form-control" required>
+            <option value="Typhoon">Typhoon Pre-positioning</option>
+            <option value="Flood">Flood Relief Assistance</option>
+            <option value="Flash Flood">Flash Flood Emergency</option>
+            <option value="Landslide">Landslide Evacuation Support</option>
+            <option value="Storm Surge">Storm Surge Coastal Response</option>
+            <option value="Fire">Fire Incident Relief</option>
+            <option value="Earthquake">Earthquake Standby Supply</option>
+          </select>
         </div>
 
         <div class="form-group" style="margin-bottom:0;">
@@ -2969,12 +2975,15 @@ function openProcessAllocationModal(itemId) {
     depotAvail: parseInt(row.dataset.depotAvail) || 0,
     trackingCode: row.dataset.trackingCode,
     barangayName: row.dataset.barangayName,
+    purokName: row.dataset.purokName || 'All Puroks',
     status: row.dataset.status
   };
 
   document.getElementById('procModalItemId').value = itemId;
   document.getElementById('procModalTrackingBadge').innerText = currentProcItem.trackingCode;
-  document.getElementById('procModalBarangayName').innerText = 'Brgy. ' + currentProcItem.barangayName;
+  document.getElementById('procModalBarangayName').innerText = (currentProcItem.purokName && currentProcItem.purokName !== 'All Puroks')
+    ? `${currentProcItem.purokName}, Hinaplanon`
+    : 'Brgy. ' + currentProcItem.barangayName;
   document.getElementById('procModalResourceName').innerText = currentProcItem.resourceName;
   document.getElementById('procModalResourceMeta').innerText = `SKU: ${currentProcItem.resourceCode} • ${currentProcItem.unit}`;
   document.getElementById('procModalDepotAvailDisplay').innerText = `${currentProcItem.depotAvail.toLocaleString()} ${currentProcItem.unit}`;
@@ -3326,7 +3335,8 @@ function validateDirectAllocQuantity() {
 
 // Submit Direct Allocation via AJAX
 async function submitDirectAllocation() {
-  const brgyId = document.getElementById('directAllocBarangay').value;
+  const brgyId = document.getElementById('directAllocBarangay').value || 12;
+  const purok = document.getElementById('directAllocPurok') ? document.getElementById('directAllocPurok').value : 'All Puroks';
   const resId = document.getElementById('directAllocResource').value;
   const qty = parseInt(document.getElementById('directAllocQuantity').value) || 0;
   const disType = document.getElementById('directAllocDisasterType').value;
@@ -3355,6 +3365,8 @@ async function submitDirectAllocation() {
     const formData = new FormData();
     formData.append('sub_action', 'direct');
     formData.append('barangay_id', brgyId);
+    formData.append('purok_name', purok);
+    formData.append('target_purok', purok);
     formData.append('resource_id', resId);
     formData.append('quantity', qty);
     formData.append('disaster_type', disType);
@@ -3391,6 +3403,7 @@ async function submitDirectAllocation() {
         newRow.dataset.depotAvail = data.metrics.remaining_depot_available || 0;
         newRow.dataset.trackingCode = a.tracking_code;
         newRow.dataset.barangayName = a.barangay_name;
+        newRow.dataset.purokName = a.purok_name || purok || 'All Puroks';
         newRow.dataset.status = 'Allocated';
 
         newRow.innerHTML = `
@@ -3398,7 +3411,10 @@ async function submitDirectAllocation() {
             <div style="font-weight:700;color:var(--color-primary);font-size:11px;">${a.tracking_code}</div>
             <div style="font-size:9px;color:var(--color-text-muted);">${a.disaster_type} &bull; ${a.severity}</div>
           </td>
-          <td style="font-weight:600;font-size:12px;">Brgy. ${a.barangay_name}</td>
+          <td style="font-size:11px;">
+            <div style="font-weight:700;color:var(--color-primary);">${a.purok_name || purok || 'All Puroks'}</div>
+            <div style="font-size:9.5px;color:var(--color-text-muted);">Brgy. ${a.barangay_name}</div>
+          </td>
           <td>
             <div style="font-weight:600;color:#0F172A;">${a.resource_name}</div>
             <div style="font-size:9px;color:var(--color-text-muted);">${a.resource_code}</div>
