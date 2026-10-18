@@ -293,7 +293,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
             </div>
           </div>
           <div style="margin-top:14px;border-top:1px solid var(--color-border);padding-top:10px;">
-            <a href="preparedness.php" class="btn btn-secondary btn-sm" style="width:100%;text-align:center;">
+            <a href="events.php" class="btn btn-secondary btn-sm" style="width:100%;text-align:center;">
               View Community Drills & Schedules
             </a>
           </div>
