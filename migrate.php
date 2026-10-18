@@ -59,27 +59,51 @@ try {
     $stmt = $pdo->query("SHOW TABLES");
     $existingTables = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
+    // Helper function to reliably execute SQL files statement-by-statement
+    // Prevents TLS buffer truncation issues on TiDB Cloud Serverless & remote databases
+    $executeSqlFile = function(PDO $db, string $filePath, string $label) {
+        if (!file_exists($filePath)) {
+            throw new RuntimeException("File not found: {$filePath}");
+        }
+        $content = file_get_contents($filePath);
+
+        // Clean TiDB / MySQL incompatibilities
+        $content = preg_replace('/LOCK TABLES `?[^`\s]+`? WRITE;/i', '', $content);
+        $content = preg_replace('/UNLOCK TABLES;/i', '', $content);
+        $content = preg_replace('/\/\*!40000 ALTER TABLE `?[^`\s]+`? (DISABLE|ENABLE) KEYS \*\/;/i', '', $content);
+
+        // Split into individual SQL statements by semicolon followed by newline
+        $statements = preg_split('/;\s*(\r\n|\r|\n)/', $content);
+        $executed = 0;
+        foreach ($statements as $stmt) {
+            $stmt = trim($stmt);
+            if ($stmt === '') continue;
+            if (strpos($stmt, '--') === 0) continue;
+            $db->exec($stmt);
+            $executed++;
+        }
+        echo "[✓] {$label} applied successfully ({$executed} statements executed).\n\n";
+    };
+
     if ($isFresh || empty($existingTables)) {
         // --------------------------------------------------------------------
         // FULL SCHEMA SETUP / FRESH RESET
         // --------------------------------------------------------------------
         echo ($isFresh ? "Step 1: Dropping and recreating tables (--fresh)...\n" : "Step 1: Initializing fresh database schema...\n");
 
-        $schemaContent = file_get_contents($schemaFile);
-        $pdo->exec($schemaContent);
-        echo "[✓] Database schema initialized successfully!\n\n";
+        if ($isFresh && !empty($existingTables)) {
+            echo "  [!] Cleanly dropping " . count($existingTables) . " existing tables for a clean wipe...\n";
+            foreach ($existingTables as $tbl) {
+                $pdo->exec("DROP TABLE IF EXISTS `{$tbl}`;");
+            }
+            echo "  [✓] All previous tables dropped.\n";
+        }
+
+        $executeSqlFile($pdo, $schemaFile, "Database schema");
 
         if (file_exists($seedsFile)) {
             echo "Step 2: Importing seed data from seeds.sql...\n";
-            $seedsContent = file_get_contents($seedsFile);
-
-            // Clean TiDB incompatibilities
-            $seedsContent = preg_replace('/LOCK TABLES `[^`]+` WRITE;/i', '', $seedsContent);
-            $seedsContent = preg_replace('/UNLOCK TABLES;/i', '', $seedsContent);
-            $seedsContent = preg_replace('/\/\*!40000 ALTER TABLE `[^`]+` (DISABLE|ENABLE) KEYS \*\/;/i', '', $seedsContent);
-
-            $pdo->exec($seedsContent);
-            echo "[✓] Seed data imported successfully!\n\n";
+            $executeSqlFile($pdo, $seedsFile, "Seed data");
         }
     } else {
         // --------------------------------------------------------------------
@@ -363,12 +387,7 @@ try {
 
         if ($seedOnly && file_exists($seedsFile)) {
             echo "Step 3: Re-seeding database from seeds.sql (--seed)...\n";
-            $seedsContent = file_get_contents($seedsFile);
-            $seedsContent = preg_replace('/LOCK TABLES `[^`]+` WRITE;/i', '', $seedsContent);
-            $seedsContent = preg_replace('/UNLOCK TABLES;/i', '', $seedsContent);
-            $seedsContent = preg_replace('/\/\*!40000 ALTER TABLE `[^`]+` (DISABLE|ENABLE) KEYS \*\/;/i', '', $seedsContent);
-            $pdo->exec($seedsContent);
-            echo "[✓] Seed data applied successfully!\n\n";
+            $executeSqlFile($pdo, $seedsFile, "Seed data");
         }
     }
 
