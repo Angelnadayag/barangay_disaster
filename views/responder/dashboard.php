@@ -239,99 +239,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   <?php endif; ?>
 
-  <div class="responsive-split-grid split-50-50">
-    <!-- Active Disasters Awaiting Support -->
-    <div class="card" style="margin-bottom:0;">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
-        <h3 class="card-title" style="margin:0;">Priority Incident Dispatches</h3>
-        <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="btn btn-outline btn-sm">All Incidents</a>
-      </div>
-      <div class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Tracking #</th>
-              <th>Location</th>
-              <th>Severity</th>
-              <th>Displaced</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php if (empty($activeIncidents)): ?>
-              <tr><td colspan="5" style="text-align:center;padding:24px;">No active disaster incidents reported.</td></tr>
-            <?php else: ?>
-              <?php foreach ($activeIncidents as $inc): ?>
-                <tr>
-                  <td style="font-weight:600;font-family:var(--font-secondary);">
-                    <?= clean($inc['tracking_code']) ?>
-                    <div style="font-size:8px;color:var(--color-text-muted);"><?= clean($inc['disaster_type']) ?></div>
-                  </td>
-                  <td>
-                    <div style="font-weight:600;"><?= clean($inc['barangay_name']) ?></div>
-                    <div style="font-size:9px;color:var(--color-text-secondary);"><?= clean($inc['purok_name']) ?></div>
-                  </td>
-                  <td><?= renderStatusBadge($inc['severity']) ?></td>
-                  <td style="font-family:var(--font-secondary);"><?= $inc['displaced_families'] ?> fam</td>
-                  <td>
-                    <a href="<?= BASE_URL ?>/views/responder/field-status.php?request_id=<?= $inc['id'] ?>" class="btn btn-secondary btn-sm">
-                      Log Situation
-                    </a>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
 
-    <!-- Evacuation Centers Available -->
-    <div class="card" style="margin-bottom:0;">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
-        <h3 class="card-title" style="margin:0;">Evacuation Shelters Vacancy Status</h3>
-        <a href="#evacuation-routing" class="btn btn-outline btn-sm">View All &darr;</a>
-      </div>
-      <div class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Shelter Name</th>
-              <th>Barangay</th>
-              <th>Occupancy</th>
-              <th>Road Access</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php if (empty($openCenters)): ?>
-              <tr><td colspan="4" style="text-align:center;padding:24px;">No open shelters recorded.</td></tr>
-            <?php else: ?>
-              <?php foreach ($openCenters as $oc): ?>
-                <?php
-                  $pct = $oc['capacity_individuals'] > 0 ? min(100, round(($oc['current_evacuees_count'] / $oc['capacity_individuals']) * 100)) : 0;
-                ?>
-                <tr>
-                  <td>
-                    <div style="font-weight:600;color:var(--color-primary);"><?= clean($oc['name']) ?></div>
-                    <div style="font-size:8px;color:var(--color-text-muted);"><?= clean($oc['center_type']) ?></div>
-                  </td>
-                  <td><?= clean($oc['barangay_name']) ?></td>
-                  <td style="font-family:var(--font-secondary);">
-                    <?= $oc['current_evacuees_count'] ?> / <?= $oc['capacity_individuals'] ?> (<?= $pct ?>%)
-                  </td>
-                  <td>
-                    <span style="font-size:9px;color:var(--color-secondary);font-weight:600;">
-                      <?= clean($oc['accessibility']) ?>
-                    </span>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
 
   <!-- Tactical Evacuation Routing & Shelter Management (Scroll-Down Section) -->
   <section class="evac-routing-section" id="evacuation-routing">
@@ -888,7 +796,6 @@ async function setQuickStatus(status) {
     const targetCard = document.getElementById(`resp-shelter-card-${shelterId}`);
     if (targetCard) {
       targetCard.classList.add('active-routed');
-      targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     // Clear previous line
@@ -924,6 +831,15 @@ async function setQuickStatus(status) {
       document.getElementById('respSheetDistVal').textContent = `${distKm.toFixed(1)} km`;
       document.getElementById('respSheetConvoyVal').textContent = `${convoyMin} min`;
       document.getElementById('respSheetRapidVal').textContent = `${rapidMin} min`;
+    }
+
+    // Automatically scroll down to the map
+    const mapBox = document.getElementById('respEvacMap') || document.querySelector('.evac-map-wrapper');
+    if (mapBox) {
+      mapBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 350);
     }
   };
 

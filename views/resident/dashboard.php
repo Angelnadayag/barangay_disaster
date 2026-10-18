@@ -239,170 +239,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   </div>
 
-  <!-- Summary Metric Cards (Clean Label & Value Only) -->
-  <div class="metrics-grid" style="margin-bottom:var(--space-3);">
-    <div class="metric-card">
-      <div class="metric-label">My Barangay</div>
-      <div class="metric-value" style="font-size:14.5px;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?></div>
-    </div>
 
-    <div class="metric-card">
-      <div class="metric-label">Open Shelters</div>
-      <div class="metric-value" style="font-size:15px;"><?= count($localEvacs) ?> Verified</div>
-    </div>
-
-    <div class="metric-card">
-      <div class="metric-label">Active Advisories</div>
-      <div class="metric-value" style="font-size:15px;"><?= count($recentAdvisories) ?> Bulletins</div>
-    </div>
-
-    <div class="metric-card">
-      <div class="metric-label">Emergency Call Direct</div>
-      <div class="metric-value" style="color:var(--color-danger);font-size:15px;">161 (ICDRRMO)</div>
-    </div>
-  </div>
-
-  <!-- Main Content Split -->
-  <div class="responsive-split-grid split-60-40">
-    <!-- Left Column: Safe Shelters & Public Advisories -->
-    <div style="display:flex;flex-direction:column;gap:var(--space-3);">
-
-      <!-- Evacuation Centers Available (Mobile-Optimized Clean Cards) -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
-          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Designated Evacuation Shelters</h2>
-          <a href="#evacuation-routing" style="font-size:11px;color:var(--color-secondary);font-weight:600;">View Map &amp; All &darr;</a>
-        </div>
-        <div class="card-body" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
-          <?php if (empty($localEvacs)): ?>
-            <div style="padding:16px;text-align:center;color:var(--color-text-muted);font-size:10.5px;">
-              No open evacuation shelters currently registered for this barangay.
-            </div>
-          <?php else: ?>
-            <?php foreach ($localEvacs as $ev): 
-              $cap = (int)$ev['capacity'];
-              $cur = (int)$ev['current_evacuees'];
-              $pct = $cap > 0 ? round(($cur / $cap) * 100) : 0;
-              $barCol = $pct >= 90 ? 'var(--color-danger)' : ($pct >= 75 ? 'var(--color-warning)' : 'var(--color-success)');
-              $remaining = max(0, $cap - $cur);
-            ?>
-              <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:6px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-                <div style="flex:1;min-width:170px;">
-                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                    <strong style="font-size:12px;color:var(--color-primary);"><?= clean($ev['name']) ?></strong>
-                    <?= renderStatusBadge($ev['status']) ?>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-                    <div style="flex:1;max-width:130px;background:#D9E0E3;height:5px;border-radius:3px;overflow:hidden;">
-                      <div style="width:<?= $pct ?>%;height:100%;background:<?= $barCol ?>;"></div>
-                    </div>
-                    <span style="font-size:10px;color:var(--color-text-secondary);font-weight:600;">
-                      <?= $pct ?>% (<?= number_format($remaining) ?> slots available)
-                    </span>
-                  </div>
-                </div>
-                <a href="#evacuation-routing" onclick="plotEvacuationRoute(<?= (int)$ev['id'] ?>)" class="btn btn-outline btn-sm" style="font-size:10.5px;padding:4px 10px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-                  Route
-                </a>
-              </div>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </div>
-      </div>
-
-      <!-- Public Safety Advisories -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
-          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Official Bulletins</h2>
-          <a href="notifications.php" style="font-size:11px;color:var(--color-secondary);font-weight:600;">All Bulletins &rarr;</a>
-        </div>
-        <div class="card-body" style="padding:0;">
-          <?php if (empty($recentAdvisories)): ?>
-            <div style="padding:16px;text-align:center;color:var(--color-text-muted);font-size:10.5px;">
-              No new public advisories at this time.
-            </div>
-          <?php else: ?>
-            <div class="list-group">
-              <?php foreach ($recentAdvisories as $adv): ?>
-                <div style="padding:10px 14px;border-bottom:1px solid var(--color-border-light);display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                  <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;">
-                    <?= renderStatusBadge($adv['alert_level']) ?>
-                    <span style="font-size:11px;font-weight:600;color:var(--color-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                      <?= clean($adv['title']) ?>
-                    </span>
-                  </div>
-                  <span style="font-size:9.5px;color:var(--color-text-muted);white-space:nowrap;">
-                    <?= timeAgo($adv['created_at']) ?>
-                  </span>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Right Column: Emergency Contacts & Quick Navigation -->
-    <div style="display:flex;flex-direction:column;gap:var(--space-3);">
-
-      <!-- Direct Emergency Directory -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header" style="padding:10px 14px;">
-          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Emergency Hotlines</h2>
-        </div>
-        <div class="card-body" style="padding:0;">
-          <table class="table" style="font-size:10.5px;margin-bottom:0;">
-            <tbody>
-              <tr>
-                <td style="padding:9px 14px;"><strong>ICDRRMO Command Center</strong></td>
-                <td style="padding:9px 14px;text-align:right;">
-                  <a href="tel:161" style="font-weight:700;color:var(--color-danger);">161 / (063) 221-1234</a>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:9px 14px;"><strong>Brgy. Emergency Desk</strong></td>
-                <td style="padding:9px 14px;text-align:right;">
-                  <a href="tel:<?= clean($barangay['contact_number'] ?? '09170001111') ?>" style="font-weight:600;color:var(--color-primary);">
-                    <?= clean($barangay['contact_number'] ?? '(063) 223-9000') ?>
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:9px 14px;"><strong>National Emergency Hotline</strong></td>
-                <td style="padding:9px 14px;text-align:right;">
-                  <a href="tel:911" style="font-weight:700;color:var(--color-danger);">911</a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Quick Portals -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header" style="padding:10px 14px;">
-          <h2 class="card-title" style="font-size:14px;font-weight:600;margin:0;">Community Safety Links</h2>
-        </div>
-        <div class="card-body" style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;">
-          <a href="#evacuation-routing" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
-            <span>Evacuation Centers &amp; Route Map</span>
-            <span>&darr;</span>
-          </a>
-          <a href="events.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
-            <span>Preparedness Events &amp; Drills</span>
-            <span>&rarr;</span>
-          </a>
-          <a href="notifications.php" class="btn btn-outline btn-sm" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;">
-            <span>Safety Advisories &amp; Bulletins</span>
-            <span>&rarr;</span>
-          </a>
-        </div>
-      </div>
-
-    </div>
-  </div>
 
   <!-- Evacuation Routing & Safe Shelters (Scroll-Down Section) -->
   <section class="evac-routing-section" id="evacuation-routing">
@@ -939,7 +776,6 @@ require_once __DIR__ . '/../layouts/header.php';
     const targetCard = document.getElementById(`res-shelter-card-${shelterId}`);
     if (targetCard) {
       targetCard.classList.add('active-routed');
-      targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     // Clear previous line
@@ -976,6 +812,15 @@ require_once __DIR__ . '/../layouts/header.php';
       document.getElementById('sheetDistVal').textContent = `${distKm.toFixed(1)} km`;
       document.getElementById('sheetWalkVal').textContent = `${walkMin} min`;
       document.getElementById('sheetDriveVal').textContent = `${driveMin} min`;
+    }
+
+    // Automatically scroll down to the map
+    const mapBox = document.getElementById('homeEvacMap') || document.querySelector('.evac-map-wrapper');
+    if (mapBox) {
+      mapBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 350);
     }
   };
 

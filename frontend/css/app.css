@@ -3018,6 +3018,12 @@ body.citizen-responder-shell .tac-date-day {
   margin-top: 2px;
 }
 
+/* Smooth Auto-Scroll & Topbar Offset */
+html {
+  scroll-behavior: smooth;
+}
 
-
-
+.evac-routing-section,
+.evac-map-wrapper {
+  scroll-margin-top: 65px;
+}
