@@ -52,24 +52,40 @@ $pageTitle = "Responder Field Dashboard";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:8px;">
+    <div class="page-header-title-wrap">
+      <h1 style="font-size:16px;font-weight:700;margin:0 0 2px 0;">Tactical Field Operations Dashboard</h1>
+      <p class="page-header-desc" style="font-size:10.5px;margin:0;">
+        Real-time responder dispatch situational status, priority incident alerts, and safe evacuation logistics.
+      </p>
+    </div>
+    <div class="page-header-actions">
+      <a href="active-incidents.php" class="btn btn-secondary btn-sm" style="font-size:11px;padding:6px 12px;">Active Incidents</a>
+      <a href="evacuation.php" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Evacuation Routing
+      </a>
+    </div>
+  </div>
+
   <!-- Tactical Identity Banner -->
-  <div style="background:var(--color-primary);color:#FFF;border-radius:10px;padding:14px 18px;margin-bottom:var(--space-4);box-shadow:var(--shadow-subtle);">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+  <div style="background:var(--color-primary);color:#FFF;border-radius:var(--radius-primary, 10px);padding:12px 16px;margin-bottom:var(--space-3);box-shadow:var(--shadow-subtle);">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div>
         <div style="font-size:9px;text-transform:uppercase;color:#B5C6D4;letter-spacing:0.8px;font-weight:700;">Tactical Field Identity</div>
-        <div style="font-size:16px;font-weight:700;margin-top:2px;"><?= clean($user['full_name']) ?></div>
+        <div style="font-size:15px;font-weight:700;margin-top:2px;"><?= clean($user['full_name']) ?></div>
         <div style="font-size:10px;color:#D9E0E3;">Field Unit: <?= clean($user['purok'] ?: 'Rapid Response Team A') ?> • Base: Central Command</div>
       </div>
       <div>
         <span style="font-size:9px;color:#B5C6D4;display:block;margin-bottom:4px;text-align:right;">Current Mission Readiness:</span>
-        <div style="display:flex;gap:6px;">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <?php foreach (['Available', 'En Route', 'On Scene', 'Busy', 'Off Duty'] as $st): ?>
             <?php
               $isSelected = ($activeStatus === $st);
               $bgCol = $isSelected ? '#2F6F73' : 'rgba(255,255,255,0.12)';
               $borderCol = $isSelected ? '#4DD0E1' : 'transparent';
             ?>
-            <button class="btn btn-sm" style="background:<?= $bgCol ?>;color:#FFF;border:1px solid <?= $borderCol ?>;font-size:9px;"
+            <button class="btn btn-sm" style="background:<?= $bgCol ?>;color:#FFF;border:1px solid <?= $borderCol ?>;font-size:9.5px;padding:4px 9px;"
                     onclick="setQuickStatus('<?= $st ?>')">
               <?= $st ?>
             </button>
@@ -80,19 +96,19 @@ require_once __DIR__ . '/../layouts/header.php';
   </div>
 
   <?php if (!empty($urgentAlerts)): ?>
-    <div style="margin-bottom:var(--space-4);display:flex;flex-direction:column;gap:6px;">
+    <div style="margin-bottom:var(--space-3);display:flex;flex-direction:column;gap:6px;">
       <?php foreach ($urgentAlerts as $alert): ?>
-        <div style="background:#FDE8E8;border-left:4px solid var(--color-danger);padding:8px 12px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="background:#FDE8E8;border-left:4px solid var(--color-danger);padding:7px 12px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
           <div style="font-size:10px;color:var(--color-danger);font-weight:600;">
             [<?= strtoupper($alert['alert_level']) ?>] <?= clean($alert['title']) ?>: <span style="font-weight:400;"><?= clean($alert['message']) ?></span>
           </div>
-          <span style="font-size:8px;color:#991B1B;white-space:nowrap;margin-left:8px;"><?= formatDate($alert['created_at'], 'h:i A') ?></span>
+          <span style="font-size:8.5px;color:#991B1B;white-space:nowrap;margin-left:8px;"><?= formatDate($alert['created_at'], 'h:i A') ?></span>
         </div>
       <?php endforeach; ?>
     </div>
   <?php endif; ?>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);align-items:start;">
+  <div class="responsive-split-grid split-50-50">
     <!-- Active Disasters Awaiting Support -->
     <div class="card" style="margin-bottom:0;">
       <div class="card-header">

@@ -57,7 +57,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 360px;gap:var(--space-4);align-items:start;">
+  <div class="responsive-split-grid split-map-side">
     <!-- Map Canvas Card -->
     <div class="card" style="margin-bottom:0;overflow:hidden;">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;background:var(--color-surface-subtle);padding:10px 14px;">
@@ -140,7 +140,6 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
   </div>
-</main>
 
 <!-- Leaflet Library -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>

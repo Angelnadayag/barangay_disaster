@@ -227,7 +227,6 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
   </div>
-</main>
 
 <script>
 function updateKit() {

@@ -178,8 +178,8 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .evac-search-input {
   flex: 1;
-  font-size: 12px;
-  padding: 8px 12px;
+  font-size: 11px;
+  padding: 7px 11px;
   border: 1px solid var(--color-border, #D9E0E3);
   border-radius: var(--radius-sm, 6px);
   outline: none;
@@ -202,7 +202,7 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .evac-pill-btn {
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 500;
   padding: 4px 10px;
   border-radius: var(--radius-full, 9999px);
@@ -245,10 +245,10 @@ require_once __DIR__ . '/../layouts/header.php';
   background: var(--color-surface, #FFFFFF);
   border: 1px solid var(--color-border, #D9E0E3);
   border-radius: var(--radius-primary, 10px);
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   position: relative;
 }
@@ -270,14 +270,14 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .evac-card-title {
   font-family: var(--font-primary, 'Poppins', sans-serif);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--color-primary, #17324D);
-  line-height: 1.3;
+  line-height: 1.25;
   margin: 0;
 }
 .evac-card-subtitle {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--color-text-secondary, #66737D);
   margin-top: 2px;
 }
@@ -287,11 +287,11 @@ require_once __DIR__ . '/../layouts/header.php';
   background: var(--color-surface-subtle, #F0F3F4);
   border: 1px solid var(--color-border-light, #E7EDF0);
   border-radius: var(--radius-sm, 6px);
-  padding: 8px 10px;
+  padding: 7px 10px;
 }
 .evac-progress-bar-bg {
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: #D9E0E3;
   border-radius: 3px;
   overflow: hidden;
@@ -308,7 +308,7 @@ require_once __DIR__ . '/../layouts/header.php';
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  font-size: 10px;
+  font-size: 9.5px;
 }
 .evac-utility-badge {
   display: inline-flex;
@@ -339,7 +339,7 @@ require_once __DIR__ . '/../layouts/header.php';
   justify-content: space-between;
   gap: 8px;
   border-top: 1px solid var(--color-border-light, #E7EDF0);
-  padding-top: 10px;
+  padding-top: 8px;
   margin-top: 2px;
 }
 
@@ -348,16 +348,16 @@ require_once __DIR__ . '/../layouts/header.php';
   background: var(--color-primary, #17324D) !important;
   color: #FFFFFF !important;
   font-family: var(--font-primary, 'Poppins', sans-serif) !important;
-  font-size: 11.5px !important;
+  font-size: 11px !important;
   font-weight: 600 !important;
-  border-radius: var(--radius-primary, 10px) !important;
-  padding: 8px 16px !important;
+  border-radius: var(--radius-sm, 6px) !important;
+  padding: 7px 14px !important;
   border: 1px solid var(--color-primary-dark, #102336) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
-  min-height: 40px !important;
+  min-height: 36px !important;
   cursor: pointer !important;
   transition: all 0.15s ease !important;
   text-decoration: none !important;
@@ -371,7 +371,7 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 
 .evac-contact-link {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--color-secondary, #2F6F73);
   text-decoration: none;
@@ -392,7 +392,7 @@ require_once __DIR__ . '/../layouts/header.php';
   box-shadow: var(--shadow-card, 0 1px 4px rgba(23, 50, 77, 0.08));
 }
 .evac-map-header {
-  padding: 10px 14px;
+  padding: 9px 12px;
   background: var(--color-surface-subtle, #F0F3F4);
   border-bottom: 1px solid var(--color-border, #D9E0E3);
   display: flex;
@@ -414,7 +414,7 @@ require_once __DIR__ . '/../layouts/header.php';
   display: none;
   background: #FFFFFF;
   border-top: 3px solid var(--color-primary, #17324D);
-  padding: 14px 16px;
+  padding: 12px 14px;
   animation: slideUpRoute 0.25s ease forwards;
 }
 @keyframes slideUpRoute {
@@ -428,7 +428,7 @@ require_once __DIR__ . '/../layouts/header.php';
   background: var(--color-surface-subtle, #F0F3F4);
   border: 1px solid var(--color-border-light, #E7EDF0);
   border-radius: var(--radius-sm, 6px);
-  padding: 8px 12px;
+  padding: 7px 10px;
   text-align: center;
 }
 .route-stat-val {
@@ -438,22 +438,23 @@ require_once __DIR__ . '/../layouts/header.php';
   color: var(--color-primary, #17324D);
 }
 .route-stat-lbl {
-  font-size: 9.5px;
+  font-size: 9px;
   color: var(--color-text-secondary, #66737D);
   text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 </style>
   <!-- Page Header -->
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:8px;">
     <div class="page-header-title-wrap">
-      <h1>Evacuation Routing & Safe Shelters</h1>
-      <p class="page-header-desc">
+      <h1 style="font-size:16px;font-weight:700;margin:0 0 2px 0;">Evacuation Routing &amp; Safe Shelters</h1>
+      <p class="page-header-desc" style="font-size:10.5px;margin:0;">
         Real-time capacity tracking, backup utilities, and instant GPS evacuation routing to designated safe shelters.
       </p>
     </div>
     <div class="page-header-actions">
-      <button type="button" class="btn btn-secondary btn-sm" onclick="locateUserGPS()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="locateUserGPS()" style="font-size:11px;padding:6px 12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         Update My GPS
       </button>
     </div>
@@ -687,7 +688,6 @@ require_once __DIR__ . '/../layouts/header.php';
 
     </div>
   </div>
-</main>
 
 <script>
 // Evacuation Centers Master Payload

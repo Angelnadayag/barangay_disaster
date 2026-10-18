@@ -151,6 +151,5 @@ require_once __DIR__ . '/../layouts/header.php';
       <?php endforeach; ?>
     <?php endif; ?>
   </div>
-</main>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

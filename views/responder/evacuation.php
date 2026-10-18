@@ -150,8 +150,8 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .tactical-search-input {
   flex: 1;
-  font-size: 12px;
-  padding: 8px 12px;
+  font-size: 11px;
+  padding: 7px 11px;
   border: 1px solid var(--color-border, #D9E0E3);
   border-radius: var(--radius-sm, 6px);
   outline: none;
@@ -174,7 +174,7 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .tactical-pill-btn {
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 500;
   padding: 4px 10px;
   border-radius: var(--radius-full, 9999px);
@@ -217,10 +217,10 @@ require_once __DIR__ . '/../layouts/header.php';
   background: var(--color-surface, #FFFFFF);
   border: 1px solid var(--color-border, #D9E0E3);
   border-radius: var(--radius-primary, 10px);
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .tactical-camp-card:hover {
@@ -237,7 +237,7 @@ require_once __DIR__ . '/../layouts/header.php';
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-family: var(--font-secondary, 'Roboto', sans-serif);
   font-weight: 600;
   padding: 2px 7px;
@@ -265,16 +265,16 @@ require_once __DIR__ . '/../layouts/header.php';
   background: var(--color-primary, #17324D) !important;
   color: #FFFFFF !important;
   font-family: var(--font-primary, 'Poppins', sans-serif) !important;
-  font-size: 11.5px !important;
+  font-size: 11px !important;
   font-weight: 600 !important;
-  border-radius: var(--radius-primary, 10px) !important;
-  padding: 8px 16px !important;
+  border-radius: var(--radius-sm, 6px) !important;
+  padding: 7px 14px !important;
   border: 1px solid var(--color-primary-dark, #102336) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
-  min-height: 40px !important;
+  min-height: 36px !important;
   cursor: pointer !important;
   transition: all 0.15s ease !important;
   text-decoration: none !important;
@@ -549,7 +549,6 @@ require_once __DIR__ . '/../layouts/header.php';
 
     </div>
   </div>
-</main>
 
 <!-- Modal: Update Center Status & Evacuees -->
 <div class="modal-overlay" id="updateEvacModal">

@@ -97,8 +97,8 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .tac-search-input {
   flex: 1;
-  font-size: 12px;
-  padding: 8px 12px;
+  font-size: 11px;
+  padding: 7px 11px;
   border: 1px solid var(--color-border, #D9E0E3);
   border-radius: var(--radius-sm, 6px);
   outline: none;
@@ -120,7 +120,7 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .tac-pill-link {
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 500;
   padding: 4px 10px;
   border-radius: var(--radius-full, 9999px);
@@ -144,10 +144,10 @@ require_once __DIR__ . '/../layouts/header.php';
   background: var(--color-surface, #FFFFFF);
   border: 1px solid var(--color-border, #D9E0E3);
   border-radius: var(--radius-primary, 10px);
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .tac-event-card:hover {
@@ -166,7 +166,7 @@ require_once __DIR__ . '/../layouts/header.php';
   border-radius: var(--radius-sm, 6px);
   padding: 6px 10px;
   text-align: center;
-  min-width: 58px;
+  min-width: 56px;
   flex-shrink: 0;
 }
 .tac-date-month {
@@ -177,8 +177,8 @@ require_once __DIR__ . '/../layouts/header.php';
 }
 .tac-date-day {
   font-family: var(--font-secondary, 'Roboto', sans-serif);
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--color-text, #24313A);
   line-height: 1.1;
   margin: 1px 0;
@@ -391,7 +391,6 @@ require_once __DIR__ . '/../layouts/header.php';
       <?php endif; ?>
     </div>
   </div>
-</main>
 
 <script>
 function toggleResponderDuty(eventId) {

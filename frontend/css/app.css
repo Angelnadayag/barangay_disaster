@@ -2288,4 +2288,175 @@ body.citizen-responder-shell .main-content {
   }
 }
 
+/* ==========================================================================
+   STRICT TYPOGRAPHY & RESPONSIVE LAYOUT ENGINE FOR CITIZEN & RESPONDER VIEWS
+   User Rule:
+     - Headings & Titles: Strictly 14px to 16px (h1: 16px, h2/h3/card-title: 14px)
+     - Paragraphs, descriptions, details, body, table: Strictly 9px to 11px
+     - Form inputs & Buttons: 11px
+     - Badges, pills, tags, timestamps: 9.5px - 10px
+   Anti-slop aesthetic: Clean 10px outer radius, 6px inner radius, crisp borders
+   ========================================================================== */
+
+body.citizen-responder-shell {
+  font-family: var(--font-primary, 'Poppins', sans-serif);
+  font-size: 10.5px;
+  color: var(--color-text, #24313A);
+  background-color: var(--color-background, #F7F8F7);
+}
+
+/* Headings scale: strictly 14px to 16px */
+body.citizen-responder-shell h1,
+body.citizen-responder-shell .page-header h1,
+body.citizen-responder-shell .page-title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  color: var(--color-primary, #17324D) !important;
+  letter-spacing: -0.01em;
+}
+
+body.citizen-responder-shell h2,
+body.citizen-responder-shell .section-title,
+body.citizen-responder-shell .section-header h2 {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  color: var(--color-primary, #17324D) !important;
+}
+
+body.citizen-responder-shell h3,
+body.citizen-responder-shell .card-title,
+body.citizen-responder-shell .modal-title,
+body.citizen-responder-shell .evac-card-title,
+body.citizen-responder-shell .tac-card-title,
+body.citizen-responder-shell .tactical-card-title,
+body.citizen-responder-shell .event-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  color: var(--color-primary, #17324D) !important;
+}
+
+body.citizen-responder-shell h4,
+body.citizen-responder-shell h5,
+body.citizen-responder-shell h6 {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--color-primary, #17324D) !important;
+}
+
+/* Body text, descriptions, details: strictly 9px to 11px */
+body.citizen-responder-shell p,
+body.citizen-responder-shell .page-header-desc,
+body.citizen-responder-shell .card-subtitle,
+body.citizen-responder-shell .desc,
+body.citizen-responder-shell .meta-text,
+body.citizen-responder-shell .protocol-item,
+body.citizen-responder-shell .text-muted,
+body.citizen-responder-shell .list-group-item,
+body.citizen-responder-shell .alert-body {
+  font-size: 10.5px !important;
+  line-height: 1.48 !important;
+}
+
+/* Form controls, inputs, buttons: 11px */
+body.citizen-responder-shell input,
+body.citizen-responder-shell select,
+body.citizen-responder-shell textarea,
+body.citizen-responder-shell .form-control {
+  font-size: 11px !important;
+  font-family: var(--font-secondary, 'Roboto', sans-serif);
+}
+
+body.citizen-responder-shell button,
+body.citizen-responder-shell .btn {
+  font-size: 11px !important;
+  font-family: var(--font-primary, 'Poppins', sans-serif);
+  font-weight: 600 !important;
+}
+
+body.citizen-responder-shell .btn-sm {
+  font-size: 10.5px !important;
+  padding: 5px 11px !important;
+}
+
+/* Badges, tags, chips, pills, metrics labels: 9.5px - 10px */
+body.citizen-responder-shell .badge,
+body.citizen-responder-shell .tag,
+body.citizen-responder-shell .pill,
+body.citizen-responder-shell .metric-label,
+body.citizen-responder-shell .metric-trend,
+body.citizen-responder-shell .timestamp,
+body.citizen-responder-shell .time-ago,
+body.citizen-responder-shell small {
+  font-size: 9.5px !important;
+}
+
+/* Table cells: 10.5px, Table headers: 10px uppercase */
+body.citizen-responder-shell table,
+body.citizen-responder-shell td {
+  font-size: 10.5px !important;
+}
+
+body.citizen-responder-shell th {
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.35px !important;
+  font-weight: 600 !important;
+  color: var(--color-text-secondary, #66737D) !important;
+}
+
+/* Numbers & Highlights: capped at 16px */
+body.citizen-responder-shell .metric-value,
+body.citizen-responder-shell .stat-number,
+body.citizen-responder-shell .event-date-day,
+body.citizen-responder-shell .tac-date-day {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+/* Unified Responsive Layout Grid Helpers */
+.responsive-split-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4, 12px);
+  align-items: start;
+}
+@media (min-width: 901px) {
+  .responsive-split-grid.split-60-40 {
+    grid-template-columns: 1.25fr 0.75fr;
+  }
+  .responsive-split-grid.split-50-50 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .responsive-split-grid.split-map-side {
+    grid-template-columns: 1fr 340px;
+  }
+}
+
+/* Metrics Grid on Mobile */
+@media (max-width: 900px) {
+  body.citizen-responder-shell .metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  body.citizen-responder-shell .metric-card {
+    padding: 10px 12px !important;
+  }
+  body.citizen-responder-shell .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+  body.citizen-responder-shell .page-header-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+}
+
 
