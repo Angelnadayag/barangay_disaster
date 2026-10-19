@@ -54,6 +54,7 @@ $purokClustersStmt = $db->prepare("
 ");
 $purokClustersStmt->execute([$barangayId]);
 $purokClusterRows = $purokClustersStmt->fetchAll(PDO::FETCH_ASSOC);
+sortPuroksMainFirst($purokClusterRows);
 
 // Fetch Primary Hazard Type options strictly from database
 $hazardTypesStmt = $db->query("
@@ -98,6 +99,7 @@ $sql .= " ORDER BY name ASC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $puroks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+sortPuroksMainFirst($puroks);
 
 // Metrics across active jurisdiction puroks
 $metricsStmt = $db->prepare("
@@ -515,6 +517,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <table class="data-table">
       <thead>
         <tr>
+          <th style="width:45px;text-align:center;">#</th>
           <th>Purok Name</th>
           <th>Households</th>
           <th>Population</th>
@@ -527,15 +530,18 @@ require_once __DIR__ . '/../layouts/header.php';
       <tbody>
         <?php if (empty($puroks)): ?>
           <tr>
-            <td colspan="<?= $viewTab === 'archived' ? '5' : '4' ?>"
+            <td colspan="<?= $viewTab === 'archived' ? '6' : '5' ?>"
               style="text-align:center;padding:36px;color:var(--color-text-muted);">
               No purok records found in <?= $viewTab === 'archived' ? 'Archived' : 'Active' ?> registry matching your filter
               criteria.
             </td>
           </tr>
         <?php else: ?>
-          <?php foreach ($puroks as $p): ?>
+          <?php foreach ($puroks as $idx => $p): ?>
             <tr>
+              <td style="text-align:center;color:var(--color-text-muted);font-size:11px;font-family:var(--font-secondary);">
+                <?= $idx + 1 ?>
+              </td>
               <td>
                 <a href="javascript:void(0)" onclick="viewPurokDetails(<?= htmlspecialchars(json_encode($p)) ?>)"
                   class="table-user-link">

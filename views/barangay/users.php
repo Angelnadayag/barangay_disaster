@@ -71,6 +71,7 @@ if (!$defaultAgencyId && !empty($availableAgencies)) {
 $purokStmt = $db->prepare("SELECT id, name FROM puroks WHERE barangay_id = ? ORDER BY name ASC");
 $purokStmt->execute([$barangayId]);
 $localPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
+sortPuroksMainFirst($localPuroks);
 
 // Responder Readiness KPIs
 $availCountsStmt = $db->prepare("

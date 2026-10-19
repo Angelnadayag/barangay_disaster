@@ -342,3 +342,58 @@ function getStaticResourcesCatalog(): array {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 }
+
+// Sort Puroks so that Main Puroks come first (Purok 1, 2, 3...) followed by lettered sub-puroks (Purok 1a, 1b, 2a, 2b...)
+if (!function_exists('sortPuroksMainFirst')) {
+function sortPuroksMainFirst(array &$puroksList): void {
+    usort($puroksList, function($a, $b) {
+        $nameA = trim($a['name'] ?? '');
+        $nameB = trim($b['name'] ?? '');
+
+        // Pattern 1: Pure Main Purok (e.g. "Purok 1", "Purok 2", "Purok 10")
+        $isMainA = preg_match('/^Purok\s*(\d+)$/i', $nameA, $mA);
+        $isMainB = preg_match('/^Purok\s*(\d+)$/i', $nameB, $mB);
+
+        // Pattern 2: Sub-purok with letter suffix (e.g. "Purok 1a", "Purok 1-A", "Purok 2b", "Purok 9a")
+        $isSubA = preg_match('/^Purok\s*(\d+)\s*[-_]?\s*([a-zA-Z]+.*)$/i', $nameA, $sA);
+        $isSubB = preg_match('/^Purok\s*(\d+)\s*[-_]?\s*([a-zA-Z]+.*)$/i', $nameB, $sB);
+
+        // Priority Group:
+        // 1 = Main Puroks (Purok 1, Purok 2, Purok 3...)
+        // 2 = Lettered Sub-puroks (Purok 1a, Purok 1b, Purok 2a...)
+        // 3 = Other named puroks (Purok Centro, Purok Riverside 1...)
+        $groupA = $isMainA ? 1 : ($isSubA ? 2 : 3);
+        $groupB = $isMainB ? 1 : ($isSubB ? 2 : 3);
+
+        if ($groupA !== $groupB) {
+            return $groupA <=> $groupB;
+        }
+
+        // Group 1: Numerical order by purok number
+        if ($groupA === 1) {
+            $numA = (int) $mA[1];
+            $numB = (int) $mB[1];
+            if ($numA !== $numB) {
+                return $numA <=> $numB;
+            }
+            return strnatcasecmp($nameA, $nameB);
+        }
+
+        // Group 2: Numerical order by purok number, then alphabetical by letter suffix
+        if ($groupA === 2) {
+            $numA = (int) $sA[1];
+            $numB = (int) $sB[1];
+            if ($numA !== $numB) {
+                return $numA <=> $numB;
+            }
+            $suffixA = strtolower(trim($sA[2]));
+            $suffixB = strtolower(trim($sB[2]));
+            return strnatcasecmp($suffixA, $suffixB);
+        }
+
+        // Group 3: Natural sort for other custom names
+        return strnatcasecmp($nameA, $nameB);
+    });
+}
+}
+

@@ -31,6 +31,7 @@ require_once __DIR__ . '/../layouts/header.php';
 $purokStmt = $db->prepare("SELECT id, name FROM puroks WHERE barangay_id = ? ORDER BY name ASC");
 $purokStmt->execute([$barangayId]);
 $localPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
+sortPuroksMainFirst($localPuroks);
 
 // Active Tab
 $activeTab = in_array($_GET['tab'] ?? '', ['catalog', 'movements']) ? $_GET['tab'] : 'catalog';

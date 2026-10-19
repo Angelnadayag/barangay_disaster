@@ -17,7 +17,7 @@
   --color-surface: #FFFFFF;
   --color-surface-hover: #F9FAFB;
   --color-surface-subtle: #F0F3F4;
-  
+
   /* Text & Border */
   --color-text: #24313A;
   --color-text-secondary: #66737D;
@@ -79,13 +79,16 @@
 }
 
 /* Base Reset */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   max-height: 100%;
   overflow: hidden;
@@ -99,22 +102,48 @@ html, body {
 }
 
 /* Typography elements */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--color-primary);
   font-weight: 600;
   line-height: 1.25;
 }
 
-h1 { font-size: var(--text-page-title); }
-h2 { font-size: var(--text-section-title); }
-h3 { font-size: var(--text-card-title); }
-h4 { font-size: var(--text-base); }
+h1 {
+  font-size: var(--text-page-title);
+}
 
-p, span, label, input, button, select, textarea, table {
+h2 {
+  font-size: var(--text-section-title);
+}
+
+h3 {
+  font-size: var(--text-card-title);
+}
+
+h4 {
+  font-size: var(--text-base);
+}
+
+p,
+span,
+label,
+input,
+button,
+select,
+textarea,
+table {
   font-size: var(--text-xs);
 }
 
-input, button, select, textarea {
+input,
+button,
+select,
+textarea {
   font-family: inherit;
 }
 
@@ -187,6 +216,7 @@ a:hover {
 }
 
 @media (min-width: 901px) {
+
   body.sidebar-collapsed .sidebar,
   html.sidebar-collapsed body .sidebar {
     margin-left: calc(-1 * var(--sidebar-width, 220px)) !important;
@@ -234,6 +264,7 @@ a:hover {
   margin-bottom: 16px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
 }
 
 .login-brand-logo img {
@@ -281,6 +312,7 @@ a:hover {
   outline: none;
   cursor: pointer;
 }
+
 .role-switcher-select option {
   background-color: var(--color-primary);
   color: #FFFFFF;
@@ -411,6 +443,7 @@ a:hover {
     opacity: 0;
     transform: translateY(-6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -779,6 +812,7 @@ a.btn-primary {
   background-color: var(--color-primary);
   color: #FFFFFF !important;
 }
+
 .btn-primary:hover,
 .btn-primary:focus,
 a.btn-primary:hover,
@@ -793,6 +827,7 @@ a.btn-secondary {
   background-color: var(--color-secondary);
   color: #FFFFFF !important;
 }
+
 .btn-secondary:hover,
 .btn-secondary:focus,
 a.btn-secondary:hover,
@@ -807,6 +842,7 @@ a.btn-secondary:focus {
   border-color: var(--color-border);
   color: var(--color-text);
 }
+
 .btn-outline:hover {
   background-color: var(--color-surface-subtle);
   border-color: var(--color-text-secondary);
@@ -817,6 +853,7 @@ a.btn-danger {
   background-color: var(--color-danger);
   color: #FFFFFF !important;
 }
+
 .btn-danger:hover,
 .btn-danger:focus,
 a.btn-danger:hover,
@@ -831,6 +868,7 @@ a.btn-success {
   background-color: var(--color-success);
   color: #FFFFFF !important;
 }
+
 .btn-success:hover,
 .btn-success:focus,
 a.btn-success:hover,
@@ -1077,7 +1115,7 @@ select.form-control {
 
 /* Ensure forms inside modals flex properly so body scrolls without hiding footer */
 .modal-dialog form,
-.modal-dialog > form {
+.modal-dialog>form {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -1205,14 +1243,32 @@ select.form-control {
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.toast-success { border-left: 4px solid var(--color-success); }
-.toast-warning { border-left: 4px solid var(--color-warning); }
-.toast-danger { border-left: 4px solid var(--color-danger); }
-.toast-info { border-left: 4px solid var(--color-info); }
+.toast-success {
+  border-left: 4px solid var(--color-success);
+}
+
+.toast-warning {
+  border-left: 4px solid var(--color-warning);
+}
+
+.toast-danger {
+  border-left: 4px solid var(--color-danger);
+}
+
+.toast-info {
+  border-left: 4px solid var(--color-info);
+}
 
 /* Decision Tree Recommendation Visualizer */
 .decision-pipeline {
@@ -1305,9 +1361,11 @@ select.form-control {
   .mobile-menu-toggle {
     display: flex !important;
   }
+
   .brand-subtitle {
     display: none;
   }
+
   .sidebar {
     position: fixed !important;
     top: var(--topbar-height, 52px) !important;
@@ -1321,9 +1379,11 @@ select.form-control {
     transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
     box-shadow: 4px 0 24px rgba(23, 50, 77, 0.25) !important;
   }
+
   .sidebar.open {
     left: 0 !important;
   }
+
   .sidebar-backdrop {
     position: fixed;
     top: var(--topbar-height, 52px);
@@ -1337,9 +1397,11 @@ select.form-control {
     display: none;
     backdrop-filter: blur(2px);
   }
+
   .sidebar-backdrop.active {
     display: block !important;
   }
+
   .main-content {
     padding: var(--space-3);
   }
@@ -1428,9 +1490,11 @@ select.form-control {
   left: 0;
   transform: translateX(0) translateY(6px);
 }
+
 .confidence-hover-wrap.align-left .confidence-hover-box::after {
   left: 24px;
 }
+
 .confidence-hover-wrap.align-left:hover .confidence-hover-box {
   transform: translateX(0) translateY(0);
 }
@@ -1440,10 +1504,12 @@ select.form-control {
   right: 0;
   transform: translateX(0) translateY(6px);
 }
+
 .confidence-hover-wrap.align-right .confidence-hover-box::after {
   left: auto;
   right: 24px;
 }
+
 .confidence-hover-wrap.align-right:hover .confidence-hover-box {
   transform: translateX(0) translateY(0);
 }
@@ -1859,6 +1925,7 @@ select.form-control {
 .dss-pipeline-scroll::-webkit-scrollbar {
   height: 5px;
 }
+
 .dss-pipeline-scroll::-webkit-scrollbar-thumb {
   background: #CBD5E1;
   border-radius: 4px;
@@ -2067,6 +2134,7 @@ select.form-control {
   border-color: #059669;
   background: linear-gradient(180deg, #FFFFFF 0%, #F0FDF4 100%);
 }
+
 .review-btn-card.approve:hover {
   border-color: #047857;
   box-shadow: 0 4px 14px rgba(5, 150, 105, 0.2);
@@ -2076,6 +2144,7 @@ select.form-control {
   border-color: #2563EB;
   background: linear-gradient(180deg, #FFFFFF 0%, #EFF6FF 100%);
 }
+
 .review-btn-card.modify:hover {
   border-color: #1D4ED8;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
@@ -2085,6 +2154,7 @@ select.form-control {
   border-color: #DC2626;
   background: linear-gradient(180deg, #FFFFFF 0%, #FEF2F2 100%);
 }
+
 .review-btn-card.reject:hover {
   border-color: #B91C1C;
   box-shadow: 0 4px 14px rgba(220, 38, 38, 0.2);
@@ -2108,9 +2178,17 @@ select.form-control {
   line-height: 1.2;
 }
 
-.review-btn-card.approve .review-btn-title { color: #065F46; }
-.review-btn-card.modify .review-btn-title { color: #1E40AF; }
-.review-btn-card.reject .review-btn-title { color: #991B1B; }
+.review-btn-card.approve .review-btn-title {
+  color: #065F46;
+}
+
+.review-btn-card.modify .review-btn-title {
+  color: #1E40AF;
+}
+
+.review-btn-card.reject .review-btn-title {
+  color: #991B1B;
+}
 
 .review-btn-desc {
   font-size: 9.5px;
@@ -2141,6 +2219,7 @@ select.form-control {
   text-decoration: none;
   color: #FFFFFF;
 }
+
 .portal-brand-logo {
   height: 28px;
   max-width: 110px;
@@ -2151,10 +2230,12 @@ select.form-control {
   border-radius: var(--radius-sm, 6px);
   display: block;
 }
+
 .portal-brand-text {
   display: flex;
   flex-direction: column;
 }
+
 .portal-brand-title {
   font-family: var(--font-primary, 'Poppins', sans-serif);
   font-size: 12px;
@@ -2163,6 +2244,7 @@ select.form-control {
   line-height: 1.2;
   letter-spacing: 0.3px;
 }
+
 .portal-brand-sub {
   font-size: 9px;
   color: #B5C6D4;
@@ -2176,6 +2258,7 @@ select.form-control {
   align-items: center;
   gap: 4px;
 }
+
 .topbar-nav-pill {
   color: #B5C6D4;
   font-family: var(--font-primary, 'Poppins', sans-serif);
@@ -2187,10 +2270,12 @@ select.form-control {
   transition: all 0.15s ease;
   white-space: nowrap;
 }
+
 .topbar-nav-pill:hover {
   color: #FFFFFF;
   background: rgba(255, 255, 255, 0.08);
 }
+
 .topbar-nav-pill.active {
   color: #FFFFFF;
   background: rgba(255, 255, 255, 0.16);
@@ -2209,6 +2294,7 @@ select.form-control {
   max-width: 100vw;
   overflow: hidden;
 }
+
 .app-container-no-sidebar .main-content {
   width: 100% !important;
   max-width: 100% !important;
@@ -2219,11 +2305,13 @@ select.form-control {
 body.citizen-responder-shell .main-content {
   padding: 14px 18px;
 }
+
 @media (min-width: 901px) {
   body.citizen-responder-shell .main-content {
     padding: 20px 32px;
   }
-  body.citizen-responder-shell .main-content > * {
+
+  body.citizen-responder-shell .main-content>* {
     max-width: 1320px;
     margin-left: auto;
     margin-right: auto;
@@ -2234,6 +2322,7 @@ body.citizen-responder-shell .main-content {
 .mobile-bottom-nav {
   display: none;
 }
+
 @media (max-width: 900px) {
   .mobile-bottom-nav {
     display: flex;
@@ -2250,9 +2339,11 @@ body.citizen-responder-shell .main-content {
     justify-content: space-around;
     padding: 0 4px;
   }
+
   body.citizen-responder-shell .main-content {
     padding-bottom: 74px !important;
   }
+
   .bottom-nav-item {
     flex: 1;
     display: flex;
@@ -2270,18 +2361,22 @@ body.citizen-responder-shell .main-content {
     transition: all 0.15s ease;
     min-height: 48px;
   }
+
   .bottom-nav-item svg {
     flex-shrink: 0;
     transition: transform 0.15s ease;
   }
+
   .bottom-nav-item:hover,
   .bottom-nav-item:active {
     color: var(--color-primary, #17324D);
   }
+
   .bottom-nav-item.active {
     color: var(--color-primary, #17324D);
     font-weight: 700;
   }
+
   .bottom-nav-item.active svg {
     stroke-width: 2.4;
     transform: translateY(-1px);
@@ -2428,13 +2523,16 @@ body.citizen-responder-shell .tac-date-day {
   gap: var(--space-4, 12px);
   align-items: start;
 }
+
 @media (min-width: 901px) {
   .responsive-split-grid.split-60-40 {
     grid-template-columns: 1.25fr 0.75fr;
   }
+
   .responsive-split-grid.split-50-50 {
     grid-template-columns: 1fr 1fr;
   }
+
   .responsive-split-grid.split-map-side {
     grid-template-columns: 1fr 340px;
   }
@@ -2446,15 +2544,18 @@ body.citizen-responder-shell .tac-date-day {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;
   }
+
   body.citizen-responder-shell .metric-card {
     padding: 10px 12px !important;
   }
+
   body.citizen-responder-shell .page-header {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 8px !important;
     margin-bottom: 12px !important;
   }
+
   body.citizen-responder-shell .page-header-actions {
     width: 100% !important;
     display: flex !important;
@@ -2524,6 +2625,7 @@ body.citizen-responder-shell .tac-date-day {
   transition: all 0.15s ease;
   font-size: 11px;
 }
+
 .prep-cal-btn:hover {
   background: var(--color-surface-subtle, #F0F3F4);
   border-color: var(--color-secondary, #2F6F73);
@@ -2786,6 +2888,7 @@ body.citizen-responder-shell .tac-date-day {
   padding-bottom: 2px;
   scrollbar-width: none;
 }
+
 .evac-filter-pills::-webkit-scrollbar {
   display: none;
 }
@@ -2806,6 +2909,7 @@ body.citizen-responder-shell .tac-date-day {
   gap: 4px;
   transition: all 0.15s ease;
 }
+
 .evac-pill-btn.active,
 .evac-pill-btn:hover {
   background: var(--color-primary, #17324D);
@@ -2847,9 +2951,11 @@ body.citizen-responder-shell .tac-date-day {
   gap: 6px;
   transition: all 0.15s ease;
 }
+
 .evac-shelter-card:hover {
   border-color: var(--color-secondary, #2F6F73);
 }
+
 .evac-shelter-card.active-routed {
   border: 2px solid var(--color-primary, #17324D);
   background: #FDFEFE;
@@ -2915,11 +3021,13 @@ body.citizen-responder-shell .tac-date-day {
   font-weight: 600;
   border: 1px solid transparent;
 }
+
 .evac-utility-badge.avail {
   background: #EAF4EB;
   color: #2E7D32;
   border-color: #BCE3C1;
 }
+
 .evac-utility-badge.unavail {
   background: var(--color-surface-subtle, #F0F3F4);
   color: var(--color-text-muted, #8A96A0);
@@ -2952,6 +3060,7 @@ body.citizen-responder-shell .tac-date-day {
   transition: all 0.15s ease !important;
   text-decoration: none !important;
 }
+
 .evac-route-btn:hover {
   background: #214364 !important;
 }
@@ -2981,6 +3090,7 @@ body.citizen-responder-shell .tac-date-day {
   width: 100%;
   height: 380px;
 }
+
 @media (min-width: 901px) {
   .evac-live-map-box {
     height: 470px;
@@ -2993,6 +3103,7 @@ body.citizen-responder-shell .tac-date-day {
   padding: 10px 12px;
   display: none;
 }
+
 .evac-route-sheet.active {
   display: block;
 }
@@ -3004,12 +3115,14 @@ body.citizen-responder-shell .tac-date-day {
   padding: 6px;
   text-align: center;
 }
+
 .route-stat-val {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--color-primary, #17324D);
   line-height: 1.1;
 }
+
 .route-stat-lbl {
   font-size: 9px;
   color: var(--color-text-secondary, #66737D);
