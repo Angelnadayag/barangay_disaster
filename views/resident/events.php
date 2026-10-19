@@ -23,16 +23,17 @@ $myRsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_i
 $myRsvpStmt->execute([$userId, $user['phone'] ?? '']);
 $myRegisteredEventIds = $myRsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
-// Fetch Events query
+// Fetch Events query strictly scoped to resident's barangay and created by their Barangay Head
 $sql = "
     SELECT e.*, b.name AS barangay_name, u.full_name AS organizer_name
     FROM events e
     LEFT JOIN barangays b ON e.barangay_id = b.id
     LEFT JOIN users u ON e.created_by = u.id
-    WHERE (e.barangay_id = ? OR e.barangay_id IS NULL)
+    WHERE e.barangay_id = ?
       AND (e.is_archived = 0 OR e.is_archived IS NULL)
+      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
 ";
-$params = [$barangayId];
+$params = [$barangayId, $barangayId];
 
 if ($filterTab === 'upcoming') {
     $sql .= " AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled'";
@@ -61,13 +62,27 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $eventsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Counts for filter pills
-$countUpcoming = (int)$db->query("SELECT COUNT(*) FROM events WHERE (barangay_id = {$barangayId} OR barangay_id IS NULL) AND start_datetime >= CURDATE() AND status != 'Cancelled' AND (is_archived = 0 OR is_archived IS NULL)")->fetchColumn();
+// Counts for filter pills (strictly scoped to this barangay and created by Barangay Head)
+$countUpcomingStmt = $db->prepare("
+    SELECT COUNT(*) FROM events e 
+    LEFT JOIN users u ON e.created_by = u.id 
+    WHERE e.barangay_id = ? 
+      AND e.start_datetime >= CURDATE() 
+      AND e.status != 'Cancelled' 
+      AND (e.is_archived = 0 OR e.is_archived IS NULL)
+      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+");
+$countUpcomingStmt->execute([$barangayId, $barangayId]);
+$countUpcoming = (int)$countUpcomingStmt->fetchColumn();
 $countMyDrills = count($myRegisteredEventIds);
 
 $pageTitle = "Community Events & Drills";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
+
+<!-- Leaflet GIS Map Dependencies for Venue Navigation -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <style>
 /* ==========================================================================
@@ -284,6 +299,180 @@ require_once __DIR__ . '/../layouts/header.php';
   border: 1px solid var(--color-success-border, #BCE3C1);
 }
 
+/* Navigate to Venue Button with Loading State */
+.btn-navigate-venue {
+  font-family: var(--font-primary, 'Poppins', sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-secondary, #2F6F73);
+  color: var(--color-secondary, #2F6F73);
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-navigate-venue:hover {
+  background: var(--color-secondary, #2F6F73);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(47, 111, 115, 0.25);
+  transform: translateY(-1px);
+}
+.btn-navigate-venue.is-loading {
+  pointer-events: none;
+  opacity: 0.85;
+  background: #EBF3F5;
+  color: var(--color-secondary, #2F6F73);
+}
+.btn-navigate-venue .spin-loader {
+  animation: venueSpin 0.75s linear infinite;
+}
+@keyframes venueSpin {
+  100% { transform: rotate(360deg); }
+}
+
+/* Venue Leaflet Modal */
+.venue-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: venueFadeIn 0.2s ease;
+}
+.venue-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.venue-modal-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 680px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: venueSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 90vh;
+}
+@keyframes venueFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes venueSlideUp {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.venue-modal-header {
+  padding: 12px 16px;
+  background: #F8FAFB;
+  border-bottom: 1px solid var(--color-border-light, #E7EDF0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.venue-modal-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+}
+.venue-modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-text-muted, #8A96A0);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.venue-modal-close-btn:hover {
+  background: #EAEFF2;
+  color: var(--color-danger, #C62828);
+}
+.venue-modal-summary {
+  padding: 10px 16px;
+  background: #FFFFFF;
+  border-bottom: 1px solid var(--color-border-light, #E7EDF0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.venue-name-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+}
+.venue-event-sub {
+  font-size: 10.5px;
+  color: var(--color-text-secondary, #5A6A75);
+  margin-top: 2px;
+}
+.venue-summary-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.venue-stat-pill {
+  background: #EBF3F5;
+  border: 1px solid #C4DDE2;
+  border-radius: 6px;
+  padding: 3px 8px;
+  text-align: right;
+}
+.venue-map-wrap {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  background: #EAEEF0;
+}
+.venue-map-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  transition: opacity 0.2s ease;
+}
+.venue-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #D9E0E3;
+  border-top-color: var(--color-secondary, #2F6F73);
+  border-radius: 50%;
+  animation: venueSpin 0.7s linear infinite;
+}
+.venue-modal-footer {
+  padding: 10px 16px;
+  background: #F8FAFB;
+  border-top: 1px solid var(--color-border-light, #E7EDF0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Protocols Card */
 .protocols-side-card {
   background: var(--color-surface, #FFFFFF);
@@ -433,11 +622,26 @@ require_once __DIR__ . '/../layouts/header.php';
                 </div>
               </div>
 
-              <!-- Action Bar with RSVP Toggle Button -->
+              <!-- Action Bar with Venue Navigation & RSVP Button -->
               <div class="event-action-bar">
-                <span style="font-size:10px;color:var(--color-text-muted);">
-                  Organized by <?= clean($act['barangay_name'] ? "BDRRMC {$act['barangay_name']}" : "ICDRRMO Central") ?>
-                </span>
+                <button type="button" 
+                        class="btn-navigate-venue" 
+                        onclick="openVenueModal(this)"
+                        data-event-id="<?= $eventId ?>"
+                        data-title="<?= htmlspecialchars($act['title'], ENT_QUOTES) ?>"
+                        data-venue="<?= htmlspecialchars($act['venue'], ENT_QUOTES) ?>"
+                        data-barangay="<?= htmlspecialchars($act['barangay_name'] ?? '', ENT_QUOTES) ?>"
+                        data-lat="<?= (float)($act['latitude'] ?? 0) ?>"
+                        data-lng="<?= (float)($act['longitude'] ?? 0) ?>"
+                        data-time="<?= htmlspecialchars(date('h:i A', $startDt) . ' – ' . date('h:i A', $endDt), ENT_QUOTES) ?>"
+                        data-date="<?= htmlspecialchars(date('M d, Y', $startDt), ENT_QUOTES) ?>">
+                  <span class="btn-nav-icon">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+                    </svg>
+                  </span>
+                  <span class="btn-nav-label">Navigate to Venue &rarr;</span>
+                </button>
 
                 <?php if ($isCancelled || $isPast): ?>
                   <span class="badge badge-neutral" style="font-size:10px;">
@@ -570,6 +774,295 @@ function toggleRsvp(eventId) {
     alert('Network error while processing registration.');
   });
 }
+
+// ============================================================================
+// Venue Navigation Leaflet Mapping Tool Engine & Modality Logic
+// ============================================================================
+let venueMapInstance = null;
+let venueMarker = null;
+let userMarker = null;
+let routeLine = null;
+let currentTargetLat = null;
+let currentTargetLng = null;
+let currentUserLat = null;
+let currentUserLng = null;
+let currentVenueName = '';
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function openVenueModal(btn) {
+  if (!btn) return;
+
+  const originalHtml = btn.innerHTML;
+  btn.classList.add('is-loading');
+  btn.innerHTML = `
+    <svg class="spin-loader" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25"></circle>
+      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor"></path>
+    </svg>
+    <span>Locating Venue...</span>
+  `;
+
+  const title = btn.getAttribute('data-title') || 'Community Event';
+  const venue = btn.getAttribute('data-venue') || 'Venue';
+  const barangay = btn.getAttribute('data-barangay') || '';
+  let lat = parseFloat(btn.getAttribute('data-lat'));
+  let lng = parseFloat(btn.getAttribute('data-lng'));
+  const schedule = btn.getAttribute('data-time') || '';
+  const dateStr = btn.getAttribute('data-date') || '';
+
+  // Default fallback if coordinates not set (Hinaplanon center)
+  if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+    lat = 8.246596;
+    lng = 124.259474;
+  }
+
+  currentTargetLat = lat;
+  currentTargetLng = lng;
+  currentVenueName = venue;
+
+  // Populate Modal Text
+  document.getElementById('venueModalVenueName').textContent = venue;
+  document.getElementById('venueModalEventSub').textContent = `${title} • ${dateStr} (${schedule})`;
+  document.getElementById('venueCoordVal').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  document.getElementById('venueGmapsLink').href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat + ',' + lng)}`;
+
+  // Show Modal Overlay with animation
+  const modal = document.getElementById('venueNavModal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  // Smooth loading animation simulation & map initialization
+  const loaderOverlay = document.getElementById('venueMapLoading');
+  loaderOverlay.style.display = 'flex';
+
+  setTimeout(() => {
+    initVenueMap(lat, lng, venue, title, barangay);
+    loaderOverlay.style.display = 'none';
+    btn.classList.remove('is-loading');
+    btn.innerHTML = originalHtml;
+
+    // Trigger user GPS lookup to plot route
+    requestUserGps(false);
+  }, 400);
+}
+
+function initVenueMap(targetLat, targetLng, venueName, eventTitle, brgyName) {
+  const mapContainer = document.getElementById('venueLeafletMap');
+  if (!mapContainer) return;
+
+  if (venueMapInstance) {
+    venueMapInstance.remove();
+    venueMapInstance = null;
+  }
+
+  venueMapInstance = L.map('venueLeafletMap', {
+    center: [targetLat, targetLng],
+    zoom: 16,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(venueMapInstance);
+
+  // Custom Red/Burgundy Destination Pin
+  const venuePinIcon = L.divIcon({
+    className: 'custom-venue-pin',
+    html: `
+      <div style="background:#C62828;width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(198,40,40,0.45);border:2px solid #FFF;">
+        <svg style="transform:rotate(45deg);color:#FFF;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -32]
+  });
+
+  venueMarker = L.marker([targetLat, targetLng], { icon: venuePinIcon }).addTo(venueMapInstance);
+  venueMarker.bindPopup(`
+    <div style="font-family:var(--font-primary, sans-serif);padding:4px;font-size:11px;min-width:180px;">
+      <strong style="color:var(--color-primary);font-size:12px;display:block;margin-bottom:2px;">${escapeHtml(venueName)}</strong>
+      <span style="font-size:10px;color:var(--color-secondary);font-weight:600;">Brgy. ${escapeHtml(brgyName)}</span>
+      <div style="font-size:10px;color:var(--color-text-secondary);margin-top:3px;">${escapeHtml(eventTitle)}</div>
+    </div>
+  `).openPopup();
+
+  // Fix map resize rendering
+  setTimeout(() => {
+    if (venueMapInstance) venueMapInstance.invalidateSize();
+  }, 250);
+}
+
+function requestUserGps(showAlert = true) {
+  const gpsLabel = document.getElementById('venueGpsLabel');
+  if (gpsLabel) gpsLabel.textContent = 'Locating...';
+
+  if (!navigator.geolocation) {
+    if (showAlert && typeof showToast === 'function') showToast('Geolocation is not supported by your browser.', 'warning');
+    if (gpsLabel) gpsLabel.textContent = 'My Location';
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      currentUserLat = pos.coords.latitude;
+      currentUserLng = pos.coords.longitude;
+      if (gpsLabel) gpsLabel.textContent = 'GPS Active ✓';
+
+      updateRouteOnMap(currentUserLat, currentUserLng, currentTargetLat, currentTargetLng);
+    },
+    (err) => {
+      // If error/denied, fallback to Hinaplanon barangay base coordinates as origin
+      currentUserLat = 8.246596;
+      currentUserLng = 124.259474;
+      if (gpsLabel) gpsLabel.textContent = 'Brgy Base';
+      updateRouteOnMap(currentUserLat, currentUserLng, currentTargetLat, currentTargetLng, 'Barangay Base / Center');
+    },
+    { enableHighAccuracy: true, timeout: 7000 }
+  );
+}
+
+function updateRouteOnMap(uLat, uLng, tLat, tLng, originLabel = 'Your Location') {
+  if (!venueMapInstance) return;
+
+  // Remove existing user marker & route line
+  if (userMarker) venueMapInstance.removeLayer(userMarker);
+  if (routeLine) venueMapInstance.removeLayer(routeLine);
+
+  // User location marker (Blue radar dot)
+  const userDotIcon = L.divIcon({
+    className: 'custom-user-dot',
+    html: `
+      <div style="width:18px;height:18px;border-radius:50%;background:#1976D2;border:3px solid #FFF;box-shadow:0 0 0 3px rgba(25,118,210,0.35);"></div>
+    `,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+  });
+
+  userMarker = L.marker([uLat, uLng], { icon: userDotIcon }).addTo(venueMapInstance);
+  userMarker.bindTooltip(originLabel, { permanent: false, direction: 'top' });
+
+  // Draw Route Polyline
+  routeLine = L.polyline([[uLat, uLng], [tLat, tLng]], {
+    color: '#2F6F73',
+    weight: 4,
+    opacity: 0.85,
+    dashArray: '8, 8'
+  }).addTo(venueMapInstance);
+
+  // Fit bounds to show both points with comfort padding
+  const bounds = L.latLngBounds([[uLat, uLng], [tLat, tLng]]);
+  venueMapInstance.fitBounds(bounds, { padding: [40, 40] });
+
+  // Calculate Haversine distance
+  const distKm = computeDistanceKm(uLat, uLng, tLat, tLng);
+  const distPill = document.getElementById('venueDistPill');
+  const distVal = document.getElementById('venueDistVal');
+
+  if (distPill && distVal) {
+    distPill.style.display = 'block';
+    if (distKm < 1) {
+      distVal.textContent = `${Math.round(distKm * 1000)} m (${Math.ceil(distKm * 12)} min walk)`;
+    } else {
+      distVal.textContent = `${distKm.toFixed(1)} km (~${Math.ceil(distKm * 3)} min drive)`;
+    }
+  }
+
+  // Update Google Maps direct navigation link
+  const gmapsLink = document.getElementById('venueGmapsLink');
+  if (gmapsLink) {
+    gmapsLink.href = `https://www.google.com/maps/dir/?api=1&origin=${uLat},${uLng}&destination=${tLat},${tLng}`;
+  }
+}
+
+function computeDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function closeVenueModal() {
+  const modal = document.getElementById('venueNavModal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ESC key to close modal
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeVenueModal();
+});
 </script>
+
+<!-- Venue Navigation Leaflet Modal -->
+<div id="venueNavModal" class="venue-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="venueModalTitle">
+  <div class="venue-modal-backdrop" onclick="closeVenueModal()"></div>
+  <div class="venue-modal-container">
+    <div class="venue-modal-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-primary" style="font-size:9.5px;padding:3px 7px;background:var(--color-primary);color:#FFF;">VENUE MAP</span>
+        <h3 id="venueModalTitle" class="venue-modal-title">Event Venue &amp; Navigation</h3>
+      </div>
+      <button type="button" class="venue-modal-close-btn" onclick="closeVenueModal()" aria-label="Close Modal">&times;</button>
+    </div>
+
+    <!-- Venue & Route Summary Bar -->
+    <div class="venue-modal-summary">
+      <div class="venue-summary-info">
+        <div class="venue-name-heading" id="venueModalVenueName">Venue Name</div>
+        <div class="venue-event-sub" id="venueModalEventSub">Event Title &bull; Schedule</div>
+      </div>
+      <div class="venue-summary-stats">
+        <div class="venue-stat-pill" id="venueDistPill" style="display:none;">
+          <span style="font-size:9px;color:var(--color-text-muted);display:block;">Est. Distance</span>
+          <strong id="venueDistVal" style="font-size:12px;color:var(--color-primary);">0.0 km</strong>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" id="venueGpsBtn" onclick="requestUserGps(true)" style="font-size:10px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          <span id="venueGpsLabel">My Location</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Leaflet Map Container -->
+    <div class="venue-map-wrap">
+      <div id="venueLeafletMap" style="width:100%;height:380px;"></div>
+      <div id="venueMapLoading" class="venue-map-loading-overlay">
+        <div class="venue-spinner"></div>
+        <span style="font-size:11px;font-weight:600;color:var(--color-primary);margin-top:8px;">Initializing Map &amp; Navigation...</span>
+      </div>
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div class="venue-modal-footer">
+      <div id="venueCoordDisplay" style="font-size:10px;color:var(--color-text-muted);">
+        Coordinates: <span id="venueCoordVal">--</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <a id="venueGmapsLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;text-decoration:none;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          Open Turn-by-Turn in Google Maps &rarr;
+        </a>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeVenueModal()" style="font-size:11px;padding:6px 12px;">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

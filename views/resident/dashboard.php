@@ -89,43 +89,35 @@ foreach ($allEvacAreas as $ea) {
     }
 }
 
-// Latest Public Advisories
+// Latest Public Advisories (strictly scoped to resident's barangay and created by Barangay Head)
 $notifStmt = $db->prepare("
-    SELECT n.*, b.name AS barangay_name 
+    SELECT n.*, b.name AS barangay_name, u.full_name AS sender_name 
     FROM notifications n
     LEFT JOIN barangays b ON n.target_barangay_id = b.id
-    WHERE n.target_role IN ('all', 'resident')
-       OR n.target_barangay_id = ?
-    ORDER BY n.alert_level = 'Critical' DESC, n.created_at DESC
+    LEFT JOIN users u ON n.created_by = u.id
+    WHERE (n.target_barangay_id = ? OR n.target_user_id = ?)
+      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
+      AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    ORDER BY n.alert_level = 'urgent' DESC, n.alert_level = 'warning' DESC, n.created_at DESC
     LIMIT 4
 ");
-$notifStmt->execute([$barangayId]);
+$notifStmt->execute([$barangayId, $user['id'], $user['id'], $barangayId]);
 $recentAdvisories = $notifStmt->fetchAll();
 
-// Fetch Preparedness Schedule Drills / Events for Resident
+// Fetch Preparedness Schedule Drills / Events for Resident (created by Barangay Head)
 $actStmt = $db->prepare("
-    SELECT e.*, b.name AS barangay_name 
+    SELECT e.*, b.name AS barangay_name, u.full_name AS organizer_name 
     FROM events e
     LEFT JOIN barangays b ON e.barangay_id = b.id
-    WHERE (e.barangay_id = ? OR e.barangay_id IS NULL)
+    LEFT JOIN users u ON e.created_by = u.id
+    WHERE e.barangay_id = ?
       AND (e.is_archived = 0 OR e.is_archived IS NULL)
       AND e.status != 'Cancelled'
+      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
     ORDER BY e.start_datetime ASC
 ");
-$actStmt->execute([$barangayId]);
+$actStmt->execute([$barangayId, $barangayId]);
 $scheduleEvents = $actStmt->fetchAll(PDO::FETCH_ASSOC);
-
-if (empty($scheduleEvents)) {
-    $actStmt2 = $db->query("
-        SELECT e.*, b.name AS barangay_name 
-        FROM events e
-        LEFT JOIN barangays b ON e.barangay_id = b.id
-        WHERE (e.is_archived = 0 OR e.is_archived IS NULL)
-          AND e.status != 'Cancelled'
-        ORDER BY e.start_datetime ASC
-    ");
-    $scheduleEvents = $actStmt2->fetchAll(PDO::FETCH_ASSOC);
-}
 
 // User RSVP status
 $myRsvps = [];
