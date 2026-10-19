@@ -45,6 +45,13 @@ if ($filterTab === 'upcoming') {
   } else {
     $sql .= " AND 1=0"; // No registered drills
   }
+} elseif ($filterTab === 'missed') {
+  $sql .= " AND (e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled'";
+  if (!empty($myRegisteredEventIds)) {
+    $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+    $sql .= " AND e.id NOT IN ($inPlaceholders)";
+    $params = array_merge($params, $myRegisteredEventIds);
+  }
 } elseif ($filterTab === 'completed') {
   $sql .= " AND (e.status = 'Completed' OR e.start_datetime < CURDATE())";
 }
@@ -75,6 +82,27 @@ $countUpcomingStmt = $db->prepare("
 $countUpcomingStmt->execute([$barangayId, $barangayId]);
 $countUpcoming = (int) $countUpcomingStmt->fetchColumn();
 $countMyDrills = count($myRegisteredEventIds);
+
+// Missed Events Count (Past events where resident did NOT register/attend)
+$missedQuery = "
+    SELECT COUNT(*) FROM events e 
+    LEFT JOIN users u ON e.created_by = u.id 
+    WHERE e.barangay_id = ? 
+      AND (e.start_datetime < NOW() OR e.status = 'Completed')
+      AND e.status != 'Cancelled'
+      AND (e.is_archived = 0 OR e.is_archived IS NULL)
+      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+";
+if (!empty($myRegisteredEventIds)) {
+  $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+  $missedQuery .= " AND e.id NOT IN ($inPlaceholders)";
+  $countMissedStmt = $db->prepare($missedQuery);
+  $countMissedStmt->execute(array_merge([$barangayId, $barangayId], $myRegisteredEventIds));
+} else {
+  $countMissedStmt = $db->prepare($missedQuery);
+  $countMissedStmt->execute([$barangayId, $barangayId]);
+}
+$countMissed = (int) $countMissedStmt->fetchColumn();
 
 $pageTitle = "Community Events & Drills";
 require_once __DIR__ . '/../layouts/header.php';
@@ -187,12 +215,15 @@ require_once __DIR__ . '/../layouts/header.php';
     display: flex;
     flex-direction: column;
     gap: 8px;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    position: relative;
   }
 
   .resident-event-card:hover {
-    border-color: var(--color-secondary, #2F6F73);
-    box-shadow: 0 3px 10px rgba(23, 50, 77, 0.06);
+    border-color: var(--color-primary, #17324D);
+    box-shadow: 0 4px 14px rgba(23, 50, 77, 0.08);
+    transform: translateY(-1px);
   }
 
   /* Date + Content Grid inside Card */
@@ -597,6 +628,9 @@ require_once __DIR__ . '/../layouts/header.php';
       <a href="events.php?tab=my_drills" class="event-pill-link <?= ($filterTab === 'my_drills') ? 'active' : '' ?>">
         My Registered Drills (<?= $countMyDrills ?>)
       </a>
+      <a href="events.php?tab=missed" class="event-pill-link <?= ($filterTab === 'missed') ? 'active' : '' ?>">
+        Missed Events (<?= $countMissed ?>)
+      </a>
       <a href="events.php?tab=all" class="event-pill-link <?= ($filterTab === 'all') ? 'active' : '' ?>">
         All Events
       </a>
@@ -626,8 +660,30 @@ require_once __DIR__ . '/../layouts/header.php';
           $pctAtt = min(100, round(($actual / $target) * 100));
           $isPast = ($startDt < time());
           $isCancelled = ($act['status'] === 'Cancelled');
+          $isMissed = ($isPast && !$isAttending && !$isCancelled);
+
+          $statusLabel = $isCancelled ? 'Cancelled' : ($isMissed ? 'Missed Event' : ($isPast ? 'Completed' : 'Upcoming'));
+          $attendanceLabel = $isMissed ? 'Missed (Concluded)' : ($isAttending ? 'Registered' : 'Not Registered');
           ?>
-          <div class="resident-event-card" id="event-card-<?= $eventId ?>">
+          <div class="resident-event-card" id="event-card-<?= $eventId ?>"
+            onclick="openEventDetailsModal(this)"
+            data-id="<?= $eventId ?>"
+            data-title="<?= htmlspecialchars($act['title'], ENT_QUOTES) ?>"
+            data-type="<?= htmlspecialchars($act['activity_type'], ENT_QUOTES) ?>"
+            data-status="<?= $statusLabel ?>"
+            data-is-missed="<?= $isMissed ? '1' : '0' ?>"
+            data-is-past="<?= $isPast ? '1' : '0' ?>"
+            data-date="<?= htmlspecialchars(date('M d, Y', $startDt), ENT_QUOTES) ?>"
+            data-time="<?= htmlspecialchars(date('h:i A', $startDt) . ' – ' . date('h:i A', $endDt), ENT_QUOTES) ?>"
+            data-venue="<?= htmlspecialchars($act['venue'], ENT_QUOTES) ?>"
+            data-barangay="<?= htmlspecialchars($act['barangay_name'] ?? '', ENT_QUOTES) ?>"
+            data-organizer="<?= htmlspecialchars($act['organizer_name'] ?? 'Hon. Rodrigo Almonte (Barangay Head)', ENT_QUOTES) ?>"
+            data-turnout="<?= number_format($actual) ?> / <?= number_format($target) ?> Registered"
+            data-attendance="<?= $attendanceLabel ?>"
+            data-desc="<?= htmlspecialchars($act['description'] ?? '', ENT_QUOTES) ?>"
+            role="button"
+            tabindex="0"
+            aria-label="View event details for <?= htmlspecialchars($act['title'], ENT_QUOTES) ?>">
             <div class="event-card-inner">
               <!-- Date Box -->
               <div class="event-date-box">
@@ -640,7 +696,15 @@ require_once __DIR__ . '/../layouts/header.php';
               <div class="event-details-col">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
                   <h3 class="event-title"><?= clean($act['title']) ?></h3>
-                  <div><?= renderStatusBadge($act['status']) ?></div>
+                  <div>
+                    <?php if ($isMissed): ?>
+                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#FFF3CD;color:#856404;font-weight:600;border:1px solid #FFEEBA;">Missed Event</span>
+                    <?php elseif ($isPast && $isAttending): ?>
+                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#E8F5E9;color:#2E7D32;font-weight:600;border:1px solid #C8E6C9;">Attended</span>
+                    <?php else: ?>
+                      <?= renderStatusBadge($act['status']) ?>
+                    <?php endif; ?>
+                  </div>
                 </div>
 
                 <div class="event-meta-line">
@@ -685,7 +749,7 @@ require_once __DIR__ . '/../layouts/header.php';
 
             <!-- Action Bar with Venue Navigation & RSVP Button -->
             <div class="event-action-bar">
-              <button type="button" class="btn-navigate-venue" onclick="openVenueModal(this)"
+              <button type="button" class="btn-navigate-venue" onclick="event.stopPropagation(); openVenueModal(this)"
                 data-event-id="<?= $eventId ?>" data-title="<?= htmlspecialchars($act['title'], ENT_QUOTES) ?>"
                 data-venue="<?= htmlspecialchars($act['venue'], ENT_QUOTES) ?>"
                 data-barangay="<?= htmlspecialchars($act['barangay_name'] ?? '', ENT_QUOTES) ?>"
@@ -697,10 +761,12 @@ require_once __DIR__ . '/../layouts/header.php';
                     <polygon points="3 11 22 2 13 21 11 13 3 11" />
                   </svg>
                 </span>
-                <span class="btn-nav-label">Navigate to Venue &rarr;</span>
+                <span class="btn-nav-label">Venue Map &rarr;</span>
               </button>
 
-              <?php if ($isCancelled || $isPast): ?>
+              <?php if ($isMissed): ?>
+                <span style="font-size:10.5px;color:#856404;font-weight:600;">Missed Activity</span>
+              <?php elseif ($isCancelled || $isPast): ?>
                 <span class="badge badge-neutral" style="font-size:10px;">
                   <?= $isCancelled ? 'Event Cancelled' : 'Completed Activity' ?>
                 </span>
@@ -708,7 +774,7 @@ require_once __DIR__ . '/../layouts/header.php';
                 <div style="display:flex;align-items:center;gap:8px;">
                   <button type="button" id="rsvp-btn-<?= $eventId ?>"
                     class="rsvp-toggle-btn <?= $isAttending ? 'registered' : 'attend' ?>"
-                    onclick="toggleRsvp(<?= $eventId ?>)">
+                    onclick="event.stopPropagation(); toggleRsvp(<?= $eventId ?>)">
                     <?php if ($isAttending): ?>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <polyline points="20 6 9 17 4 12" />
@@ -965,11 +1031,153 @@ require_once __DIR__ . '/../layouts/header.php';
     document.body.style.overflow = '';
   }
 
-  // ESC key to close modal
+  // ============================================================================
+  // Event Details Direct Modal Logic (Clean, Direct, Single Restrained Palette)
+  // ============================================================================
+  function openEventDetailsModal(cardEl) {
+    if (!cardEl) return;
+
+    const title = cardEl.getAttribute('data-title') || '';
+    const type = cardEl.getAttribute('data-type') || '';
+    const status = cardEl.getAttribute('data-status') || '';
+    const date = cardEl.getAttribute('data-date') || '';
+    const time = cardEl.getAttribute('data-time') || '';
+    const venue = cardEl.getAttribute('data-venue') || '';
+    const barangay = cardEl.getAttribute('data-barangay') || '';
+    const organizer = cardEl.getAttribute('data-organizer') || 'Hon. Rodrigo Almonte (Barangay Head)';
+    const attendance = cardEl.getAttribute('data-attendance') || '';
+    const desc = cardEl.getAttribute('data-desc') || 'No additional details provided.';
+    const isMissed = cardEl.getAttribute('data-is-missed') === '1';
+    const isPast = cardEl.getAttribute('data-is-past') === '1';
+
+    const titleEl = document.getElementById('detailsModalTitle');
+    if (titleEl) titleEl.textContent = title;
+
+    const typeEl = document.getElementById('detailsModalType');
+    if (typeEl) typeEl.textContent = type;
+
+    const statusBadge = document.getElementById('detailsModalStatusBadge');
+    if (statusBadge) {
+      statusBadge.textContent = status;
+      if (isMissed) {
+        statusBadge.style.color = '#856404';
+        statusBadge.style.background = '#FFF3CD';
+        statusBadge.style.border = '1px solid #FFEEBA';
+      } else if (isPast) {
+        statusBadge.style.color = '#2E7D32';
+        statusBadge.style.background = '#E8F5E9';
+        statusBadge.style.border = '1px solid #C8E6C9';
+      } else {
+        statusBadge.style.color = '#17324D';
+        statusBadge.style.background = '#EBF3F5';
+        statusBadge.style.border = '1px solid #D9E0E3';
+      }
+    }
+
+    const dateTimeEl = document.getElementById('detailsModalDateTime');
+    if (dateTimeEl) dateTimeEl.textContent = `${date} • ${time}`;
+
+    const venueEl = document.getElementById('detailsModalVenue');
+    if (venueEl) venueEl.textContent = barangay ? `${venue}, Brgy. ${barangay}` : venue;
+
+    const organizerEl = document.getElementById('detailsModalOrganizer');
+    if (organizerEl) organizerEl.textContent = organizer;
+
+    const attendanceEl = document.getElementById('detailsModalAttendance');
+    if (attendanceEl) {
+      attendanceEl.textContent = attendance;
+      if (isMissed) {
+        attendanceEl.style.color = '#856404';
+      } else if (attendance.includes('Registered') && !attendance.includes('Not')) {
+        attendanceEl.style.color = '#2E7D32';
+      } else {
+        attendanceEl.style.color = '#66737D';
+      }
+    }
+
+    const descEl = document.getElementById('detailsModalDesc');
+    if (descEl) descEl.textContent = desc;
+
+    const modal = document.getElementById('eventDetailsModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function closeEventDetailsModal() {
+    const modal = document.getElementById('eventDetailsModal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  // ESC key to close any active modal
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeVenueModal();
+    if (e.key === 'Escape') {
+      closeVenueModal();
+      closeEventDetailsModal();
+    }
   });
 </script>
+
+<!-- Event Details Modal (Direct, Focused, Single Unified Palette, No Icon Clutter) -->
+<div id="eventDetailsModal" class="venue-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="detailsModalHeading">
+  <div class="venue-modal-backdrop" onclick="closeEventDetailsModal()"></div>
+  <div class="venue-modal-container" style="max-width:520px;">
+    <!-- Modal Header -->
+    <div class="venue-modal-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-primary" style="font-size:9.5px;padding:3px 7px;background:var(--color-primary);color:#FFF;">EVENT DETAILS</span>
+        <h3 id="detailsModalHeading" class="venue-modal-title" style="font-size:13px;font-weight:600;margin:0;">Full Information</h3>
+      </div>
+      <button type="button" class="venue-modal-close-btn" onclick="closeEventDetailsModal()" aria-label="Close Modal">&times;</button>
+    </div>
+
+    <!-- Modal Content -->
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;">
+      <!-- Title & Type Header -->
+      <div>
+        <h2 id="detailsModalTitle" style="font-family:var(--font-primary);font-size:15px;font-weight:700;color:var(--color-primary);line-height:1.35;margin:0 0 6px 0;"></h2>
+        <div style="font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span id="detailsModalType" style="font-weight:600;color:var(--color-primary);"></span>
+          <span>&bull;</span>
+          <span id="detailsModalStatusBadge" style="font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;"></span>
+        </div>
+      </div>
+
+      <!-- Essential Key Facts (Clean 2-column grid, neutral styling, direct) -->
+      <div style="background:#F8FAFB;border:1px solid #E7EDF0;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;font-size:11px;">
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Date &amp; Schedule</div>
+          <div id="detailsModalDateTime" style="font-weight:600;color:#17324D;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Location</div>
+          <div id="detailsModalVenue" style="font-weight:600;color:#17324D;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Organizer</div>
+          <div id="detailsModalOrganizer" style="font-weight:600;color:#17324D;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Your Status</div>
+          <div id="detailsModalAttendance" style="font-weight:600;"></div>
+        </div>
+      </div>
+
+      <!-- Description / Direct Guidelines -->
+      <div>
+        <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:4px;">Details &amp; Guidelines</div>
+        <div id="detailsModalDesc" style="font-size:11.5px;line-height:1.5;color:#2C3E50;white-space:pre-line;"></div>
+      </div>
+
+      <!-- Footer Action -->
+      <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #E7EDF0;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeEventDetailsModal()" style="font-size:11px;padding:6px 14px;">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Venue Navigation Leaflet Modal -->
 <div id="venueNavModal" class="venue-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="venueModalTitle">

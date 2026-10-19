@@ -334,7 +334,7 @@ DROP TABLE IF EXISTS `events`;
 CREATE TABLE `events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(150) NOT NULL,
-  `activity_type` enum('Disaster Drill','First Aid / Rescuer Training','Community Seminar','IEC Campaign','Contingency Planning','Hazard Mapping Workshop') NOT NULL,
+  `activity_type` varchar(100) NOT NULL DEFAULT 'Disaster Drill',
   `barangay_id` int(11) DEFAULT NULL,
   `venue` varchar(150) NOT NULL,
   `start_datetime` datetime NOT NULL,
