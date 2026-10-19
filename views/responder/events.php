@@ -640,13 +640,6 @@ function toggleResponderDuty(eventId) {
 // ============================================================================
 let venueMapInstance = null;
 let venueMarker = null;
-let userMarker = null;
-let routeLine = null;
-let currentTargetLat = null;
-let currentTargetLng = null;
-let currentUserLat = null;
-let currentUserLng = null;
-let currentVenueName = '';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -685,33 +678,33 @@ function openVenueModal(btn) {
     lng = 124.259474;
   }
 
-  currentTargetLat = lat;
-  currentTargetLng = lng;
-  currentVenueName = venue;
+  // Populate Modal Text safely
+  const vNameEl = document.getElementById('venueModalVenueName');
+  if (vNameEl) vNameEl.textContent = venue;
 
-  // Populate Modal Text
-  document.getElementById('venueModalVenueName').textContent = venue;
-  document.getElementById('venueModalEventSub').textContent = `${title} • ${dateStr} (${schedule})`;
-  document.getElementById('venueCoordVal').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-  document.getElementById('venueGmapsLink').href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat + ',' + lng)}`;
+  const vSubEl = document.getElementById('venueModalEventSub');
+  if (vSubEl) vSubEl.textContent = `${title} • ${dateStr} (${schedule})`;
+
+  const vCoordEl = document.getElementById('venueCoordVal');
+  if (vCoordEl) vCoordEl.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+  const vGmapsEl = document.getElementById('venueGmapsLink');
+  if (vGmapsEl) vGmapsEl.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat + ',' + lng)}`;
 
   // Show Modal Overlay with animation
   const modal = document.getElementById('venueNavModal');
-  modal.style.display = 'flex';
+  if (modal) modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
   // Smooth loading animation simulation & map initialization
   const loaderOverlay = document.getElementById('venueMapLoading');
-  loaderOverlay.style.display = 'flex';
+  if (loaderOverlay) loaderOverlay.style.display = 'flex';
 
   setTimeout(() => {
     initVenueMap(lat, lng, venue, title, barangay);
-    loaderOverlay.style.display = 'none';
+    if (loaderOverlay) loaderOverlay.style.display = 'none';
     btn.classList.remove('is-loading');
     btn.innerHTML = originalHtml;
-
-    // Trigger user GPS lookup to plot route
-    requestUserGps(false);
   }, 400);
 }
 
@@ -765,99 +758,6 @@ function initVenueMap(targetLat, targetLng, venueName, eventTitle, brgyName) {
   }, 250);
 }
 
-function requestUserGps(showAlert = true) {
-  const gpsLabel = document.getElementById('venueGpsLabel');
-  if (gpsLabel) gpsLabel.textContent = 'Locating...';
-
-  if (!navigator.geolocation) {
-    if (showAlert && typeof showToast === 'function') showToast('Geolocation is not supported by your browser.', 'warning');
-    if (gpsLabel) gpsLabel.textContent = 'My Location';
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      currentUserLat = pos.coords.latitude;
-      currentUserLng = pos.coords.longitude;
-      if (gpsLabel) gpsLabel.textContent = 'GPS Active ✓';
-
-      updateRouteOnMap(currentUserLat, currentUserLng, currentTargetLat, currentTargetLng);
-    },
-    (err) => {
-      // Fallback to Hinaplanon barangay base coordinates as origin
-      currentUserLat = 8.246596;
-      currentUserLng = 124.259474;
-      if (gpsLabel) gpsLabel.textContent = 'Brgy Base';
-      updateRouteOnMap(currentUserLat, currentUserLng, currentTargetLat, currentTargetLng, 'Barangay Base / Center');
-    },
-    { enableHighAccuracy: true, timeout: 7000 }
-  );
-}
-
-function updateRouteOnMap(uLat, uLng, tLat, tLng, originLabel = 'Your Location') {
-  if (!venueMapInstance) return;
-
-  // Remove existing user marker & route line
-  if (userMarker) venueMapInstance.removeLayer(userMarker);
-  if (routeLine) venueMapInstance.removeLayer(routeLine);
-
-  // User location marker (Blue radar dot)
-  const userDotIcon = L.divIcon({
-    className: 'custom-user-dot',
-    html: `
-      <div style="width:18px;height:18px;border-radius:50%;background:#1976D2;border:3px solid #FFF;box-shadow:0 0 0 3px rgba(25,118,210,0.35);"></div>
-    `,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9]
-  });
-
-  userMarker = L.marker([uLat, uLng], { icon: userDotIcon }).addTo(venueMapInstance);
-  userMarker.bindTooltip(originLabel, { permanent: false, direction: 'top' });
-
-  // Draw Route Polyline
-  routeLine = L.polyline([[uLat, uLng], [tLat, tLng]], {
-    color: '#2F6F73',
-    weight: 4,
-    opacity: 0.85,
-    dashArray: '8, 8'
-  }).addTo(venueMapInstance);
-
-  // Fit bounds to show both points with comfort padding
-  const bounds = L.latLngBounds([[uLat, uLng], [tLat, tLng]]);
-  venueMapInstance.fitBounds(bounds, { padding: [40, 40] });
-
-  // Calculate Haversine distance
-  const distKm = computeDistanceKm(uLat, uLng, tLat, tLng);
-  const distPill = document.getElementById('venueDistPill');
-  const distVal = document.getElementById('venueDistVal');
-
-  if (distPill && distVal) {
-    distPill.style.display = 'block';
-    if (distKm < 1) {
-      distVal.textContent = `${Math.round(distKm * 1000)} m (${Math.ceil(distKm * 12)} min walk)`;
-    } else {
-      distVal.textContent = `${distKm.toFixed(1)} km (~${Math.ceil(distKm * 3)} min drive)`;
-    }
-  }
-
-  // Update Google Maps direct navigation link
-  const gmapsLink = document.getElementById('venueGmapsLink');
-  if (gmapsLink) {
-    gmapsLink.href = `https://www.google.com/maps/dir/?api=1&origin=${uLat},${uLng}&destination=${tLat},${tLng}`;
-  }
-}
-
-function computeDistanceKm(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
 function closeVenueModal() {
   const modal = document.getElementById('venueNavModal');
   if (modal) modal.style.display = 'none';
@@ -882,21 +782,11 @@ document.addEventListener('keydown', function(e) {
       <button type="button" class="venue-modal-close-btn" onclick="closeVenueModal()" aria-label="Close Modal">&times;</button>
     </div>
 
-    <!-- Venue & Route Summary Bar -->
+    <!-- Venue Summary Bar (Clean: Venue & Schedule Only) -->
     <div class="venue-modal-summary">
       <div class="venue-summary-info">
         <div class="venue-name-heading" id="venueModalVenueName">Venue Name</div>
         <div class="venue-event-sub" id="venueModalEventSub">Event Title &bull; Schedule</div>
-      </div>
-      <div class="venue-summary-stats">
-        <div class="venue-stat-pill" id="venueDistPill" style="display:none;">
-          <span style="font-size:9px;color:var(--color-text-muted);display:block;">Est. Distance</span>
-          <strong id="venueDistVal" style="font-size:12px;color:var(--color-primary);">0.0 km</strong>
-        </div>
-        <button type="button" class="btn btn-outline btn-sm" id="venueGpsBtn" onclick="requestUserGps(true)" style="font-size:10px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-          <span id="venueGpsLabel">My Location</span>
-        </button>
       </div>
     </div>
 
