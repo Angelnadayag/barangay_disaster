@@ -685,12 +685,6 @@ function openVenueModal(btn) {
   const vSubEl = document.getElementById('venueModalEventSub');
   if (vSubEl) vSubEl.textContent = `${title} • ${dateStr} (${schedule})`;
 
-  const vCoordEl = document.getElementById('venueCoordVal');
-  if (vCoordEl) vCoordEl.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-
-  const vGmapsEl = document.getElementById('venueGmapsLink');
-  if (vGmapsEl) vGmapsEl.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat + ',' + lng)}`;
-
   // Show Modal Overlay with animation
   const modal = document.getElementById('venueNavModal');
   if (modal) modal.style.display = 'flex';
@@ -796,20 +790,6 @@ document.addEventListener('keydown', function(e) {
       <div id="venueMapLoading" class="venue-map-loading-overlay">
         <div class="venue-spinner"></div>
         <span style="font-size:11px;font-weight:600;color:var(--color-primary);margin-top:8px;">Initializing Map &amp; Navigation...</span>
-      </div>
-    </div>
-
-    <!-- Modal Footer Actions -->
-    <div class="venue-modal-footer">
-      <div id="venueCoordDisplay" style="font-size:10px;color:var(--color-text-muted);">
-        Coordinates: <span id="venueCoordVal">--</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <a id="venueGmapsLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;text-decoration:none;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-          Open Turn-by-Turn in Google Maps &rarr;
-        </a>
-        <button type="button" class="btn btn-outline btn-sm" onclick="closeVenueModal()" style="font-size:11px;padding:6px 12px;">Close</button>
       </div>
     </div>
   </div>
