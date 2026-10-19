@@ -13,6 +13,7 @@ requireRole('resident');
 $user = getCurrentUser();
 $userId = (int) $user['id'];
 $barangayId = (int) ($user['barangay_id'] ?? 1);
+$userPurok = trim($user['purok'] ?? '');
 $db = getDBConnection();
 
 $filterTab = $_GET['tab'] ?? 'upcoming';
@@ -23,100 +24,135 @@ $myRsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_i
 $myRsvpStmt->execute([$userId, $user['phone'] ?? '']);
 $myRegisteredEventIds = $myRsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
-// Fetch Events query strictly scoped to resident's barangay and created by their Barangay Head
-$sql = "
+// Base Query: Scoped strictly to resident's barangay, created by Barangay Head
+// AND relevant to the resident (their purok, barangay-wide events, or events they registered for)
+$baseWhere = "
+    e.barangay_id = ?
+    AND (e.is_archived = 0 OR e.is_archived IS NULL)
+    AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+";
+$baseParams = [$barangayId, $barangayId];
+
+if (!empty($userPurok)) {
+  $purokLike = "%{$userPurok}%";
+  if (!empty($myRegisteredEventIds)) {
+    $inRsvpPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+    $baseWhere .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.title NOT LIKE 'Purok %' OR e.id IN ($inRsvpPlaceholders))";
+    $baseParams = array_merge($baseParams, [$purokLike, $purokLike], $myRegisteredEventIds);
+  } else {
+    $baseWhere .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.title NOT LIKE 'Purok %')";
+    $baseParams = array_merge($baseParams, [$purokLike, $purokLike]);
+  }
+}
+
+// 1. Upcoming Count
+$countUpcomingStmt = $db->prepare("
+    SELECT COUNT(*) FROM events e 
+    LEFT JOIN users u ON e.created_by = u.id 
+    WHERE {$baseWhere}
+      AND e.start_datetime >= CURDATE() 
+      AND e.status != 'Cancelled'
+");
+$countUpcomingStmt->execute($baseParams);
+$countUpcoming = (int) $countUpcomingStmt->fetchColumn();
+
+// 2. My Drills Count
+$countMyDrills = count($myRegisteredEventIds);
+
+// 3. Missed Events Count & Most Recent Missed Event
+$missedWhere = "{$baseWhere} AND (e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled'";
+$missedParams = $baseParams;
+if (!empty($myRegisteredEventIds)) {
+  $inMissedRsvp = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+  $missedWhere .= " AND e.id NOT IN ($inMissedRsvp)";
+  $missedParams = array_merge($missedParams, $myRegisteredEventIds);
+}
+
+$countMissedStmt = $db->prepare("
+    SELECT COUNT(*) FROM events e 
+    LEFT JOIN users u ON e.created_by = u.id 
+    WHERE {$missedWhere}
+");
+$countMissedStmt->execute($missedParams);
+$countMissed = (int) $countMissedStmt->fetchColumn();
+
+// Fetch most recent missed event for instant top alert banner
+$recentMissedEvent = null;
+if ($countMissed > 0) {
+  $recentMissedStmt = $db->prepare("
+      SELECT e.*, b.name AS barangay_name, u.full_name AS organizer_name
+      FROM events e
+      LEFT JOIN barangays b ON e.barangay_id = b.id
+      LEFT JOIN users u ON e.created_by = u.id
+      WHERE {$missedWhere}
+      ORDER BY e.start_datetime DESC
+      LIMIT 1
+  ");
+  $recentMissedStmt->execute($missedParams);
+  $recentMissedEvent = $recentMissedStmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// Build Active Feed Query according to filter tab
+$feedSql = "
     SELECT e.*, b.name AS barangay_name, u.full_name AS organizer_name
     FROM events e
     LEFT JOIN barangays b ON e.barangay_id = b.id
     LEFT JOIN users u ON e.created_by = u.id
-    WHERE e.barangay_id = ?
-      AND (e.is_archived = 0 OR e.is_archived IS NULL)
-      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    WHERE {$baseWhere}
 ";
-$params = [$barangayId, $barangayId];
+$feedParams = $baseParams;
 
 if ($filterTab === 'upcoming') {
-  $sql .= " AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled'";
+  $feedSql .= " AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled'";
 } elseif ($filterTab === 'my_drills') {
   if (!empty($myRegisteredEventIds)) {
     $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
-    $sql .= " AND e.id IN ($inPlaceholders)";
-    $params = array_merge($params, $myRegisteredEventIds);
+    $feedSql .= " AND e.id IN ($inPlaceholders)";
+    $feedParams = array_merge($feedParams, $myRegisteredEventIds);
   } else {
-    $sql .= " AND 1=0"; // No registered drills
+    $feedSql .= " AND 1=0";
   }
 } elseif ($filterTab === 'missed') {
-  $sql .= " AND (e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled'";
+  $feedSql .= " AND (e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled'";
   if (!empty($myRegisteredEventIds)) {
     $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
-    $sql .= " AND e.id NOT IN ($inPlaceholders)";
-    $params = array_merge($params, $myRegisteredEventIds);
+    $feedSql .= " AND e.id NOT IN ($inPlaceholders)";
+    $feedParams = array_merge($feedParams, $myRegisteredEventIds);
   }
 } elseif ($filterTab === 'completed') {
-  $sql .= " AND (e.status = 'Completed' OR e.start_datetime < CURDATE())";
+  $feedSql .= " AND (e.status = 'Completed' OR e.start_datetime < CURDATE())";
 }
 
 if (!empty($searchQuery)) {
-  $sql .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.activity_type LIKE ?)";
+  $feedSql .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.activity_type LIKE ?)";
   $like = "%{$searchQuery}%";
-  $params[] = $like;
-  $params[] = $like;
-  $params[] = $like;
+  $feedParams[] = $like;
+  $feedParams[] = $like;
+  $feedParams[] = $like;
 }
 
-$sql .= " ORDER BY (e.start_datetime >= NOW()) DESC, e.start_datetime ASC";
-$stmt = $db->prepare($sql);
-$stmt->execute($params);
-$eventsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Counts for filter pills (strictly scoped to this barangay and created by Barangay Head)
-$countUpcomingStmt = $db->prepare("
-    SELECT COUNT(*) FROM events e 
-    LEFT JOIN users u ON e.created_by = u.id 
-    WHERE e.barangay_id = ? 
-      AND e.start_datetime >= CURDATE() 
-      AND e.status != 'Cancelled' 
-      AND (e.is_archived = 0 OR e.is_archived IS NULL)
-      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
-");
-$countUpcomingStmt->execute([$barangayId, $barangayId]);
-$countUpcoming = (int) $countUpcomingStmt->fetchColumn();
-$countMyDrills = count($myRegisteredEventIds);
-
-// Missed Events Count (Past events where resident did NOT register/attend)
-$missedQuery = "
-    SELECT COUNT(*) FROM events e 
-    LEFT JOIN users u ON e.created_by = u.id 
-    WHERE e.barangay_id = ? 
-      AND (e.start_datetime < NOW() OR e.status = 'Completed')
-      AND e.status != 'Cancelled'
-      AND (e.is_archived = 0 OR e.is_archived IS NULL)
-      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
-";
-if (!empty($myRegisteredEventIds)) {
-  $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
-  $missedQuery .= " AND e.id NOT IN ($inPlaceholders)";
-  $countMissedStmt = $db->prepare($missedQuery);
-  $countMissedStmt->execute(array_merge([$barangayId, $barangayId], $myRegisteredEventIds));
+// Order: Upcoming first (ASC), Missed/Past by most recent first (DESC)
+if ($filterTab === 'missed' || $filterTab === 'completed') {
+  $feedSql .= " ORDER BY e.start_datetime DESC";
 } else {
-  $countMissedStmt = $db->prepare($missedQuery);
-  $countMissedStmt->execute([$barangayId, $barangayId]);
+  $feedSql .= " ORDER BY (e.start_datetime >= NOW()) DESC, e.start_datetime ASC";
 }
-$countMissed = (int) $countMissedStmt->fetchColumn();
+
+$stmt = $db->prepare($feedSql);
+$stmt->execute($feedParams);
+$eventsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = "Community Events & Drills";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
 <!-- Leaflet GIS Map Dependencies for Venue Navigation -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<link rel="stylesheet" href="<?= BASE_URL ?>/frontend/vendor/leaflet/leaflet.css" />
+<script src="<?= BASE_URL ?>/frontend/vendor/leaflet/leaflet.js"></script>
 
 <style>
   /* ==========================================================================
-   Resident Events & Drills: Mobile-First Priority & Anti-Slop Guidelines
+   Resident Events & Drills: Mobile-First Priority & Clean Design System
    Strict 10px radius, standard Poppins/Roboto typography, crisp color tokens
    ========================================================================== */
   .resident-events-wrap {
@@ -124,6 +160,28 @@ require_once __DIR__ . '/../layouts/header.php';
     flex-direction: column;
     gap: var(--space-4, 12px);
     width: 100%;
+  }
+
+  /* Missed Event Alert Banner */
+  .missed-alert-banner {
+    background: #FFFDF5;
+    border: 1px solid #FFE69C;
+    border-left: 4px solid #F59E0B;
+    border-radius: var(--radius-primary, 10px);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.08);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .missed-alert-banner:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
   }
 
   /* Event Filter Deck */
@@ -182,6 +240,12 @@ require_once __DIR__ . '/../layouts/header.php';
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    transition: all 0.15s ease;
+  }
+
+  .event-pill-link:hover {
+    border-color: var(--color-primary, #17324D);
+    color: var(--color-primary, #17324D);
   }
 
   .event-pill-link.active {
@@ -189,6 +253,12 @@ require_once __DIR__ . '/../layouts/header.php';
     border-color: var(--color-primary, #17324D);
     color: #FFFFFF;
     font-weight: 600;
+  }
+
+  .event-pill-link.pill-missed.active {
+    background: #856404;
+    border-color: #856404;
+    color: #FFFFFF;
   }
 
   /* Responsive Split on Desktop: Events List (Left) + Safety Protocols (Right) */
@@ -206,24 +276,29 @@ require_once __DIR__ . '/../layouts/header.php';
     }
   }
 
-  /* Event Card Item */
+  /* Event Card Item - Distinct Clickable Card */
   .resident-event-card {
     background: var(--color-surface, #FFFFFF);
     border: 1px solid var(--color-border, #D9E0E3);
     border-radius: var(--radius-primary, 10px);
-    padding: 12px 14px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    gap: 10px;
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease;
     cursor: pointer;
     position: relative;
+    user-select: none;
   }
 
   .resident-event-card:hover {
     border-color: var(--color-primary, #17324D);
-    box-shadow: 0 4px 14px rgba(23, 50, 77, 0.08);
-    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(23, 50, 77, 0.09);
+    transform: translateY(-2px);
+  }
+
+  .resident-event-card:active {
+    transform: translateY(0);
   }
 
   /* Date + Content Grid inside Card */
@@ -270,13 +345,21 @@ require_once __DIR__ . '/../layouts/header.php';
     min-width: 0;
   }
 
+  .event-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+
   .event-title {
     font-family: var(--font-primary, 'Poppins', sans-serif);
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
     color: var(--color-primary, #17324D);
-    margin: 0 0 2px 0;
-    line-height: 1.3;
+    margin: 0;
+    line-height: 1.35;
   }
 
   .event-meta-line {
@@ -310,7 +393,7 @@ require_once __DIR__ . '/../layouts/header.php';
     border-radius: 3px;
   }
 
-  /* RSVP Actions */
+  /* Action Bar with Venue Navigation & RSVP Button */
   .event-action-bar {
     display: flex;
     align-items: center;
@@ -319,6 +402,7 @@ require_once __DIR__ . '/../layouts/header.php';
     padding-top: 10px;
     margin-top: 4px;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .rsvp-toggle-btn {
@@ -330,8 +414,8 @@ require_once __DIR__ . '/../layouts/header.php';
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    min-height: 36px;
+    gap: 6px;
+    min-height: 34px;
     transition: all 0.15s ease;
   }
 
@@ -361,8 +445,8 @@ require_once __DIR__ . '/../layouts/header.php';
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    min-height: 36px;
+    gap: 6px;
+    min-height: 34px;
     background: var(--color-surface, #FFFFFF);
     border: 1px solid var(--color-secondary, #2F6F73);
     color: var(--color-secondary, #2F6F73);
@@ -394,31 +478,25 @@ require_once __DIR__ . '/../layouts/header.php';
     }
   }
 
-  /* Venue Leaflet Modal */
-  .venue-modal-overlay {
+  /* Clean Modal Overlay & Backdrop - Unified System Architecture */
+  .custom-modal-overlay {
     position: fixed;
     inset: 0;
     z-index: 99999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    animation: venueFadeIn 0.2s ease;
-  }
-
-  .venue-modal-backdrop {
-    position: fixed;
-    inset: 0;
     background: rgba(15, 23, 42, 0.65);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: modalFadeIn 0.2s ease;
   }
 
-  .venue-modal-container {
+  .custom-modal-dialog {
     position: relative;
-    z-index: 1;
     width: 100%;
-    max-width: 680px;
+    max-width: 600px;
     background: #FFFFFF;
     border: 1px solid var(--color-border, #D9E0E3);
     border-radius: var(--radius-primary, 10px);
@@ -426,34 +504,32 @@ require_once __DIR__ . '/../layouts/header.php';
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    animation: venueSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     max-height: 90vh;
   }
 
-  @keyframes venueFadeIn {
+  @keyframes modalFadeIn {
     from {
       opacity: 0;
     }
-
     to {
       opacity: 1;
     }
   }
 
-  @keyframes venueSlideUp {
+  @keyframes modalSlideUp {
     from {
       opacity: 0;
-      transform: translateY(18px) scale(0.98);
+      transform: translateY(16px) scale(0.98);
     }
-
     to {
       opacity: 1;
       transform: translateY(0) scale(1);
     }
   }
 
-  .venue-modal-header {
-    padding: 12px 16px;
+  .custom-modal-header {
+    padding: 12px 18px;
     background: #F8FAFB;
     border-bottom: 1px solid var(--color-border-light, #E7EDF0);
     display: flex;
@@ -461,66 +537,30 @@ require_once __DIR__ . '/../layouts/header.php';
     justify-content: space-between;
   }
 
-  .venue-modal-title {
+  .custom-modal-title {
     margin: 0;
     font-size: 13.5px;
     font-weight: 700;
     color: var(--color-primary, #17324D);
   }
 
-  .venue-modal-close-btn {
+  .custom-modal-close-btn {
     background: none;
     border: none;
-    font-size: 20px;
+    font-size: 22px;
     line-height: 1;
     color: var(--color-text-muted, #8A96A0);
     cursor: pointer;
     padding: 2px 6px;
     border-radius: 4px;
+    transition: color 0.15s ease;
   }
 
-  .venue-modal-close-btn:hover {
-    background: #EAEFF2;
+  .custom-modal-close-btn:hover {
     color: var(--color-danger, #C62828);
   }
 
-  .venue-modal-summary {
-    padding: 10px 16px;
-    background: #FFFFFF;
-    border-bottom: 1px solid var(--color-border-light, #E7EDF0);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  .venue-name-heading {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--color-primary, #17324D);
-  }
-
-  .venue-event-sub {
-    font-size: 10.5px;
-    color: var(--color-text-secondary, #5A6A75);
-    margin-top: 2px;
-  }
-
-  .venue-summary-stats {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .venue-stat-pill {
-    background: #EBF3F5;
-    border: 1px solid #C4DDE2;
-    border-radius: 6px;
-    padding: 3px 8px;
-    text-align: right;
-  }
-
+  /* Venue Map Wrap */
   .venue-map-wrap {
     position: relative;
     width: 100%;
@@ -541,23 +581,12 @@ require_once __DIR__ . '/../layouts/header.php';
   }
 
   .venue-spinner {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border: 3px solid #D9E0E3;
     border-top-color: var(--color-secondary, #2F6F73);
     border-radius: 50%;
     animation: venueSpin 0.7s linear infinite;
-  }
-
-  .venue-modal-footer {
-    padding: 10px 16px;
-    background: #F8FAFB;
-    border-top: 1px solid var(--color-border-light, #E7EDF0);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
   }
 
   /* Protocols Card */
@@ -608,6 +637,26 @@ require_once __DIR__ . '/../layouts/header.php';
 </div>
 
 <div class="resident-events-wrap">
+
+  <!-- Attention Notice for Missed Community Activities -->
+  <?php if ($countMissed > 0 && !empty($recentMissedEvent)): ?>
+    <div class="missed-alert-banner" onclick="openEventDetailsModalById(<?= (int)$recentMissedEvent['id'] ?>)" role="button" tabindex="0">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+        <span class="badge" style="background:#FFF3CD;color:#856404;border:1px solid #FFEEBA;font-weight:700;font-size:10px;padding:3px 8px;white-space:nowrap;">
+          MISSED ACTIVITY
+        </span>
+        <div style="font-size:11.5px;color:#24313A;line-height:1.35;overflow:hidden;text-overflow:ellipsis;">
+          You missed: <strong><?= clean($recentMissedEvent['title']) ?></strong>
+          <span style="color:#66737D;font-size:10.5px;"> &bull; Concluded on <?= date('M d, Y', strtotime($recentMissedEvent['start_datetime'])) ?></span>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); openEventDetailsModalById(<?= (int)$recentMissedEvent['id'] ?>)"
+        style="font-size:10.5px;padding:4px 10px;background:#FFFFFF;border:1px solid #D9E0E3;color:var(--color-primary);font-weight:600;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">
+        View Details &rarr;
+      </button>
+    </div>
+  <?php endif; ?>
+
   <!-- Filter Deck -->
   <div class="event-filter-deck">
     <form method="GET" class="event-search-row">
@@ -628,7 +677,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <a href="events.php?tab=my_drills" class="event-pill-link <?= ($filterTab === 'my_drills') ? 'active' : '' ?>">
         My Registered Drills (<?= $countMyDrills ?>)
       </a>
-      <a href="events.php?tab=missed" class="event-pill-link <?= ($filterTab === 'missed') ? 'active' : '' ?>">
+      <a href="events.php?tab=missed" class="event-pill-link pill-missed <?= ($filterTab === 'missed') ? 'active' : '' ?>">
         Missed Events (<?= $countMissed ?>)
       </a>
       <a href="events.php?tab=all" class="event-pill-link <?= ($filterTab === 'all') ? 'active' : '' ?>">
@@ -684,6 +733,7 @@ require_once __DIR__ . '/../layouts/header.php';
             role="button"
             tabindex="0"
             aria-label="View event details for <?= htmlspecialchars($act['title'], ENT_QUOTES) ?>">
+
             <div class="event-card-inner">
               <!-- Date Box -->
               <div class="event-date-box">
@@ -694,13 +744,13 @@ require_once __DIR__ . '/../layouts/header.php';
 
               <!-- Event Details -->
               <div class="event-details-col">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+                <div class="event-title-row">
                   <h3 class="event-title"><?= clean($act['title']) ?></h3>
                   <div>
                     <?php if ($isMissed): ?>
-                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#FFF3CD;color:#856404;font-weight:600;border:1px solid #FFEEBA;">Missed Event</span>
+                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#FFF3CD;color:#856404;font-weight:600;border:1px solid #FFEEBA;white-space:nowrap;">Missed Event</span>
                     <?php elseif ($isPast && $isAttending): ?>
-                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#E8F5E9;color:#2E7D32;font-weight:600;border:1px solid #C8E6C9;">Attended</span>
+                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#E8F5E9;color:#2E7D32;font-weight:600;border:1px solid #C8E6C9;white-space:nowrap;">Attended</span>
                     <?php else: ?>
                       <?= renderStatusBadge($act['status']) ?>
                     <?php endif; ?>
@@ -755,23 +805,28 @@ require_once __DIR__ . '/../layouts/header.php';
                 data-barangay="<?= htmlspecialchars($act['barangay_name'] ?? '', ENT_QUOTES) ?>"
                 data-lat="<?= (float) ($act['latitude'] ?? 0) ?>" data-lng="<?= (float) ($act['longitude'] ?? 0) ?>"
                 data-time="<?= htmlspecialchars(date('h:i A', $startDt) . ' – ' . date('h:i A', $endDt), ENT_QUOTES) ?>"
-                data-date="<?= htmlspecialchars(date('M d, Y', $startDt), ENT_QUOTES) ?>">
+                data-date="<?= htmlspecialchars(date('M d, Y', $startDt), ENT_QUOTES) ?>"
+                title="Navigate to Venue on Map">
                 <span class="btn-nav-icon">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="3 11 22 2 13 21 11 13 3 11" />
                   </svg>
                 </span>
-                <span class="btn-nav-label">Venue Map &rarr;</span>
+                <span class="btn-nav-label">Navigate to Venue</span>
               </button>
 
-              <?php if ($isMissed): ?>
-                <span style="font-size:10.5px;color:#856404;font-weight:600;">Missed Activity</span>
-              <?php elseif ($isCancelled || $isPast): ?>
-                <span class="badge badge-neutral" style="font-size:10px;">
-                  <?= $isCancelled ? 'Event Cancelled' : 'Completed Activity' ?>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:10.5px;color:var(--color-secondary);font-weight:600;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation(); openEventDetailsModal(document.getElementById('event-card-<?= $eventId ?>'))">
+                  View Details &rarr;
                 </span>
-              <?php else: ?>
-                <div style="display:flex;align-items:center;gap:8px;">
+
+                <?php if ($isMissed): ?>
+                  <span style="font-size:10.5px;color:#856404;font-weight:600;padding:4px 8px;background:#FFF3CD;border-radius:4px;border:1px solid #FFEEBA;">Missed Activity</span>
+                <?php elseif ($isCancelled || $isPast): ?>
+                  <span class="badge badge-neutral" style="font-size:10px;">
+                    <?= $isCancelled ? 'Event Cancelled' : 'Completed Activity' ?>
+                  </span>
+                <?php else: ?>
                   <button type="button" id="rsvp-btn-<?= $eventId ?>"
                     class="rsvp-toggle-btn <?= $isAttending ? 'registered' : 'attend' ?>"
                     onclick="event.stopPropagation(); toggleRsvp(<?= $eventId ?>)">
@@ -788,8 +843,8 @@ require_once __DIR__ . '/../layouts/header.php';
                       Join / Attend Drill
                     <?php endif; ?>
                   </button>
-                </div>
-              <?php endif; ?>
+                <?php endif; ?>
+              </div>
             </div>
 
           </div>
@@ -813,7 +868,7 @@ require_once __DIR__ . '/../layouts/header.php';
           <div class="protocol-item">
             <div class="protocol-bullet"></div>
             <div>
-              <strong>Earthquake: "Duck, Cover & Hold"</strong><br>
+              <strong>Earthquake: "Duck, Cover &amp; Hold"</strong><br>
               Drop down onto your hands and knees. Cover your head and neck under a sturdy table. Hold on until shaking
               ceases completely.
             </div>
@@ -822,7 +877,7 @@ require_once __DIR__ . '/../layouts/header.php';
           <div class="protocol-item">
             <div class="protocol-bullet"></div>
             <div>
-              <strong>Flood Warning & River Alert:</strong><br>
+              <strong>Flood Warning &amp; River Alert:</strong><br>
               When Mandulog river siren sounds (Red Warning), immediately proceed to your designated barangay
               high-ground shelter.
             </div>
@@ -849,6 +904,96 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ============================================================================ -->
+<!-- Event Details Modal (Direct, Clean, Focused, Restrained Single Palette)       -->
+<!-- ============================================================================ -->
+<div id="eventDetailsModal" class="custom-modal-overlay" onclick="handleOverlayClick(event, 'eventDetailsModal')" role="dialog" aria-modal="true" aria-labelledby="detailsModalHeading">
+  <div class="custom-modal-dialog" style="max-width:540px;" onclick="event.stopPropagation()">
+    <!-- Modal Header -->
+    <div class="custom-modal-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-primary" style="font-size:9.5px;padding:3px 7px;background:var(--color-primary);color:#FFF;">EVENT DETAILS</span>
+        <h3 id="detailsModalHeading" class="custom-modal-title" style="font-size:13px;font-weight:600;margin:0;">Full Information</h3>
+      </div>
+      <button type="button" class="custom-modal-close-btn" onclick="closeEventDetailsModal()" aria-label="Close Modal">&times;</button>
+    </div>
+
+    <!-- Modal Content -->
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;overflow-y:auto;max-height:calc(85vh - 100px);">
+      <!-- Title & Type Header -->
+      <div>
+        <h2 id="detailsModalTitle" style="font-family:var(--font-primary);font-size:15px;font-weight:700;color:var(--color-primary);line-height:1.35;margin:0 0 6px 0;"></h2>
+        <div style="font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span id="detailsModalType" style="font-weight:600;color:var(--color-primary);"></span>
+          <span>&bull;</span>
+          <span id="detailsModalStatusBadge" style="font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;"></span>
+        </div>
+      </div>
+
+      <!-- Essential Key Facts (Clean 2-column grid, direct) -->
+      <div style="background:#F8FAFB;border:1px solid #E7EDF0;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;font-size:11px;">
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Date &amp; Schedule</div>
+          <div id="detailsModalDateTime" style="font-weight:600;color:#17324D;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Location</div>
+          <div id="detailsModalVenue" style="font-weight:600;color:#17324D;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Organizer</div>
+          <div id="detailsModalOrganizer" style="font-weight:600;color:#17324D;"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Your Status</div>
+          <div id="detailsModalAttendance" style="font-weight:600;"></div>
+        </div>
+      </div>
+
+      <!-- Description / Direct Guidelines -->
+      <div>
+        <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:4px;">Details &amp; Guidelines</div>
+        <div id="detailsModalDesc" style="font-size:11.5px;line-height:1.5;color:#2C3E50;white-space:pre-line;"></div>
+      </div>
+
+      <!-- Footer Action -->
+      <div style="display:flex;justify-content:flex-end;padding-top:10px;border-top:1px solid #E7EDF0;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeEventDetailsModal()" style="font-size:11px;padding:6px 16px;">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================================ -->
+<!-- Venue Navigation Leaflet Modal                                               -->
+<!-- ============================================================================ -->
+<div id="venueNavModal" class="custom-modal-overlay" onclick="handleOverlayClick(event, 'venueNavModal')" role="dialog" aria-modal="true" aria-labelledby="venueModalTitle">
+  <div class="custom-modal-dialog" style="max-width:680px;" onclick="event.stopPropagation()">
+    <div class="custom-modal-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-primary" style="font-size:9.5px;padding:3px 7px;background:var(--color-primary);color:#FFF;">VENUE MAP</span>
+        <h3 id="venueModalTitle" class="custom-modal-title">Event Venue &amp; Navigation</h3>
+      </div>
+      <button type="button" class="custom-modal-close-btn" onclick="closeVenueModal()" aria-label="Close Modal">&times;</button>
+    </div>
+
+    <!-- Venue Summary Bar -->
+    <div style="padding:10px 18px;background:#FFFFFF;border-bottom:1px solid var(--color-border-light);display:flex;flex-direction:column;gap:2px;">
+      <div style="font-size:13px;font-weight:700;color:var(--color-primary);" id="venueModalVenueName">Venue Name</div>
+      <div style="font-size:10.5px;color:var(--color-text-secondary);" id="venueModalEventSub">Event Title &bull; Schedule</div>
+    </div>
+
+    <!-- Leaflet Map Container -->
+    <div class="venue-map-wrap">
+      <div id="venueLeafletMap" style="width:100%;height:380px;"></div>
+      <div id="venueMapLoading" class="venue-map-loading-overlay">
+        <div class="venue-spinner"></div>
+        <span style="font-size:11px;font-weight:600;color:var(--color-primary);margin-top:8px;">Loading Venue Location...</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -958,12 +1103,12 @@ require_once __DIR__ . '/../layouts/header.php';
     const vSubEl = document.getElementById('venueModalEventSub');
     if (vSubEl) vSubEl.textContent = `${title} • ${dateStr} (${schedule})`;
 
-    // Show Modal Overlay with animation
+    // Show Modal Overlay
     const modal = document.getElementById('venueNavModal');
     if (modal) modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
-    // Smooth loading animation simulation & map initialization
+    // Loading overlay inside map container
     const loaderOverlay = document.getElementById('venueMapLoading');
     if (loaderOverlay) loaderOverlay.style.display = 'flex';
 
@@ -972,12 +1117,22 @@ require_once __DIR__ . '/../layouts/header.php';
       if (loaderOverlay) loaderOverlay.style.display = 'none';
       btn.classList.remove('is-loading');
       btn.innerHTML = originalHtml;
-    }, 400);
+    }, 350);
   }
 
   function initVenueMap(targetLat, targetLng, venueName, eventTitle, brgyName) {
     const mapContainer = document.getElementById('venueLeafletMap');
     if (!mapContainer) return;
+
+    if (typeof L === 'undefined') {
+      mapContainer.innerHTML = `
+        <div style="padding:28px;text-align:center;color:var(--color-primary);font-size:12px;">
+          <strong>${escapeHtml(venueName)}</strong><br>
+          <span style="color:var(--color-text-secondary);font-size:11px;">Brgy. ${escapeHtml(brgyName)} (Coordinates: ${targetLat}, ${targetLng})</span>
+        </div>
+      `;
+      return;
+    }
 
     if (venueMapInstance) {
       venueMapInstance.remove();
@@ -1019,10 +1174,9 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
     `).openPopup();
 
-    // Fix map resize rendering
     setTimeout(() => {
       if (venueMapInstance) venueMapInstance.invalidateSize();
-    }, 250);
+    }, 200);
   }
 
   function closeVenueModal() {
@@ -1032,7 +1186,7 @@ require_once __DIR__ . '/../layouts/header.php';
   }
 
   // ============================================================================
-  // Event Details Direct Modal Logic (Clean, Direct, Single Restrained Palette)
+  // Event Details Modal Logic (Direct, Focused, Restrained Single Palette)
   // ============================================================================
   function openEventDetailsModal(cardEl) {
     if (!cardEl) return;
@@ -1105,109 +1259,54 @@ require_once __DIR__ . '/../layouts/header.php';
     }
   }
 
+  function openEventDetailsModalById(eventId) {
+    const card = document.getElementById(`event-card-${eventId}`);
+    if (card) {
+      openEventDetailsModal(card);
+    }
+  }
+
   function closeEventDetailsModal() {
     const modal = document.getElementById('eventDetailsModal');
     if (modal) modal.style.display = 'none';
     document.body.style.overflow = '';
   }
 
-  // ESC key to close any active modal
+  function handleOverlayClick(event, modalId) {
+    if (event.target.id === modalId || event.target.classList.contains('custom-modal-overlay')) {
+      if (modalId === 'venueNavModal') closeVenueModal();
+      else if (modalId === 'eventDetailsModal') closeEventDetailsModal();
+    }
+  }
+
+  // Bind click event listeners directly to cards
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.resident-event-card').forEach(card => {
+      card.addEventListener('click', function (e) {
+        if (e.target.closest('button') || e.target.closest('a')) {
+          return;
+        }
+        openEventDetailsModal(this);
+      });
+    });
+  });
+
+  // ESC key to close active modal
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       closeVenueModal();
       closeEventDetailsModal();
     }
   });
+
+  // Attach global functions to window
+  window.openVenueModal = openVenueModal;
+  window.closeVenueModal = closeVenueModal;
+  window.openEventDetailsModal = openEventDetailsModal;
+  window.openEventDetailsModalById = openEventDetailsModalById;
+  window.closeEventDetailsModal = closeEventDetailsModal;
+  window.handleOverlayClick = handleOverlayClick;
+  window.toggleRsvp = toggleRsvp;
 </script>
-
-<!-- Event Details Modal (Direct, Focused, Single Unified Palette, No Icon Clutter) -->
-<div id="eventDetailsModal" class="venue-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="detailsModalHeading">
-  <div class="venue-modal-backdrop" onclick="closeEventDetailsModal()"></div>
-  <div class="venue-modal-container" style="max-width:520px;">
-    <!-- Modal Header -->
-    <div class="venue-modal-header">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="badge badge-primary" style="font-size:9.5px;padding:3px 7px;background:var(--color-primary);color:#FFF;">EVENT DETAILS</span>
-        <h3 id="detailsModalHeading" class="venue-modal-title" style="font-size:13px;font-weight:600;margin:0;">Full Information</h3>
-      </div>
-      <button type="button" class="venue-modal-close-btn" onclick="closeEventDetailsModal()" aria-label="Close Modal">&times;</button>
-    </div>
-
-    <!-- Modal Content -->
-    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;">
-      <!-- Title & Type Header -->
-      <div>
-        <h2 id="detailsModalTitle" style="font-family:var(--font-primary);font-size:15px;font-weight:700;color:var(--color-primary);line-height:1.35;margin:0 0 6px 0;"></h2>
-        <div style="font-size:11px;color:var(--color-text-secondary);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <span id="detailsModalType" style="font-weight:600;color:var(--color-primary);"></span>
-          <span>&bull;</span>
-          <span id="detailsModalStatusBadge" style="font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;"></span>
-        </div>
-      </div>
-
-      <!-- Essential Key Facts (Clean 2-column grid, neutral styling, direct) -->
-      <div style="background:#F8FAFB;border:1px solid #E7EDF0;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;font-size:11px;">
-        <div>
-          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Date &amp; Schedule</div>
-          <div id="detailsModalDateTime" style="font-weight:600;color:#17324D;"></div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Location</div>
-          <div id="detailsModalVenue" style="font-weight:600;color:#17324D;"></div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Organizer</div>
-          <div id="detailsModalOrganizer" style="font-weight:600;color:#17324D;"></div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Your Status</div>
-          <div id="detailsModalAttendance" style="font-weight:600;"></div>
-        </div>
-      </div>
-
-      <!-- Description / Direct Guidelines -->
-      <div>
-        <div style="font-size:10px;color:#71828D;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:4px;">Details &amp; Guidelines</div>
-        <div id="detailsModalDesc" style="font-size:11.5px;line-height:1.5;color:#2C3E50;white-space:pre-line;"></div>
-      </div>
-
-      <!-- Footer Action -->
-      <div style="display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid #E7EDF0;">
-        <button type="button" class="btn btn-outline btn-sm" onclick="closeEventDetailsModal()" style="font-size:11px;padding:6px 14px;">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Venue Navigation Leaflet Modal -->
-<div id="venueNavModal" class="venue-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="venueModalTitle">
-  <div class="venue-modal-backdrop" onclick="closeVenueModal()"></div>
-  <div class="venue-modal-container">
-    <div class="venue-modal-header">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="badge badge-primary" style="font-size:9.5px;padding:3px 7px;background:var(--color-primary);color:#FFF;">VENUE MAP</span>
-        <h3 id="venueModalTitle" class="venue-modal-title">Event Venue &amp; Navigation</h3>
-      </div>
-      <button type="button" class="venue-modal-close-btn" onclick="closeVenueModal()" aria-label="Close Modal">&times;</button>
-    </div>
-
-    <!-- Venue Summary Bar (Clean: Venue & Schedule Only) -->
-    <div class="venue-modal-summary">
-      <div class="venue-summary-info">
-        <div class="venue-name-heading" id="venueModalVenueName">Venue Name</div>
-        <div class="venue-event-sub" id="venueModalEventSub">Event Title &bull; Schedule</div>
-      </div>
-    </div>
-
-    <!-- Leaflet Map Container -->
-    <div class="venue-map-wrap">
-      <div id="venueLeafletMap" style="width:100%;height:380px;"></div>
-      <div id="venueMapLoading" class="venue-map-loading-overlay">
-        <div class="venue-spinner"></div>
-        <span style="font-size:11px;font-weight:600;color:var(--color-primary);margin-top:8px;">Initializing Map &amp; Navigation...</span>
-      </div>
-    </div>
-  </div>
-</div>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>
