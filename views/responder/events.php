@@ -64,7 +64,7 @@ $tacticalEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $countUpcoming = (int)$db->query("SELECT COUNT(*) FROM events WHERE start_datetime >= CURDATE() AND status != 'Cancelled' AND (is_archived = 0 OR is_archived IS NULL)")->fetchColumn();
 $countMyDuties = count($myConfirmedEventIds);
 
-$pageTitle = "Tactical Drills & Events";
+$pageTitle = "Preparedness Drills & Events";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
@@ -237,7 +237,7 @@ require_once __DIR__ . '/../layouts/header.php';
   <!-- Page Header -->
   <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0;">Tactical Drills &amp; Operational Briefings</h1>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Preparedness Drills &amp; Training Events</h1>
     </div>
     <div class="page-header-actions">
       <a href="evacuation.php" class="btn btn-secondary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
@@ -254,7 +254,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <input type="text" 
                name="q" 
                value="<?= clean($searchQuery) ?>" 
-               placeholder="Search tactical event title, facilitator, or venue..." 
+               placeholder="Search event title, facilitator, or venue..." 
                class="tac-search-input">
         <?php if (!empty($filterTab)): ?><input type="hidden" name="tab" value="<?= clean($filterTab) ?>"><?php endif; ?>
         <button type="submit" class="btn btn-primary btn-sm" style="padding:0 14px;font-size:11px;">Search</button>
@@ -265,16 +265,16 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <div class="tac-pills-row">
         <a href="events.php?tab=upcoming" class="tac-pill-link <?= ($filterTab === 'upcoming') ? 'active' : '' ?>">
-          Upcoming Operations (<?= $countUpcoming ?>)
+          Upcoming Events (<?= $countUpcoming ?>)
         </a>
         <a href="events.php?tab=my_duties" class="tac-pill-link <?= ($filterTab === 'my_duties') ? 'active' : '' ?>">
-          My Confirmed Duties (<?= $countMyDuties ?>)
+          My Registered Events (<?= $countMyDuties ?>)
         </a>
         <a href="events.php?tab=all" class="tac-pill-link <?= ($filterTab === 'all') ? 'active' : '' ?>">
-          All Operations
+          All Events
         </a>
         <a href="events.php?tab=completed" class="tac-pill-link <?= ($filterTab === 'completed') ? 'active' : '' ?>">
-          Completed / Archived
+          Completed Events
         </a>
       </div>
     </div>
@@ -283,7 +283,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <div style="display:flex;flex-direction:column;gap:10px;">
       <?php if (empty($tacticalEvents)): ?>
         <div class="tac-event-card" style="padding:36px;text-align:center;color:var(--color-text-muted);">
-          No operational drills or briefing events match this tactical filter.
+          No drills or events match this filter.
         </div>
       <?php else: ?>
         <?php foreach ($tacticalEvents as $act): 
@@ -323,7 +323,7 @@ require_once __DIR__ . '/../layouts/header.php';
                 </div>
 
                 <div style="font-size:10px;color:var(--color-primary);font-weight:600;margin-bottom:6px;">
-                  Tactical Window: <?= date('h:i A', $startDt) ?> &ndash; <?= date('h:i A', $endDt) ?>
+                  Schedule: <?= date('h:i A', $startDt) ?> &ndash; <?= date('h:i A', $endDt) ?>
                 </div>
 
                 <?php if (!empty($act['assigned_personnel'])): ?>
@@ -335,7 +335,7 @@ require_once __DIR__ . '/../layouts/header.php';
                 <!-- Expected Activities / Tactical Briefing -->
                 <?php if (!empty($act['content_execution']) || !empty($act['expected_activities']) || !empty($act['description'])): ?>
                   <div class="tac-briefing-box">
-                    <strong>Tactical Scope:</strong> 
+                    <strong>Event Details:</strong> 
                     <?= clean($act['expected_activities'] ?: ($act['content_execution'] ?: $act['description'])) ?>
                   </div>
                 <?php endif; ?>
@@ -343,9 +343,9 @@ require_once __DIR__ . '/../layouts/header.php';
                 <!-- Attendance Meter -->
                 <div style="background:var(--color-surface-subtle);border:1px solid var(--color-border-light);border-radius:6px;padding:6px 10px;font-size:10px;margin-top:6px;">
                   <div style="display:flex;justify-content:space-between;font-family:var(--font-secondary);">
-                    <span style="font-weight:600;">Deployment Roster</span>
+                    <span style="font-weight:600;">Attendance</span>
                     <span style="font-weight:700;color:var(--color-primary);" id="tac-count-<?= $eventId ?>">
-                      <?= number_format($actual) ?> / <?= number_format($target) ?> Responders Confirmed
+                      <?= number_format($actual) ?> / <?= number_format($target) ?> Registered
                     </span>
                   </div>
                   <div style="width:100%;height:5px;background:#D9E0E3;border-radius:3px;overflow:hidden;margin-top:4px;">
@@ -374,10 +374,10 @@ require_once __DIR__ . '/../layouts/header.php';
                         onclick="toggleResponderDuty(<?= $eventId ?>)">
                   <?php if ($isConfirmed): ?>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    Duty Confirmed ✓
+                    Attending ✓
                   <?php else: ?>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Confirm Deployment
+                    Join Event
                   <?php endif; ?>
                 </button>
               <?php endif; ?>
@@ -414,15 +414,15 @@ function toggleResponderDuty(eventId) {
     if (data.success) {
       if (data.is_attending) {
         btn.className = 'tac-rsvp-btn deployed';
-        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Duty Confirmed ✓';
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Attending ✓';
       } else {
         btn.className = 'tac-rsvp-btn confirm';
-        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Confirm Deployment';
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Join Event';
       }
 
       const countEl = document.getElementById(`tac-count-${eventId}`);
       if (countEl && data.actual_participants !== undefined) {
-        countEl.innerText = `${data.actual_participants} Responders Confirmed`;
+        countEl.innerText = `${data.actual_participants} Registered`;
       }
 
       if (typeof showToast === 'function') {
@@ -432,14 +432,14 @@ function toggleResponderDuty(eventId) {
       }
     } else {
       btn.innerHTML = originalText;
-      alert(data.message || 'Error updating duty status.');
+      alert(data.message || 'Error updating attendance status.');
     }
   })
   .catch(err => {
     btn.disabled = false;
     btn.innerHTML = originalText;
     console.error(err);
-    alert('Network error while processing deployment confirmation.');
+    alert('Network error while updating event attendance.');
   });
 }
 </script>
