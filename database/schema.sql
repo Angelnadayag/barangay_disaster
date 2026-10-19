@@ -537,7 +537,6 @@ CREATE TABLE `resources` (
   `in_use_quantity` int(11) NOT NULL DEFAULT 0,
   `damaged_quantity` int(11) NOT NULL DEFAULT 0,
   `min_threshold` int(11) NOT NULL DEFAULT 50,
-  `storage_location` varchar(150) NOT NULL DEFAULT 'Central ICDRRMO Depot',
   `batch_number` varchar(50) DEFAULT NULL COMMENT 'Batch/Lot number from supplier',
   `supplier_id` int(11) DEFAULT NULL COMMENT 'Foreign key to resource_suppliers table',
   `date_acquired` date DEFAULT NULL COMMENT 'Date the resource was received/procured',
@@ -558,6 +557,39 @@ CREATE TABLE `resources` (
   CONSTRAINT `resources_ibfk_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `resource_suppliers` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `agency_resources`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `agency_resources` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `agency_id` int(11) NOT NULL,
+  `resource_id` int(11) NOT NULL,
+  `total_quantity` int(11) NOT NULL DEFAULT 0,
+  `available_quantity` int(11) NOT NULL DEFAULT 0,
+  `in_use_quantity` int(11) NOT NULL DEFAULT 0,
+  `damaged_quantity` int(11) NOT NULL DEFAULT 0,
+  `min_threshold` int(11) NOT NULL DEFAULT 50,
+  `batch_number` varchar(50) DEFAULT NULL,
+  `supplier_id` int(11) DEFAULT NULL,
+  `date_acquired` date DEFAULT NULL,
+  `expiry_date` date DEFAULT NULL,
+  `cost_per_unit` decimal(10,2) DEFAULT NULL,
+  `item_condition` enum('New','Good','Fair','Poor','Expired') NOT NULL DEFAULT 'New',
+  `status` enum('active','archived') NOT NULL DEFAULT 'active',
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `agency_id` (`agency_id`),
+  KEY `resource_id` (`resource_id`),
+  KEY `supplier_id` (`supplier_id`),
+  UNIQUE KEY `agency_resource_unique` (`agency_id`, `resource_id`),
+  CONSTRAINT `agency_resources_ibfk_1` FOREIGN KEY (`agency_id`) REFERENCES `agencies` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `agency_resources_ibfk_2` FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `agency_resources_ibfk_3` FOREIGN KEY (`supplier_id`) REFERENCES `resource_suppliers` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 DROP TABLE IF EXISTS `responder_field_updates`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;

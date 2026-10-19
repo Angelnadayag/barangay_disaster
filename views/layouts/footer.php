@@ -273,6 +273,60 @@ if ($dssModalRole === 'icdrrmo'):
   </div>
 <?php endif; ?>
 
+<?php
+$fUser = getCurrentUser();
+$fRole = $fUser['role'] ?? '';
+$fCurrentPage = basename($_SERVER['PHP_SELF']);
+if ($fRole === 'resident' || $fRole === 'responder'):
+?>
+  <!-- Mobile Bottom Navigation Bar (< 900px) -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile Navigation">
+    <?php if ($fRole === 'resident'): ?>
+      <a href="<?= BASE_URL ?>/views/resident/dashboard.php" class="bottom-nav-item <?= $fCurrentPage === 'dashboard.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Home</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/resident/evacuation.php" class="bottom-nav-item <?= $fCurrentPage === 'evacuation.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        <span>Evac Route</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/resident/events.php" class="bottom-nav-item <?= in_array($fCurrentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Events</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/resident/risk-map.php" class="bottom-nav-item <?= $fCurrentPage === 'risk-map.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+        <span>Hazard Map</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/resident/notifications.php" class="bottom-nav-item <?= $fCurrentPage === 'notifications.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span>Alerts</span>
+      </a>
+    <?php elseif ($fRole === 'responder'): ?>
+      <a href="<?= BASE_URL ?>/views/responder/dashboard.php" class="bottom-nav-item <?= $fCurrentPage === 'dashboard.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="bottom-nav-item <?= $fCurrentPage === 'active-incidents.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+        <span>Incidents</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/responder/evacuation.php" class="bottom-nav-item <?= $fCurrentPage === 'evacuation.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        <span>Evac Route</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/responder/events.php" class="bottom-nav-item <?= in_array($fCurrentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Drills</span>
+      </a>
+      <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="bottom-nav-item <?= $fCurrentPage === 'risk-map.php' ? 'active' : '' ?>">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+        <span>Map</span>
+      </a>
+    <?php endif; ?>
+  </nav>
+<?php endif; ?>
+
 <!-- Core Frontend JS Bundle -->
 <script src="<?= BASE_URL ?>/frontend/js/app.js?v=<?= filemtime(__DIR__ . '/../../frontend/js/app.js') ?>"></script>
 </body>

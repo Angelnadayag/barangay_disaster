@@ -41,10 +41,8 @@ $alerts = $stmt->fetchAll();
 
 $pageTitle = "Public Advisories & Bulletins";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Public Advisories & Disaster Bulletins</h1>
@@ -83,7 +81,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
         <div style="padding:48px 24px;text-align:center;color:var(--color-text-muted);">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 12px;display:block;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <div style="font-weight:600;font-size:14px;color:var(--color-text);">No Active Public Advisories</div>
-          <div style="font-size:12px;margin-top:4px;">No active emergency weather bulletins or evacuation advisories found.</div>
+          <div style="font-size:10.5px;margin-top:4px;">No active emergency weather bulletins or evacuation advisories found.</div>
         </div>
       <?php else: ?>
         <div class="list-group">
@@ -91,36 +89,36 @@ require_once __DIR__ . '/../layouts/sidebar.php';
             $isCrit = in_array($a['alert_level'], ['Critical', 'Danger']);
             $borderCol = $isCrit ? '#ef4444' : ($a['alert_level'] === 'Warning' ? '#f59e0b' : 'var(--color-primary)');
           ?>
-            <div style="padding:16px 20px;border-bottom:1px solid var(--color-border);border-left:4px solid <?= $borderCol ?>;background:<?= $a['is_read'] ? 'transparent' : 'var(--color-surface-subtle)' ?>;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div style="padding:14px 18px;border-bottom:1px solid var(--color-border);border-left:4px solid <?= $borderCol ?>;background:<?= $a['is_read'] ? 'transparent' : 'var(--color-surface-subtle)' ?>;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
                 <div style="display:flex;align-items:center;gap:8px;">
                   <?= renderStatusBadge($a['alert_level']) ?>
-                  <span style="font-size:11px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;">
+                  <span style="font-size:10px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;">
                     <?= clean($a['alert_type'] ?? 'Bulletin') ?>
                   </span>
                   <?php if (!$a['is_read']): ?>
-                    <span class="badge badge-info" style="font-size:10px;padding:1px 6px;">NEW</span>
+                    <span class="badge badge-info" style="font-size:9.5px;padding:1px 6px;">NEW</span>
                   <?php endif; ?>
                 </div>
-                <div style="font-size:11px;color:var(--color-text-muted);display:flex;align-items:center;gap:12px;">
+                <div style="font-size:10.5px;color:var(--color-text-muted);display:flex;align-items:center;gap:12px;">
                   <span><?= timeAgo($a['created_at']) ?> (<?= formatDate($a['created_at']) ?>)</span>
                   <?php if (!$a['is_read']): ?>
-                    <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="markResidentRead(<?= (int)$a['id'] ?>, this)">
+                    <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:10.5px;" onclick="markResidentRead(<?= (int)$a['id'] ?>, this)">
                       Mark Read
                     </button>
                   <?php endif; ?>
                 </div>
               </div>
 
-              <h3 style="font-size:14px;font-weight:700;color:var(--color-text);margin:0 0 6px 0;">
+              <h3 style="font-size:14px;font-weight:600;color:var(--color-text);margin:0 0 6px 0;">
                 <?= clean($a['title']) ?>
               </h3>
 
-              <div style="font-size:13px;color:var(--color-text-muted);line-height:1.5;">
+              <div style="font-size:10.5px;color:var(--color-text-secondary);line-height:1.48;">
                 <?= nl2br(clean($a['message'])) ?>
               </div>
 
-              <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--color-text-muted);border-top:1px dashed var(--color-border);padding-top:8px;">
+              <div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:var(--color-text-muted);border-top:1px dashed var(--color-border);padding-top:8px;">
                 <span><strong>Issued by:</strong> <?= clean($a['sender_name'] ?: 'ICDRRMO Central') ?></span>
                 <?php if ($a['barangay_name']): ?>
                   <span><strong>Target Barangay:</strong> <?= clean($a['barangay_name']) ?></span>
@@ -134,7 +132,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       <?php endif; ?>
     </div>
   </div>
-</main>
 
 <script>
 async function markResidentRead(id, btn) {

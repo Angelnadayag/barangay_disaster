@@ -36,14 +36,14 @@ $purpose = trim($_POST['purpose'] ?? '');
 // Check if a central resource was selected from catalog or matches by item name
 $catItem = null;
 if ($resourceId) {
-    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity, storage_location FROM resources WHERE id = ? AND barangay_id IS NULL AND status = 'active'");
+    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity FROM resources WHERE id = ? AND barangay_id IS NULL AND status = 'active'");
     $cStmt->execute([$resourceId]);
     $catItem = $cStmt->fetch(PDO::FETCH_ASSOC);
 }
 
 if (!$catItem && !empty($itemName)) {
     // Try to auto-match with active central resource
-    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity, storage_location FROM resources WHERE barangay_id IS NULL AND status = 'active' AND LOWER(name) = LOWER(?) LIMIT 1");
+    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity FROM resources WHERE barangay_id IS NULL AND status = 'active' AND LOWER(name) = LOWER(?) LIMIT 1");
     $cStmt->execute([$itemName]);
     $catItem = $cStmt->fetch(PDO::FETCH_ASSOC);
     if ($catItem) {

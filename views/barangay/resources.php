@@ -37,39 +37,75 @@ $search = trim($_GET['search'] ?? '');
 $filterCategory = trim($_GET['category'] ?? '');
 $filterStock = trim($_GET['stock'] ?? '');
 
-// Metrics: strictly scoped to this barangay
-$localTotalStock = (int) $db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
-$localSkuCount = (int) $db->query("SELECT COUNT(*) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
-$localLowStockCount = (int) $db->query("SELECT COUNT(*) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold")->fetchColumn();
+// Fetch Barangay BDRRMC Agency record
+$bAgency = getAgencyForUser($user);
+$agencyId = $bAgency ? (int)$bAgency['id'] : 0;
+
+// Metrics: strictly scoped to this barangay agency in agency_resources
+$localTotalStock = (int) $db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM agency_resources WHERE agency_id = {$agencyId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
+$localSkuCount = (int) $db->query("SELECT COUNT(*) FROM agency_resources WHERE agency_id = {$agencyId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
+$localLowStockCount = (int) $db->query("SELECT COUNT(*) FROM agency_resources WHERE agency_id = {$agencyId} AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold")->fetchColumn();
 $pendingRequestsCount = (int) $db->query("SELECT COUNT(*) FROM barangay_resource_requests WHERE barangay_id = {$barangayId} AND status = 'Pending'")->fetchColumn();
 $approvedRequestsCount = (int) $db->query("SELECT COUNT(*) FROM barangay_resource_requests WHERE barangay_id = {$barangayId} AND status = 'Approved'")->fetchColumn();
 
-// 1. Fetch Local Barangay Inventory
-$invSql = "SELECT * FROM (SELECT r.*, rs.name AS supplier_donor FROM resources r LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id) resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)";
-$invParams = [$barangayId];
+// 1. Fetch Local Barangay Inventory from agency_resources junction table
+$invSql = "
+    SELECT 
+        ar.id AS id,
+        ar.id AS agency_resource_id,
+        ar.agency_id,
+        ar.resource_id,
+        r.code,
+        r.name,
+        r.category,
+        r.unit,
+        r.description,
+        r.brand,
+        r.is_perishable,
+        ar.total_quantity,
+        ar.available_quantity,
+        ar.in_use_quantity,
+        ar.damaged_quantity,
+        ar.min_threshold,
+        ar.batch_number,
+        ar.supplier_id,
+        rs.name AS supplier_donor,
+        rs.name AS supplier_name,
+        ar.date_acquired,
+        ar.expiry_date,
+        ar.cost_per_unit,
+        ar.item_condition,
+        ar.status,
+        ar.created_at,
+        ar.updated_at
+    FROM agency_resources ar
+    JOIN resources r ON ar.resource_id = r.id
+    LEFT JOIN resource_suppliers rs ON ar.supplier_id = rs.id
+    WHERE ar.agency_id = ? AND (ar.status != 'archived' OR ar.status IS NULL)
+";
+$invParams = [$agencyId];
 
 if (!empty($filterCategory)) {
-  $invSql .= " AND category = ?";
+  $invSql .= " AND r.category = ?";
   $invParams[] = $filterCategory;
 }
 
 if ($filterStock === 'low') {
-  $invSql .= " AND available_quantity <= min_threshold";
+  $invSql .= " AND ar.available_quantity <= ar.min_threshold";
 } elseif ($filterStock === 'out') {
-  $invSql .= " AND available_quantity = 0";
+  $invSql .= " AND ar.available_quantity = 0";
 }
 
 if (!empty($search)) {
-  $invSql .= " AND (code LIKE ? OR name LIKE ? OR storage_location LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
+  $invSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR rs.name LIKE ? OR r.brand LIKE ?)";
   $like = "%$search%";
   $invParams[] = $like;
   $invParams[] = $like;
   $invParams[] = $like;
   $invParams[] = $like;
-  $invParams[] = $like;
 }
 
-$invSql .= " ORDER BY (available_quantity <= min_threshold) DESC, name ASC";
+$invSql .= " ORDER BY (ar.available_quantity <= ar.min_threshold) DESC, r.name ASC";
 $invStmt = $db->prepare($invSql);
 $invStmt->execute($invParams);
 $inventoryList = $invStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -114,11 +150,18 @@ $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 4. Central Depot Catalog (for requisition items dropdown)
 $centralCatalog = $db->query("
-    SELECT id, code, name, category, unit, available_quantity, storage_location
+    SELECT id, code, name, category, unit, available_quantity
     FROM resources
-    WHERE barangay_id IS NULL AND status = 'active'
+    WHERE status = 'active' OR status IS NULL
     ORDER BY category ASC, name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
+
+// Static Master Resource Catalog (for direct selection into agency_resources)
+$staticCatalog = getStaticResourcesCatalog();
+$catalogByCategory = [];
+foreach ($staticCatalog as $cItem) {
+  $catalogByCategory[$cItem['category']][] = $cItem;
+}
 
 // Dynamic Categories: strictly persisted in resource_categories table
 $categories = $db->query("SELECT name FROM resource_categories ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
@@ -897,7 +940,37 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
 
-        <div class="form-section-title">Basic Information</div>
+        <!-- Master Resource Catalog Direct Selection -->
+        <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:8px;padding:12px 14px;">
+          <label class="form-label" style="font-weight:700;color:var(--color-primary);font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <span>📦</span> Select Resource from Master Catalog <span style="font-size:10px;font-weight:500;color:var(--color-secondary);">(Diretso nalang)</span>
+          </label>
+          <select name="resource_id" id="create_select_catalog_resource" class="form-control" onchange="onCatalogResourceSelected(this)" style="font-weight:600;background:#FFFFFF;border-color:#94A3B8;">
+            <option value="">— Select from Static Resources Catalog (Diretso nalang) —</option>
+            <?php foreach ($catalogByCategory as $catGroup => $cItems): ?>
+              <optgroup label="📂 <?= clean($catGroup) ?>">
+                <?php foreach ($cItems as $ci): ?>
+                  <option value="<?= $ci['id'] ?>"
+                          data-code="<?= clean($ci['code']) ?>"
+                          data-name="<?= clean($ci['name']) ?>"
+                          data-category="<?= clean($ci['category']) ?>"
+                          data-unit="<?= clean($ci['unit']) ?>"
+                          data-brand="<?= clean($ci['brand'] ?? '') ?>"
+                          data-perishable="<?= (int)($ci['is_perishable'] ?? 0) ?>"
+                          data-desc="<?= clean($ci['description'] ?? '') ?>">
+                    <?= clean($ci['name']) ?> (<?= clean($ci['code']) ?> — <?= clean($ci['unit']) ?>)
+                  </option>
+                <?php endforeach; ?>
+              </optgroup>
+            <?php endforeach; ?>
+            <option value="custom">➕ Or Add New Custom Resource Definition</option>
+          </select>
+          <div style="font-size:10px;color:#475569;margin-top:4px;">
+            Choosing a resource auto-populates the official SKU code, item name, category, and unit into your local agency inventory.
+          </div>
+        </div>
+
+        <div class="form-section-title">Resource Specifications</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">SKU / Item Code <span style="color:var(--color-danger)">*</span></label>
@@ -1033,11 +1106,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           </div>
         </div>
 
-        <div class="form-section-title">Storage & Details</div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Storage Depot / Warehouse Location</label>
-          <input type="text" name="storage_location" class="form-control" value="Barangay Hall Stockroom">
-        </div>
+        <div class="form-section-title">Description & Details</div>
 
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Description & Specifications</label>
@@ -1255,11 +1324,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           </div>
         </div>
 
-        <div class="form-section-title">Storage & Details</div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Storage Depot / Warehouse Location</label>
-          <input type="text" name="storage_location" id="view_res_storage_location" class="form-control" disabled>
-        </div>
+        <div class="form-section-title">Description & Details</div>
 
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Description & Specifications</label>
@@ -1338,8 +1403,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
               style="font-size:9.5px;text-transform:uppercase;font-weight:700;color:var(--color-primary);letter-spacing:0.5px;">ICDRRMO
               Central Depot Live Stock</span>
             <div id="boxDepotItemName" style="font-weight:700;font-size:13.5px;color:#0F172A;margin-top:2px;"></div>
-            <div id="boxDepotLocation" style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">Central
-              ICDRRMO Depot</div>
+            <div id="boxDepotCategory" style="font-size:10px;color:var(--color-text-muted);margin-top:2px;"></div>
           </div>
           <div style="text-align:right;">
             <div id="boxDepotStockNum"
@@ -1378,7 +1442,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
               data-category="<?= htmlspecialchars($catItem['category']) ?>"
               data-unit="<?= htmlspecialchars($catItem['unit']) ?>"
               data-avail="<?= (int) $catItem['available_quantity'] ?>"
-              data-location="<?= htmlspecialchars($catItem['storage_location'] ?? 'Central ICDRRMO Depot') ?>"
               <?= $isOutOfStock ? 'disabled style="color:#94A3B8;background:#F8FAFC;"' : '' ?>>
               [<?= clean($catItem['category']) ?>] <?= clean($catItem['name']) ?> —
               <?= number_format($catItem['available_quantity']) ?>   <?= clean($catItem['unit']) ?> available
@@ -1791,10 +1854,60 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     }
   }
 
+  // Catalog Resource Auto-Fill handler (Direct selection from static resources)
+  function onCatalogResourceSelected(selectElem) {
+    const val = selectElem.value;
+    const form = selectElem.closest('form');
+    if (!form) return;
+    const codeInput = form.querySelector('input[name="code"]');
+    const nameInput = form.querySelector('input[name="name"]');
+    const catSelect = form.querySelector('select[name="category"]');
+    const unitInput = form.querySelector('input[name="unit"]');
+    const brandSelect = form.querySelector('select[name="brand"]');
+    const descInput = form.querySelector('textarea[name="description"]');
+    const perishCheck = form.querySelector('input[name="is_perishable"]');
+
+    if (val === 'custom') {
+      if (codeInput) { codeInput.value = ''; codeInput.readOnly = false; codeInput.focus(); }
+      if (nameInput) { nameInput.value = ''; nameInput.readOnly = false; }
+      if (descInput) { descInput.value = ''; }
+      return;
+    }
+
+    const opt = selectElem.selectedOptions[0];
+    if (!opt || !val) {
+      if (codeInput) { codeInput.value = ''; codeInput.readOnly = false; }
+      if (nameInput) { nameInput.value = ''; nameInput.readOnly = false; }
+      return;
+    }
+
+    const code = opt.getAttribute('data-code') || '';
+    const name = opt.getAttribute('data-name') || '';
+    const category = opt.getAttribute('data-category') || '';
+    const unit = opt.getAttribute('data-unit') || '';
+    const brand = opt.getAttribute('data-brand') || '';
+    const desc = opt.getAttribute('data-desc') || '';
+    const perish = opt.getAttribute('data-perishable') === '1';
+
+    if (codeInput) { codeInput.value = code; codeInput.readOnly = true; }
+    if (nameInput) { nameInput.value = name; nameInput.readOnly = true; }
+    if (catSelect && category) { catSelect.value = category; }
+    if (unitInput && unit) { unitInput.value = unit; }
+    if (brandSelect && brand) { brandSelect.value = brand; }
+    if (descInput && desc) { descInput.value = desc; }
+    if (perishCheck) { perishCheck.checked = perish; }
+  }
+
   // 1. Open Create Resource Modal
   function openCreateResourceModal() {
     const form = document.getElementById('createResourceForm');
-    if (form) form.reset();
+    if (form) {
+      form.reset();
+      const codeInput = form.querySelector('input[name="code"]');
+      const nameInput = form.querySelector('input[name="name"]');
+      if (codeInput) codeInput.readOnly = false;
+      if (nameInput) nameInput.readOnly = false;
+    }
     ['category', 'brand', 'supplier'].forEach(f => {
       const c = document.getElementById(`dynAddContainer_${f}_create`);
       if (c) c.style.display = 'none';
@@ -1894,7 +2007,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       opt.setAttribute('data-category', item.category);
       opt.setAttribute('data-unit', item.unit);
       opt.setAttribute('data-avail', item.available_quantity);
-      opt.setAttribute('data-location', item.storage_location || 'Central ICDRRMO Depot');
 
       if (isOut) {
         opt.disabled = true;
@@ -1926,7 +2038,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const cat = opt.getAttribute('data-category');
     const unit = opt.getAttribute('data-unit');
     const avail = parseInt(opt.getAttribute('data-avail') || 0);
-    const location = opt.getAttribute('data-location') || 'Central ICDRRMO Depot';
 
     selectedCentralResourceMax = avail;
 
@@ -1949,7 +2060,8 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     if (infoBox) {
       infoBox.style.display = 'block';
       document.getElementById('boxDepotItemName').innerText = name;
-      document.getElementById('boxDepotLocation').innerText = `Location: ${location}`;
+      const catEl = document.getElementById('boxDepotCategory');
+      if (catEl) catEl.innerText = cat ? `Category: ${cat}` : '';
       document.getElementById('boxDepotStockNum').innerText = `${avail.toLocaleString()} ${unit}`;
 
       const badge = document.getElementById('boxDepotBadge');
@@ -2125,7 +2237,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     document.getElementById('view_res_available_quantity').value = r.available_quantity || 0;
     document.getElementById('view_res_in_use_quantity').value = r.in_use_quantity || 0;
     document.getElementById('view_res_damaged_quantity').value = r.damaged_quantity || 0;
-    document.getElementById('view_res_storage_location').value = r.storage_location || '';
     document.getElementById('view_res_description').value = r.description || '';
 
     // Set Brand select (ensure option exists dynamically)
@@ -2276,7 +2387,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       document.getElementById('view_res_available_quantity').value = r.available_quantity || 0;
       document.getElementById('view_res_in_use_quantity').value = r.in_use_quantity || 0;
       document.getElementById('view_res_damaged_quantity').value = r.damaged_quantity || 0;
-      document.getElementById('view_res_storage_location').value = r.storage_location || '';
       document.getElementById('view_res_description').value = r.description || '';
       const brandSelect = document.getElementById('view_res_brand');
       if (brandSelect) brandSelect.value = r.brand || '';
@@ -2308,7 +2418,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const fields = [
       'view_res_code', 'view_res_category', 'view_res_name', 'view_res_unit',
       'view_res_min_threshold', 'view_res_available_quantity', 'view_res_in_use_quantity',
-      'view_res_damaged_quantity', 'view_res_storage_location', 'view_res_description',
+      'view_res_damaged_quantity', 'view_res_description',
       'view_res_brand', 'view_res_item_condition', 'view_res_weight_per_unit',
       'view_res_cost_per_unit', 'view_res_date_acquired', 'view_res_expiry_date',
       'view_res_is_perishable', 'view_res_supplier_donor', 'view_res_batch_number'

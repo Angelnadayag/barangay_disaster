@@ -7,6 +7,12 @@
 require_once __DIR__ . '/../../backend/services/Auth.php';
 $user = getCurrentUser();
 $role = $user['role'];
+
+// Residents and Responders use mobile-first app shell without sidebar
+if ($role === 'resident' || $role === 'responder') {
+    return;
+}
+
 $currentPage = basename($_SERVER['PHP_SELF']);
 $db = getDBConnection();
 
@@ -48,6 +54,13 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
 }
 ?>
 <aside class="sidebar" id="appSidebar">
+
+  <!-- Secondary Brand Logo Header -->
+  <div class="sidebar-brand-header">
+    <a href="<?= BASE_URL ?>/views/<?= getRoleFolder($role) ?>/dashboard.php" class="sidebar-brand-link" title="Disaster Resource Allocation Recommender">
+      <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender" class="sidebar-brand-logo">
+    </a>
+  </div>
 
   <?php if ($role === 'icdrrmo'): ?>
     <!-- ICDRRMO Admin Navigation -->
@@ -168,87 +181,6 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
         */ ?>
       </ul>
     </div>
-
-  <?php elseif ($role === 'responder'): ?>
-    <!-- Responder Navigation -->
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Tactical Field Menu</div>
-      <ul class="nav-list">
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/responder/dashboard.php" class="nav-link <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span>
-            Field Dashboard
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/responder/field-status.php" class="nav-link <?= $currentPage === 'field-status.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></span>
-            Field Status Updates
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="nav-link <?= $currentPage === 'active-incidents.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg></span>
-            Active Incidents
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/responder/evacuation.php" class="nav-link <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></span>
-            Evacuation Camps
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="nav-link <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon></svg></span>
-            Hazard Map
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/responder/notifications.php" class="nav-link <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path></svg></span>
-            Emergency Alerts
-          </a>
-        </li>
-      </ul>
-    </div>
-
-  <?php elseif ($role === 'resident'): ?>
-    <!-- Resident Navigation -->
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Community Services</div>
-      <ul class="nav-list">
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/resident/dashboard.php" class="nav-link <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span>
-            Community Dashboard
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/resident/evacuation.php" class="nav-link <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></span>
-            Evacuation Directory
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/resident/risk-map.php" class="nav-link <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon></svg></span>
-            Hazard Map
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/resident/preparedness.php" class="nav-link <?= $currentPage === 'preparedness.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect></svg></span>
-            Preparedness Drills
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/resident/notifications.php" class="nav-link <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path></svg></span>
-            Public Advisories
-          </a>
-        </li>
-      </ul>
-    </div>
   <?php endif; ?>
 </aside>
+

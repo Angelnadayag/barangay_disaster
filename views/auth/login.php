@@ -123,6 +123,13 @@ unset($_SESSION['login_error']);
   <!-- Project CSS & Fonts -->
   <link rel="stylesheet" href="<?= BASE_URL ?>/frontend/css/app.css">
   
+  <!-- Favicon & Touch Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= BASE_URL ?>/frontend/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= BASE_URL ?>/frontend/images/favicon-16x16.png">
+  <link rel="icon" type="image/png" href="<?= BASE_URL ?>/frontend/images/favicon.png">
+  <link rel="shortcut icon" href="<?= BASE_URL ?>/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="<?= BASE_URL ?>/frontend/images/apple-touch-icon.png">
+  
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 
@@ -802,8 +809,11 @@ unset($_SESSION['login_error']);
   <div class="login-pane">
     <div>
       <div class="login-header-group">
+        <div class="login-brand-logo" style="margin-bottom: 16px;">
+          <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender" style="max-width: 150px; height: auto; display: block; object-fit: contain;">
+        </div>
         <span class="login-badge">ICDRRMO &bull; City Government of Iligan</span>
-        <h1 class="login-title">Disaster Resource Allocation Recommender</h1>
+        <h1 class="login-title" style="font-size: 16px; margin-top: 6px;">Portal Access Authentication</h1>
         <p class="login-subtitle">
           Official decision-support and emergency resource recommender portal for all 44 barangays of Iligan City and municipal emergency responders.
         </p>

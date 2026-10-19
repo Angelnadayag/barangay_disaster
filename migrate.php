@@ -277,6 +277,14 @@ try {
                     $pdo->exec("ALTER TABLE `resources` DROP COLUMN `supplier_donor`;");
                 } catch (Throwable $e) {}
             }
+            if (in_array('storage_location', $resCols, true)) {
+                try {
+                    echo "  [-] Dropping column `storage_location` from `resources`...\n";
+                    $pdo->exec("ALTER TABLE `resources` DROP COLUMN `storage_location`;");
+                } catch (Throwable $e) {
+                    echo "  [!] Notice dropping storage_location: " . $e->getMessage() . "\n";
+                }
+            }
             if (!in_array('supplier_id', $resCols, true)) {
                 try {
                     $pdo->exec("ALTER TABLE `resources` ADD COLUMN `supplier_id` int(11) DEFAULT NULL AFTER `batch_number`;");
@@ -321,6 +329,62 @@ try {
                 }
             }
         }
+
+        // Table: agency_resources (Junction table linking agencies and static resources)
+        if (!in_array('agency_resources', $existingTables, true)) {
+            echo "  [+] Creating `agency_resources` junction table...\n";
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `agency_resources` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `agency_id` int(11) NOT NULL,
+                  `resource_id` int(11) NOT NULL,
+                  `total_quantity` int(11) NOT NULL DEFAULT 0,
+                  `available_quantity` int(11) NOT NULL DEFAULT 0,
+                  `in_use_quantity` int(11) NOT NULL DEFAULT 0,
+                  `damaged_quantity` int(11) NOT NULL DEFAULT 0,
+                  `min_threshold` int(11) NOT NULL DEFAULT 50,
+                  `batch_number` varchar(50) DEFAULT NULL,
+                  `supplier_id` int(11) DEFAULT NULL,
+                  `date_acquired` date DEFAULT NULL,
+                  `expiry_date` date DEFAULT NULL,
+                  `cost_per_unit` decimal(10,2) DEFAULT NULL,
+                  `item_condition` enum('New','Good','Fair','Poor','Expired') NOT NULL DEFAULT 'New',
+                  `status` enum('active','archived') NOT NULL DEFAULT 'active',
+                  `created_at` datetime DEFAULT current_timestamp(),
+                  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+                  PRIMARY KEY (`id`),
+                  KEY `agency_id` (`agency_id`),
+                  KEY `resource_id` (`resource_id`),
+                  KEY `supplier_id` (`supplier_id`),
+                  UNIQUE KEY `agency_resource_unique` (`agency_id`, `resource_id`),
+                  CONSTRAINT `agency_resources_ibfk_1` FOREIGN KEY (`agency_id`) REFERENCES `agencies` (`id`) ON DELETE CASCADE,
+                  CONSTRAINT `agency_resources_ibfk_2` FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE,
+                  CONSTRAINT `agency_resources_ibfk_3` FOREIGN KEY (`supplier_id`) REFERENCES `resource_suppliers` (`id`) ON DELETE SET NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+            $existingTables[] = 'agency_resources';
+        }
+
+        if (in_array('agency_resources', $existingTables, true)) {
+            $arCount = (int)$pdo->query("SELECT COUNT(*) FROM `agency_resources`")->fetchColumn();
+            if ($arCount === 0) {
+                echo "  [+] Linking catalog resources into `agency_resources` for agencies...\n";
+                $icdAgencyId = (int)$pdo->query("SELECT id FROM agencies WHERE agency_type = 'ICDRRMO' LIMIT 1")->fetchColumn() ?: 1;
+                $pdo->exec("
+                    INSERT IGNORE INTO `agency_resources` (
+                        agency_id, resource_id, total_quantity, available_quantity, in_use_quantity,
+                        damaged_quantity, min_threshold, batch_number, supplier_id, date_acquired,
+                        expiry_date, cost_per_unit, item_condition, status
+                    )
+                    SELECT 
+                        {$icdAgencyId}, id, total_quantity, available_quantity, in_use_quantity,
+                        damaged_quantity, min_threshold, batch_number, supplier_id, date_acquired,
+                        expiry_date, cost_per_unit, item_condition, status
+                    FROM `resources`
+                ");
+            }
+        }
+
         if ($seedOnly && file_exists($seedsFile)) {
             echo "Step 3: Re-seeding database from seeds.sql (--seed)...\n";
             $seedsContent = file_get_contents($seedsFile);

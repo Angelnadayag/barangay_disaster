@@ -40,47 +40,61 @@ $search = trim($_GET['search'] ?? '');
 $filterCategory = trim($_GET['category'] ?? '');
 $filterStockLevel = trim($_GET['stock'] ?? '');
 
-// Metrics for Local Barangay Hall Stockroom
-$totalLocalStock = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
-$foodPacksAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND (category = 'Relief Goods' OR name LIKE '%Food%' OR name LIKE '%Water%')")->fetchColumn();
-$medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND (category = 'Medical Supplies' OR name LIKE '%Medical%' OR name LIKE '%First Aid%')")->fetchColumn();
-$localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM resources WHERE barangay_id = {$barangayId} AND (status != 'archived' OR status IS NULL) AND available_quantity <= min_threshold")->fetchColumn();
+// Agency Resolution
+$bAgency = getAgencyForUser($user);
+$agencyId = $bAgency ? (int)$bAgency['id'] : 0;
 
-// Fetch Local Resources
-$invSql = "SELECT * FROM (SELECT r.*, rs.name AS supplier_donor FROM resources r LEFT JOIN resource_suppliers rs ON r.supplier_id = rs.id) resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)";
-$invParams = [$barangayId];
+// Metrics for Local Barangay Hall Stockroom (from agency_resources junction table)
+$totalLocalStock = (int)$db->query("SELECT COALESCE(SUM(available_quantity), 0) FROM agency_resources WHERE agency_id = {$agencyId} AND (status != 'archived' OR status IS NULL)")->fetchColumn();
+$foodPacksAvailable = (int)$db->query("SELECT COALESCE(SUM(ar.available_quantity), 0) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$agencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND (r.category = 'Relief Goods' OR r.name LIKE '%Food%' OR r.name LIKE '%Water%')")->fetchColumn();
+$medicalKitsAvailable = (int)$db->query("SELECT COALESCE(SUM(ar.available_quantity), 0) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$agencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND (r.category = 'Medical Supplies' OR r.name LIKE '%Medical%' OR r.name LIKE '%First Aid%')")->fetchColumn();
+$localLowStockCount = (int)$db->query("SELECT COUNT(*) FROM agency_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.agency_id = {$agencyId} AND (ar.status != 'archived' OR ar.status IS NULL) AND ar.available_quantity <= ar.min_threshold")->fetchColumn();
+
+// Fetch Local Resources via agency_resources
+$invSql = "SELECT ar.*, ar.id AS id, ar.id AS agency_resource_id, r.id AS resource_id, r.code, r.name, r.category, r.unit, r.brand, r.weight_per_unit, r.cost_per_unit, r.description, r.is_perishable,
+                  rs.name AS supplier_donor
+           FROM agency_resources ar
+           JOIN resources r ON ar.resource_id = r.id
+           LEFT JOIN resource_suppliers rs ON ar.supplier_id = rs.id
+           WHERE ar.agency_id = ? AND (ar.status != 'archived' OR ar.status IS NULL)";
+$invParams = [$agencyId];
 
 if (!empty($filterCategory)) {
-    $invSql .= " AND category = ?";
+    $invSql .= " AND r.category = ?";
     $invParams[] = $filterCategory;
 }
 
 if ($filterStockLevel === 'low') {
-    $invSql .= " AND available_quantity <= min_threshold";
+    $invSql .= " AND ar.available_quantity <= ar.min_threshold";
 } elseif ($filterStockLevel === 'out') {
-    $invSql .= " AND available_quantity = 0";
+    $invSql .= " AND ar.available_quantity = 0";
 } elseif ($filterStockLevel === 'damaged') {
-    $invSql .= " AND damaged_quantity > 0";
+    $invSql .= " AND ar.damaged_quantity > 0";
 }
 
 if (!empty($search)) {
-    $invSql .= " AND (code LIKE ? OR name LIKE ? OR storage_location LIKE ? OR supplier_donor LIKE ? OR brand LIKE ?)";
+    $invSql .= " AND (r.code LIKE ? OR r.name LIKE ? OR rs.name LIKE ? OR r.brand LIKE ?)";
     $like = "%$search%";
     $invParams[] = $like;
     $invParams[] = $like;
     $invParams[] = $like;
     $invParams[] = $like;
-    $invParams[] = $like;
 }
 
-$invSql .= " ORDER BY (available_quantity <= min_threshold) DESC, category ASC, name ASC";
+$invSql .= " ORDER BY (ar.available_quantity <= ar.min_threshold) DESC, r.category ASC, r.name ASC";
 $invStmt = $db->prepare($invSql);
 $invStmt->execute($invParams);
 $inventoryList = $invStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch All Local Resources for Dropdown selections in modals
-$localCatalogStmt = $db->prepare("SELECT id, code, name, category, unit, available_quantity, total_quantity, min_threshold FROM resources WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL) ORDER BY name ASC");
-$localCatalogStmt->execute([$barangayId]);
+$localCatalogStmt = $db->prepare("
+    SELECT ar.id, r.code, r.name, r.category, r.unit, ar.available_quantity, ar.total_quantity, ar.min_threshold 
+    FROM agency_resources ar 
+    JOIN resources r ON ar.resource_id = r.id 
+    WHERE ar.agency_id = ? AND (ar.status != 'archived' OR ar.status IS NULL) 
+    ORDER BY r.name ASC
+");
+$localCatalogStmt->execute([$agencyId]);
 $localCatalog = $localCatalogStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch Stock Movements Log (Tab 2) for this Barangay
@@ -89,11 +103,12 @@ $trxStmt = $db->prepare("
     FROM resource_transactions rt
     JOIN resources res ON rt.resource_id = res.id
     LEFT JOIN users u ON rt.performed_by = u.id
-    WHERE res.barangay_id = ?
+    WHERE rt.performed_by = ? 
+       OR rt.remarks LIKE ?
     ORDER BY rt.created_at DESC
     LIMIT 100
 ");
-$trxStmt->execute([$barangayId]);
+$trxStmt->execute([$user['id'], "%" . $barangay['name'] . "%"]);
 $transactions = $trxStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $categories = [
@@ -295,7 +310,6 @@ $categories = [
             <th>In-Use / Disbursed</th>
             <th>Damaged</th>
             <th>Total Stock</th>
-            <th>Storage Location</th>
             <th>Condition</th>
             <th>Expiry Date</th>
             <th style="text-align:right;">Action</th>
@@ -303,7 +317,7 @@ $categories = [
         </thead>
         <tbody id="brgyTableBody">
           <?php if (empty($inventoryList)): ?>
-            <tr id="noBrgyInvRow"><td colspan="11" style="text-align:center;padding:32px;color:var(--color-text-muted);">No resources found in Barangay <?= clean($barangay['name']) ?> inventory.</td></tr>
+            <tr id="noBrgyInvRow"><td colspan="10" style="text-align:center;padding:32px;color:var(--color-text-muted);">No resources found in Barangay <?= clean($barangay['name']) ?> inventory.</td></tr>
           <?php else: ?>
             <?php foreach ($inventoryList as $res): ?>
               <?php
@@ -334,7 +348,6 @@ $categories = [
                   data-damaged="<?= (int)$res['damaged_quantity'] ?>"
                   data-total="<?= (int)$res['total_quantity'] ?>"
                   data-min="<?= (int)$res['min_threshold'] ?>"
-                  data-location="<?= clean($res['storage_location']) ?>"
                   data-brand="<?= clean($res['brand'] ?: '') ?>"
                   data-supplier="<?= clean($res['supplier_donor'] ?: '') ?>"
                   data-condition="<?= clean($res['item_condition']) ?>"
@@ -370,9 +383,6 @@ $categories = [
                 </td>
                 <td style="font-family:var(--font-secondary);font-weight:600;font-size:12px;" id="brgy-cell-total-<?= $res['id'] ?>">
                   <span class="val-total"><?= number_format($res['total_quantity']) ?></span> <?= clean($res['unit']) ?>
-                </td>
-                <td style="font-size:11px;color:var(--color-text-secondary);">
-                  <?= clean($res['storage_location'] ?: 'Barangay Stockroom') ?>
                 </td>
                 <td><span class="badge <?= $condBadge ?>" style="font-size:9px;"><?= clean($res['item_condition']) ?></span></td>
                 <td style="font-size:10.5px;font-family:var(--font-secondary);">
@@ -517,7 +527,6 @@ $categories = [
       <!-- Tab Content 1: Specifications -->
       <div id="brgyModalTabSpecs" style="display:block;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11.5px;background:var(--color-surface-subtle);padding:12px;border-radius:var(--radius-sm, 6px);border:1px solid var(--color-border-light);color:var(--color-text);">
-          <div><strong style="color:var(--color-text-secondary);">Storage Room / Shelf:</strong> <span id="brgySpecLocation"></span></div>
           <div><strong style="color:var(--color-text-secondary);">Source / Donor:</strong> <span id="brgySpecSupplier"></span></div>
           <div><strong style="color:var(--color-text-secondary);">Condition:</strong> <span id="brgySpecCondition"></span></div>
           <div><strong style="color:var(--color-text-secondary);">Expiry Date:</strong> <span id="brgySpecExpiry"></span></div>
@@ -678,14 +687,13 @@ function openBarangayItemModal(res) {
   document.getElementById('brgyModalItemCode').innerText = res.code || '';
   document.getElementById('brgyModalItemCategory').innerText = res.category || '';
   document.getElementById('brgyModalItemName').innerText = res.name || '';
-  document.getElementById('brgyModalItemSub').innerText = res.storage_location || 'Barangay Hall Stockroom';
+  document.getElementById('brgyModalItemSub').innerText = res.brand || 'Barangay Stockroom';
 
   document.getElementById('brgyStockAvail').innerText = `${parseInt(res.available_quantity || 0).toLocaleString()} ${res.unit || ''}`;
   document.getElementById('brgyStockInUse').innerText = `${parseInt(res.in_use_quantity || 0).toLocaleString()} ${res.unit || ''}`;
   document.getElementById('brgyStockDamaged').innerText = `${parseInt(res.damaged_quantity || 0).toLocaleString()} ${res.unit || ''}`;
   document.getElementById('brgyStockTotal').innerText = `${parseInt(res.total_quantity || 0).toLocaleString()} ${res.unit || ''}`;
 
-  document.getElementById('brgySpecLocation').innerText = res.storage_location || 'Barangay Hall Stockroom';
   document.getElementById('brgySpecSupplier').innerText = res.supplier_donor || 'Local Barangay Inventory';
   document.getElementById('brgySpecCondition').innerText = res.item_condition || 'Good';
   document.getElementById('brgySpecExpiry').innerText = res.expiry_date || 'N/A (Non-perishable)';
@@ -902,12 +910,11 @@ function filterBarangayInventoryTable() {
     const name = (row.dataset.name || '').toLowerCase();
     const cat = (row.dataset.category || '').toLowerCase();
     const brand = (row.dataset.brand || '').toLowerCase();
-    const location = (row.dataset.location || '').toLowerCase();
     const avail = parseInt(row.dataset.available) || 0;
     const isLow = row.dataset.isLow === '1';
     const damaged = parseInt(row.dataset.damaged) || 0;
 
-    let matchesSearch = (!query || code.includes(query) || name.includes(query) || brand.includes(query) || location.includes(query));
+    let matchesSearch = (!query || code.includes(query) || name.includes(query) || brand.includes(query));
     let matchesCategory = (!category || cat === category);
     let matchesStock = true;
 

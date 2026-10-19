@@ -41,10 +41,8 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
 
 $pageTitle = "Field Status & Situational Report";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Tactical Field Operations & Incident Logging</h1>
@@ -184,7 +182,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
     </div>
   </div>
-</main>
 
 <script>
 function autoFillBarangay(sel) {

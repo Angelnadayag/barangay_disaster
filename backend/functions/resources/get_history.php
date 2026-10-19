@@ -20,17 +20,39 @@ if (!$resourceId) {
     jsonResponse(['success' => false, 'message' => 'Resource ID is required.'], 400);
 }
 
-// Fetch resource to verify jurisdiction
+$userAgency = getAgencyForUser($user);
+$agencyId = $userAgency ? (int)$userAgency['id'] : null;
+
+// Check if $resourceId is an agency_resources.id
+$catalogId = $resourceId;
+$agencyResource = null;
+if ($agencyId) {
+    $arStmt = $db->prepare("SELECT * FROM agency_resources WHERE id = ? AND agency_id = ?");
+    $arStmt->execute([$resourceId, $agencyId]);
+    $agencyResource = $arStmt->fetch(PDO::FETCH_ASSOC);
+    if ($agencyResource) {
+        $catalogId = (int)$agencyResource['resource_id'];
+    } else {
+        // Maybe $resourceId was already the catalog resource_id
+        $arStmt2 = $db->prepare("SELECT * FROM agency_resources WHERE resource_id = ? AND agency_id = ?");
+        $arStmt2->execute([$resourceId, $agencyId]);
+        $agencyResource = $arStmt2->fetch(PDO::FETCH_ASSOC);
+    }
+}
+
+// Fetch resource to verify
 $resStmt = $db->prepare("SELECT id, name, code, unit, barangay_id FROM resources WHERE id = ?");
-$resStmt->execute([$resourceId]);
+$resStmt->execute([$catalogId]);
 $resource = $resStmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$resource) {
+if (!$resource && !$agencyResource) {
     jsonResponse(['success' => false, 'message' => 'Resource not found.'], 404);
 }
 
-if ($role === 'barangay_head' && (int)$resource['barangay_id'] !== (int)$user['barangay_id']) {
-    jsonResponse(['success' => false, 'message' => 'Unauthorized jurisdiction.'], 403);
+if ($role === 'barangay_head') {
+    if (!$agencyResource && (int)($resource['barangay_id'] ?? 0) !== (int)$user['barangay_id']) {
+        jsonResponse(['success' => false, 'message' => 'Unauthorized jurisdiction.'], 403);
+    }
 }
 
 $stmt = $db->prepare("
@@ -43,7 +65,7 @@ $stmt = $db->prepare("
     ORDER BY rt.created_at DESC
     LIMIT 100
 ");
-$stmt->execute([$resourceId]);
+$stmt->execute([$catalogId]);
 $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 jsonResponse([

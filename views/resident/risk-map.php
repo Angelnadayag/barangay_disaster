@@ -37,10 +37,8 @@ $puroks = $puroksStmt->fetchAll();
 
 $pageTitle = "Community Hazard & Shelter Map";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Community Hazard & Evacuation Map</h1>
@@ -56,7 +54,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 340px;gap:var(--space-4);align-items:start;">
+  <div class="responsive-split-grid split-map-side">
     <!-- Map Container -->
     <div class="card" style="margin-bottom:0;overflow:hidden;">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;background:var(--color-surface-subtle);padding:10px 14px;">
@@ -127,7 +125,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
     </div>
   </div>
-</main>
 
 <!-- Leaflet Library -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>

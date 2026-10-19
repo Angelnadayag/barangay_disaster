@@ -43,6 +43,8 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
 } else {
     $officeSubtitle = 'Iligan City Disaster Risk Reduction and Management Office • Local Government of Iligan';
 }
+$isCitizenOrResponder = in_array($currentUser['role'] ?? '', ['resident', 'responder'], true);
+$currentPage = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -54,27 +56,65 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>/frontend/css/app.css?v=<?= filemtime(__DIR__ . '/../../frontend/css/app.css') ?>">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2317324D'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
-  <script>var BASE_URL = <?= json_encode(BASE_URL) ?>;</script>
+  <!-- Favicon & Touch Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="<?= BASE_URL ?>/frontend/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="<?= BASE_URL ?>/frontend/images/favicon-16x16.png">
+  <link rel="icon" type="image/png" href="<?= BASE_URL ?>/frontend/images/favicon.png">
+  <link rel="shortcut icon" href="<?= BASE_URL ?>/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="<?= BASE_URL ?>/frontend/images/apple-touch-icon.png">
+  <script>
+    var BASE_URL = <?= json_encode(BASE_URL) ?>;
+    if (window.innerWidth > 900 && localStorage.getItem('drrm_sidebar_collapsed') === 'true') {
+      document.documentElement.classList.add('sidebar-collapsed');
+      document.addEventListener('DOMContentLoaded', function() {
+        document.body.classList.add('sidebar-collapsed');
+      });
+    }
+  </script>
 </head>
-<body>
+<body class="<?= $isCitizenOrResponder ? 'citizen-responder-shell' : '' ?>">
 <div class="app-shell">
   <!-- Topbar -->
   <header class="topbar">
     <div class="topbar-left">
-      <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle Navigation">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
-
-      <div class="brand-title-wrap">
-        <span class="brand-title">Disaster Resource Allocation Recommender</span>
-        <span class="brand-subtitle"><?= clean($officeSubtitle) ?></span>
-      </div>
+      <?php if (!$isCitizenOrResponder): ?>
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle Navigation" title="Toggle Navigation Sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      <?php else: ?>
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="portal-brand-link" title="Disaster Portal">
+          <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Logo" class="portal-brand-logo">
+          <div class="portal-brand-text">
+            <div class="portal-brand-title"><?= $currentUser['role'] === 'responder' ? 'Tactical Responders' : 'Barangay Safety' ?></div>
+            <div class="portal-brand-sub"><?= clean($currentUser['barangay_name'] ?? 'Iligan City') ?></div>
+          </div>
+        </a>
+      <?php endif; ?>
     </div>
+
+    <?php if ($isCitizenOrResponder): ?>
+      <nav class="topbar-desktop-nav">
+        <?php if ($currentUser['role'] === 'resident'): ?>
+          <a href="<?= BASE_URL ?>/views/resident/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Dashboard</a>
+          <a href="<?= BASE_URL ?>/views/resident/evacuation.php" class="topbar-nav-pill <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">Evacuation Routing</a>
+          <a href="<?= BASE_URL ?>/views/resident/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events &amp; Drills</a>
+          <a href="<?= BASE_URL ?>/views/resident/risk-map.php" class="topbar-nav-pill <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">Hazard Map</a>
+          <a href="<?= BASE_URL ?>/views/resident/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">Advisories</a>
+        <?php elseif ($currentUser['role'] === 'responder'): ?>
+          <a href="<?= BASE_URL ?>/views/responder/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Field Dashboard</a>
+          <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="topbar-nav-pill <?= $currentPage === 'active-incidents.php' ? 'active' : '' ?>">Incidents</a>
+          <a href="<?= BASE_URL ?>/views/responder/evacuation.php" class="topbar-nav-pill <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">Evacuation Routing</a>
+          <a href="<?= BASE_URL ?>/views/responder/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events &amp; Drills</a>
+          <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="topbar-nav-pill <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">Hazard Map</a>
+          <a href="<?= BASE_URL ?>/views/responder/field-status.php" class="topbar-nav-pill <?= $currentPage === 'field-status.php' ? 'active' : '' ?>">Field Status</a>
+          <a href="<?= BASE_URL ?>/views/responder/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">Alerts</a>
+        <?php endif; ?>
+      </nav>
+    <?php endif; ?>
 
     <div class="topbar-right">
       <!-- Notification Bell -->
@@ -104,33 +144,19 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
       <!-- User Profile Dropdown Component -->
       <div class="user-profile-dropdown-wrap" id="userProfileWrap" style="position:relative;display:inline-block;">
         <button type="button" 
-                class="user-profile-btn" 
+                class="user-profile-btn circle-profile-btn" 
                 id="userProfileDropdownBtn" 
                 onclick="toggleUserDropdown(event)" 
                 aria-haspopup="true" 
                 aria-expanded="false" 
-                style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.28);border-radius:8px;padding:4px 10px;color:#FFFFFF;cursor:pointer;font-family:inherit;transition:all 0.15s ease;"
-                title="Account & Profile Settings">
-          <!-- Avatar -->
-          <div class="user-avatar-sm" style="width:26px;height:26px;border-radius:6px;background:var(--color-secondary,#2F6F73);color:#FFF;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;overflow:hidden;flex-shrink:0;">
+                title="<?= clean($currentUser['full_name']) ?> — Account & Profile Settings">
+          <!-- Circular Avatar Icon -->
+          <div class="user-avatar-sm circle-avatar">
             <?php if (!empty($currentUser['image'])): ?>
-              <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
+              <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="<?= clean($currentUser['full_name']) ?>">
             <?php else: ?>
               <?= strtoupper(substr($currentUser['full_name'] ?? 'U', 0, 1)) ?>
             <?php endif; ?>
-          </div>
-
-          <!-- User Details Text -->
-          <div style="display:flex;flex-direction:column;text-align:left;line-height:1.15;">
-            <span style="font-size:10px;font-weight:600;color:#FFFFFF;white-space:nowrap;"><?= clean($currentUser['full_name']) ?></span>
-            <span style="font-size:8.5px;color:#B5C6D4;white-space:nowrap;"><?= clean(formatRoleName($currentUser['role'])) ?><?= !empty($currentUser['barangay_id']) ? ' • Brgy. ' . clean($currentUser['barangay_name'] ?? 'Assigned') : '' ?></span>
-          </div>
-
-          <!-- Caret / Dropdown Indicator -->
-          <div style="display:flex;align-items:center;justify-content:center;width:14px;height:14px;margin-left:2px;">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="color:rgba(255,255,255,0.8);transition:transform 0.2s ease;" id="userProfileCaret">
-              <path d="M7 10l5 5 5-5z"/>
-            </svg>
           </div>
         </button>
 
@@ -156,7 +182,7 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
                 <?= clean(formatRoleName($currentUser['role'])) ?>
               </div>
               <div style="font-size:9px;color:#8A96A0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
-                <?= clean($currentUser['email']) ?>
+                <?= clean($currentUser['email'] ?? '') ?>
               </div>
             </div>
           </div>
@@ -254,9 +280,11 @@ if (($currentUser['role'] ?? '') === 'barangay_head') {
   </header>
 
   <!-- App Body Layout -->
-  <div class="app-container">
-    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-    <?php require_once __DIR__ . '/sidebar.php'; ?>
+  <div class="app-container <?= $isCitizenOrResponder ? 'app-container-no-sidebar' : '' ?>">
+    <?php if (!$isCitizenOrResponder): ?>
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+      <?php require_once __DIR__ . '/sidebar.php'; ?>
+    <?php endif; ?>
     <main class="main-content" id="mainContent">
       <?php if (!empty($_SESSION['flash_success'])): ?>
         <div style="margin-bottom:14px;padding:10px 14px;background:var(--color-success-bg, #EAF4EB);border:1px solid var(--color-success-border, #BCE3C1);color:var(--color-success, #2E7D32);border-radius:6px;font-size:12px;font-family:var(--font-primary);display:flex;justify-content:space-between;align-items:center;">

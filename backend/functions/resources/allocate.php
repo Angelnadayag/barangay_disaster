@@ -61,7 +61,7 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
     try {
         // 1. Verify and lock Central Depot Resource
         $cStmt = $db->prepare("
-            SELECT id, code, name, category, unit, description, available_quantity, total_quantity, storage_location
+            SELECT id, code, name, category, unit, description, available_quantity, total_quantity
             FROM resources
             WHERE id = ? AND barangay_id IS NULL AND status = 'active'
             FOR UPDATE
@@ -126,13 +126,13 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
                 INSERT INTO resources (
                     code, name, category, status, description, unit, total_quantity,
                     available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                    storage_location, supplier_id, item_condition, barangay_id, updated_at, created_at
-                ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, ?, ?, 'New', ?, NOW(), NOW())
+                    supplier_id, item_condition, barangay_id, updated_at, created_at
+                ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, ?, 'New', ?, NOW(), NOW())
             ");
             $insLocal->execute([
                 $localCode, $centralRes['name'], $centralRes['category'],
                 $centralRes['description'], $centralRes['unit'], $quantity,
-                $quantity, 'Barangay Hall Stockroom', $suppIdForLocal,
+                $quantity, $suppIdForLocal,
                 $barangayId
             ]);
             $targetLocalResId = (int)$db->lastInsertId();
@@ -365,8 +365,8 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
                     INSERT INTO resources (
                         code, name, category, status, description, unit, total_quantity,
                         available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                        storage_location, supplier_id, item_condition, barangay_id, updated_at, created_at
-                    ) VALUES (?, ?, ?, 'active', '', ?, ?, ?, 0, 0, 20, 'Barangay Hall Stockroom', ?, 'New', ?, NOW(), NOW())
+                        supplier_id, item_condition, barangay_id, updated_at, created_at
+                    ) VALUES (?, ?, ?, 'active', '', ?, ?, ?, 0, 0, 20, ?, 'New', ?, NOW(), NOW())
                 ");
                 $insLocal->execute([
                     $localCode, $pItem['resource_name'], $pItem['category'],
@@ -562,8 +562,8 @@ else {
                     INSERT INTO resources (
                         code, name, category, status, description, unit, total_quantity,
                         available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                        storage_location, supplier_id, item_condition, barangay_id, updated_at, created_at
-                    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, 'Barangay Hall Stockroom', ?, 'New', ?, NOW(), NOW())
+                        supplier_id, item_condition, barangay_id, updated_at, created_at
+                    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, ?, 'New', ?, NOW(), NOW())
                 ");
                 $insLocal->execute([
                     $localCode, $item['resource_name'], $item['category'],

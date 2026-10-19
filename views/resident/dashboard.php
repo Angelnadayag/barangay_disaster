@@ -72,71 +72,69 @@ $upcomingDrills = $actStmt->fetchAll();
 
 $pageTitle = "Community Safety Dashboard";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:8px;">
     <div class="page-header-title-wrap">
-      <h1>Barangay <?= clean($barangay['name'] ?? 'Local') ?> Resident Portal</h1>
-      <p class="page-header-desc">
+      <h1 style="font-size:16px;font-weight:700;margin:0 0 2px 0;">Barangay <?= clean($barangay['name'] ?? 'Local') ?> Resident Portal</h1>
+      <p class="page-header-desc" style="font-size:10.5px;margin:0;">
         Real-time community safety advisories, evacuation center vacancies, and emergency assistance channels.
       </p>
     </div>
     <div class="page-header-actions">
-      <span class="badge badge-<?= ($barangay['risk_level'] ?? '') === 'Critical' ? 'danger' : 'warning' ?>">
+      <span class="badge badge-<?= ($barangay['risk_level'] ?? '') === 'Critical' ? 'danger' : 'warning' ?>" style="font-size:9.5px;">
         <?= clean($barangay['risk_level'] ?? 'Moderate') ?> Risk Sector
       </span>
-      <a href="evacuation.php" class="btn btn-primary btn-sm">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      <a href="evacuation.php" class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         Find Evacuation Centers
       </a>
     </div>
   </div>
 
   <!-- Citizen Alert Banner if High Risk or Active Weather -->
-  <div style="background:var(--color-surface);border-left:4px solid var(--color-warning);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:var(--space-4);box-shadow:var(--shadow-sm);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div style="width:36px;height:36px;border-radius:50%;background:#fef3c7;display:flex;align-items:center;justify-content:center;color:#d97706;flex-shrink:0;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <div style="background:var(--color-surface);border-left:4px solid var(--color-warning);border-radius:var(--radius-primary, 10px);padding:12px 14px;margin-bottom:var(--space-3);box-shadow:var(--shadow-subtle);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:#fef3c7;display:flex;align-items:center;justify-content:center;color:#d97706;flex-shrink:0;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </div>
       <div>
-        <div style="font-weight:700;font-size:13px;color:var(--color-text);">Mandigan River Basin Alert: Code Orange (Heightened Vigilance)</div>
-        <div style="font-size:11px;color:var(--color-text-muted);margin-top:2px;">Residents near riverbanks and low-lying puroks should secure essential documents and prepare 72-hour family go-bags.</div>
+        <div style="font-weight:600;font-size:13.5px;color:var(--color-text);">Mandigan River Basin Alert: Code Orange (Heightened Vigilance)</div>
+        <div style="font-size:10.5px;color:var(--color-text-secondary);margin-top:2px;">Residents near riverbanks and low-lying puroks should secure essential documents and prepare 72-hour family go-bags.</div>
       </div>
     </div>
-    <a href="risk-map.php" class="btn btn-secondary btn-sm" style="font-size:11px;">View Safe Elevation Map</a>
+    <a href="risk-map.php" class="btn btn-secondary btn-sm" style="font-size:11px;padding:6px 12px;">View Elevation Map</a>
   </div>
 
   <!-- Summary Cards -->
-  <div class="metrics-grid" style="grid-template-columns:repeat(4, 1fr);margin-bottom:var(--space-4);">
+  <div class="metrics-grid" style="margin-bottom:var(--space-4);">
     <div class="metric-card">
       <div class="metric-label">Barangay Jurisdiction</div>
-      <div class="metric-value" style="font-size:18px;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?></div>
+      <div class="metric-value" style="font-size:15px;">Brgy. <?= clean($barangay['name'] ?? 'Local') ?></div>
       <div class="metric-trend text-muted">Population: <?= number_format($barangay['population'] ?? 15000) ?></div>
     </div>
 
     <div class="metric-card">
       <div class="metric-label">Designated Evacuation Centers</div>
-      <div class="metric-value"><?= count($localEvacs) ?></div>
+      <div class="metric-value" style="font-size:16px;"><?= count($localEvacs) ?></div>
       <div class="metric-trend text-success">Verified Municipal Shelters</div>
     </div>
 
     <div class="metric-card">
       <div class="metric-label">Active Public Bulletins</div>
-      <div class="metric-value"><?= count($recentAdvisories) ?></div>
+      <div class="metric-value" style="font-size:16px;"><?= count($recentAdvisories) ?></div>
       <div class="metric-trend text-primary">Issued by ICDRRMO Central</div>
     </div>
 
     <div class="metric-card">
       <div class="metric-label">Emergency Call Direct</div>
-      <div class="metric-value" style="color:var(--color-danger);font-size:20px;">161</div>
+      <div class="metric-value" style="color:var(--color-danger);font-size:16px;">161</div>
       <div class="metric-trend text-danger">Toll-Free 24/7 Hotline</div>
     </div>
   </div>
 
   <!-- Main Content Grid -->
-  <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:var(--space-4);align-items:start;">
+  <div class="responsive-split-grid split-60-40">
     <!-- Left Column: Safe Shelters & Public Advisories -->
     <div style="display:flex;flex-direction:column;gap:var(--space-4);">
       <!-- Evacuation Centers Available -->
@@ -293,7 +291,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
             </div>
           </div>
           <div style="margin-top:14px;border-top:1px solid var(--color-border);padding-top:10px;">
-            <a href="preparedness.php" class="btn btn-secondary btn-sm" style="width:100%;text-align:center;">
+            <a href="events.php" class="btn btn-secondary btn-sm" style="width:100%;text-align:center;">
               View Community Drills & Schedules
             </a>
           </div>
@@ -301,6 +299,5 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
     </div>
   </div>
-</main>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

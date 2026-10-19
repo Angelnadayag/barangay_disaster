@@ -37,8 +37,8 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             fputcsv($output, $row);
         }
     } elseif ($reportType === 'inventory') {
-        fputcsv($output, ['SKU Code', 'Resource Name', 'Category', 'Available', 'In Use', 'Damaged', 'Total', 'Min Threshold', 'Location']);
-        $q = $db->query("SELECT code, name, category, available_quantity, in_use_quantity, damaged_quantity, total_quantity, min_threshold, storage_location FROM resources");
+        fputcsv($output, ['SKU Code', 'Resource Name', 'Category', 'Available', 'In Use', 'Damaged', 'Total', 'Min Threshold']);
+        $q = $db->query("SELECT code, name, category, available_quantity, in_use_quantity, damaged_quantity, total_quantity, min_threshold FROM resources");
         while ($row = $q->fetch()) {
             fputcsv($output, $row);
         }
@@ -82,6 +82,9 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
 <main class="main-content">
   <!-- Printable Government Header -->
   <div class="print-header">
+    <div style="margin-bottom:8px;">
+      <img src="<?= BASE_URL ?>/frontend/images/logo-primary.png" alt="Disaster Resource Allocation Recommender" style="height:48px;width:auto;object-fit:contain;">
+    </div>
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;">Republic of the Philippines</div>
     <div style="font-size:12px;font-weight:700;">City Government of Iligan</div>
     <div style="font-size:11px;font-weight:600;color:var(--color-primary);">City Disaster Risk Reduction & Management Office (ICDRRMO)</div>

@@ -41,10 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
 
 $pageTitle = "Responder Profile & Unit Checklist";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Responder Unit Profile & Tactical Gear</h1>
@@ -213,6 +211,5 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
     </div>
   </div>
-</main>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

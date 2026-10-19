@@ -43,10 +43,8 @@ $incidents = $stmt->fetchAll();
 
 $pageTitle = "Active Incidents Dispatch";
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
 
-<main class="main-content">
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Active Incidents Dispatch Directory</h1>
@@ -153,6 +151,5 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       <?php endforeach; ?>
     <?php endif; ?>
   </div>
-</main>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>
