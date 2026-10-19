@@ -43,16 +43,13 @@ $pageTitle = "Responder Profile & Unit Checklist";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;">
     <div class="page-header-title-wrap">
-      <h1>Responder Unit Profile & Tactical Gear</h1>
-      <p class="page-header-desc">
-        Field unit credentials, emergency VHF radio channels, personal readiness checklist, and account credentials.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Responder Unit Profile &amp; Settings</h1>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:var(--space-4);align-items:start;">
+  <div class="responsive-split-grid split-50-50">
     <!-- Left Column: Unit Credentials & Security -->
     <div style="display:flex;flex-direction:column;gap:var(--space-4);">
       <!-- Profile Card -->

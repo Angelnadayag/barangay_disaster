@@ -147,6 +147,22 @@ try {
 
         logSystemEvent('DISBURSE_FINANCIAL_AID', 'Financial Aid', $auditText);
 
+        // In-app Notification for Resident
+        try {
+            $notifTitle = ($claimStatus === 'Claimed') ? "Financial Aid Disbursed: {$alloc['program_name']}" : "Eligible for Financial Aid: {$alloc['program_name']}";
+            $notifBody = ($claimStatus === 'Claimed')
+                ? "Purok {$purok}: ₱" . number_format($amount, 2) . " cash assistance disbursed to {$beneficiaryName} under {$alloc['program_name']}. Ref: " . ($referenceNo ?? $alloc['allocation_code']) . "."
+                : "Purok {$purok}: {$beneficiaryName} is listed as an eligible beneficiary for ₱" . number_format($amount, 2) . " under {$alloc['program_name']}. Coordinate with Barangay Hall.";
+            $notifStmt = $db->prepare("
+                INSERT INTO notifications (
+                    target_role, target_barangay_id, target_user_id, title, message, alert_level, related_module, related_id, created_by, created_at
+                ) VALUES ('resident', ?, ?, ?, ?, 'informational', 'financial_aid', ?, ?, NOW())
+            ");
+            $notifStmt->execute([(int)$alloc['barangay_id'], $residentId, $notifTitle, $notifBody, $distId, $user['id']]);
+        } catch (Throwable $e) {
+            error_log("Failed to insert distribution notification: " . $e->getMessage());
+        }
+
         // SMS Notification dispatch if requested
         $smsResultText = "";
         if ($sendSms && !empty($phone)) {
@@ -248,6 +264,20 @@ try {
         ]);
 
         logSystemEvent('DISBURSE_FINANCIAL_AID', 'Financial Aid', $auditText);
+
+        // In-app Notification for Resident
+        try {
+            $notifTitle = "Financial Aid Claimed: {$dist['program_name']}";
+            $notifBody = "Purok {$dist['purok']}: Payout confirmation for ₱" . number_format($amount, 2) . " under {$dist['program_name']} claimed by {$dist['beneficiary_name']}. Ref: {$referenceNo}.";
+            $notifStmt = $db->prepare("
+                INSERT INTO notifications (
+                    target_role, target_barangay_id, target_user_id, title, message, alert_level, related_module, related_id, created_by, created_at
+                ) VALUES ('resident', ?, ?, ?, ?, 'informational', 'financial_aid', ?, ?, NOW())
+            ");
+            $notifStmt->execute([(int)$dist['barangay_id'], $dist['resident_id'] ?? null, $notifTitle, $notifBody, $distId, $user['id']]);
+        } catch (Throwable $e) {
+            error_log("Failed to insert claim notification: " . $e->getMessage());
+        }
 
         // SMS Notification dispatch
         $smsResultText = "";

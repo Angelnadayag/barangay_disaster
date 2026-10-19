@@ -43,16 +43,13 @@ $pageTitle = "Field Status & Situational Report";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;">
     <div class="page-header-title-wrap">
-      <h1>Tactical Field Operations & Incident Logging</h1>
-      <p class="page-header-desc">
-        Rapid situational reporting for rescuers, mission telemetry, and live casualty/rescue counting.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Tactical Field Operations &amp; Incident Logging</h1>
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:380px 1fr;gap:var(--space-4);align-items:start;">
+  <div class="responsive-split-grid split-50-50">
     <!-- Left: Rapid Status Entry Form -->
     <div class="card" style="margin-bottom:0;">
       <div class="card-header">

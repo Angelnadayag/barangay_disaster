@@ -86,6 +86,20 @@ try {
 
     logSystemEvent('UPDATE_REQUEST_STATUS', 'Disaster Reports', "Updated {$req['tracking_code']} status to $status");
 
+    // Notify local responders
+    try {
+        $statusNotifStmt = $db->prepare("
+            INSERT INTO notifications (target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at)
+            VALUES ('responder', ?, ?, ?, ?, 'disaster_request', ?, ?, NOW())
+        ");
+        $sAlert = ($status === 'Completed') ? 'informational' : 'warning';
+        $sTitle = "Incident {$req['tracking_code']} Status: {$status}";
+        $sBody = "Incident {$req['tracking_code']} ({$req['disaster_type']} - {$req['purok_name']}) has been marked as {$status}." . ($resolutionNotes ? " Notes: {$resolutionNotes}" : "");
+        $statusNotifStmt->execute([(int)$req['barangay_id'], $sTitle, $sBody, $sAlert, $requestId, $user['id']]);
+    } catch (Throwable $e) {
+        error_log("Failed to insert status change notification: " . $e->getMessage());
+    }
+
     if ($isAjax) {
         jsonResponse([
             'success' => true,

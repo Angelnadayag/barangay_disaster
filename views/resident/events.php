@@ -313,16 +313,13 @@ require_once __DIR__ . '/../layouts/header.php';
 </style>
 
   <!-- Page Header -->
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1>Community Events & Disaster Drills</h1>
-      <p class="page-header-desc">
-        Participate in local BDRRMC disaster preparedness drills, family simulation exercises, and community training sessions.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Community Events &amp; Disaster Drills</h1>
     </div>
     <div class="page-header-actions">
-      <a href="evacuation.php" class="btn btn-secondary btn-sm">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+      <a href="evacuation.php" class="btn btn-secondary btn-sm" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         Evacuation Routing
       </a>
     </div>

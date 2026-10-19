@@ -1,7 +1,7 @@
 <?php
 // ============================================================================
 // Views (Responder): Alerts, Dispatches & Tactical Advisories
-// Streamlined dispatch notices, weather alerts, and operational directives
+// Streamlined dispatch notices strictly scoped to responder's barangay
 // ============================================================================
 
 require_once __DIR__ . '/../../backend/config/config.php';
@@ -10,8 +10,10 @@ require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireRole('responder');
 $user = getCurrentUser();
+$barangayId = (int)($user['barangay_id'] ?? 1);
 $db = getDBConnection();
 
+$filterType = $_GET['type'] ?? '';
 $filterLevel = $_GET['level'] ?? '';
 
 $sql = "
@@ -20,38 +22,39 @@ $sql = "
     LEFT JOIN barangays b ON n.target_barangay_id = b.id
     LEFT JOIN users u ON n.created_by = u.id
     LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
-    WHERE (
-        n.target_role = 'all'
-        OR n.target_role = 'responder'
-        OR n.target_user_id = ?
-    )
+    WHERE n.target_barangay_id = ?
+      AND (n.target_role IN ('all', 'responder') OR n.target_user_id = ?)
 ";
-$params = [$user['id'], $user['id']];
+$params = [$user['id'], $barangayId, $user['id']];
+
+if ($filterType === 'incidents') {
+    $sql .= " AND (n.related_module IN ('disaster_request', 'disaster_report', 'incident', 'responder') OR n.title LIKE '%Incident%' OR n.title LIKE '%Dispatch%')";
+} elseif ($filterType === 'events') {
+    $sql .= " AND (n.related_module IN ('events', 'preparedness') OR n.title LIKE '%Event%' OR n.title LIKE '%Drill%' OR n.title LIKE '%Training%')";
+}
 
 if (!empty($filterLevel)) {
-    $sql .= " AND n.alert_level = ?";
+    $sql .= " AND (n.alert_level = ? OR (n.alert_level = 'urgent' AND ? = 'Critical'))";
+    $params[] = $filterLevel;
     $params[] = $filterLevel;
 }
 
-$sql .= " ORDER BY n.alert_level = 'Critical' DESC, n.created_at DESC";
+$sql .= " ORDER BY (nr.id IS NULL) DESC, n.alert_level = 'Critical' DESC, n.created_at DESC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
-$alerts = $stmt->fetchAll();
+$alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pageTitle = "Field Alerts & Dispatches";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header">
+  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1>Operational Alerts & Dispatch Advisories</h1>
-      <p class="page-header-desc">
-        Real-time priority bulletins from Central ICDRRMO, rapid weather shifts, and incident dispatch orders.
-      </p>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Operational Alerts &amp; Dispatch Advisories</h1>
     </div>
     <div class="page-header-actions">
-      <button class="btn btn-secondary btn-sm" onclick="markAllResponderRead()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>
+      <button class="btn btn-secondary btn-sm" onclick="markAllResponderRead()" style="font-size:11px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
         Acknowledge All
       </button>
     </div>
@@ -59,17 +62,17 @@ require_once __DIR__ . '/../layouts/header.php';
 
   <!-- Filter Strip -->
   <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);flex-wrap:wrap;">
-    <a href="notifications.php" class="btn btn-sm <?= empty($filterLevel) ? 'btn-primary' : 'btn-secondary' ?>">
+    <a href="notifications.php" class="btn btn-sm <?= empty($filterType) && empty($filterLevel) ? 'btn-primary' : 'btn-secondary' ?>">
       All Alerts (<?= count($alerts) ?>)
     </a>
+    <a href="notifications.php?type=incidents" class="btn btn-sm <?= $filterType === 'incidents' ? 'btn-primary' : 'btn-secondary' ?>">
+      Disaster Incidents
+    </a>
+    <a href="notifications.php?type=events" class="btn btn-sm <?= $filterType === 'events' ? 'btn-primary' : 'btn-secondary' ?>">
+      Drills &amp; Events
+    </a>
     <a href="notifications.php?level=Critical" class="btn btn-sm <?= $filterLevel === 'Critical' ? 'btn-danger' : 'btn-secondary' ?>">
-      Critical / Evac
-    </a>
-    <a href="notifications.php?level=Warning" class="btn btn-sm <?= $filterLevel === 'Warning' ? 'btn-warning' : 'btn-secondary' ?>">
-      Warning
-    </a>
-    <a href="notifications.php?level=Info" class="btn btn-sm <?= $filterLevel === 'Info' ? 'btn-primary' : 'btn-secondary' ?>">
-      Operational Info
+      Critical / Urgent
     </a>
   </div>
 
@@ -85,15 +88,26 @@ require_once __DIR__ . '/../layouts/header.php';
       <?php else: ?>
         <div class="list-group">
           <?php foreach ($alerts as $a): 
-            $isCrit = in_array($a['alert_level'], ['Critical', 'Danger']);
-            $borderCol = $isCrit ? '#ef4444' : ($a['alert_level'] === 'Warning' ? '#f59e0b' : 'var(--color-primary)');
+            $isCrit = in_array(strtolower($a['alert_level'] ?? ''), ['critical', 'urgent', 'danger']);
+            $isWarn = in_array(strtolower($a['alert_level'] ?? ''), ['warning']);
+            $borderCol = $isCrit ? '#ef4444' : ($isWarn ? '#f59e0b' : 'var(--color-primary)');
+
+            $mod = $a['related_module'] ?? '';
+            $tLower = strtolower($a['title']);
+            if ($mod === 'disaster_request' || $mod === 'disaster_report' || strpos($tLower, 'incident') !== false) {
+                $categoryLabel = 'Incident Dispatch';
+            } elseif ($mod === 'events' || $mod === 'preparedness' || strpos($tLower, 'event') !== false || strpos($tLower, 'drill') !== false) {
+                $categoryLabel = 'Drill / Event';
+            } else {
+                $categoryLabel = clean($a['alert_type'] ?? 'Operational');
+            }
           ?>
             <div style="padding:14px 18px;border-bottom:1px solid var(--color-border);border-left:4px solid <?= $borderCol ?>;background:<?= $a['is_read'] ? 'transparent' : 'var(--color-surface-subtle)' ?>;">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
                 <div style="display:flex;align-items:center;gap:8px;">
                   <?= renderStatusBadge($a['alert_level']) ?>
                   <span style="font-size:10px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;">
-                    <?= clean($a['alert_type'] ?? 'Operational') ?>
+                    <?= $categoryLabel ?>
                   </span>
                   <?php if (!$a['is_read']): ?>
                     <span class="badge badge-info" style="font-size:9.5px;padding:1px 6px;">NEW</span>
@@ -119,11 +133,7 @@ require_once __DIR__ . '/../layouts/header.php';
 
               <div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:var(--color-text-muted);border-top:1px dashed var(--color-border);padding-top:8px;">
                 <span><strong>Originator:</strong> <?= clean($a['sender_name'] ?: 'Central Operations') ?></span>
-                <?php if ($a['barangay_name']): ?>
-                  <span><strong>Target Sector:</strong> Brgy. <?= clean($a['barangay_name']) ?></span>
-                <?php else: ?>
-                  <span><strong>Target Sector:</strong> All Active Units</span>
-                <?php endif; ?>
+                <span><strong>Target Sector:</strong> Brgy. <?= clean($a['barangay_name'] ?? $user['barangay_name'] ?? 'Local') ?></span>
               </div>
             </div>
           <?php endforeach; ?>

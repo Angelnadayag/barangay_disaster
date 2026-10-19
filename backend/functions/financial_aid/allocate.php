@@ -31,6 +31,13 @@ try {
         $programName = trim($_POST['program_name'] ?? '');
         $disasterType = trim($_POST['disaster_type'] ?? '') ?: null;
         $barangayId = (int)($_POST['barangay_id'] ?? 0);
+        if ($barangayId <= 0) {
+            $barangayId = 12; // Default to Hinaplanon
+        }
+        $targetPurok = trim($_POST['target_purok'] ?? 'All Puroks');
+        if (empty($targetPurok)) {
+            $targetPurok = 'All Puroks';
+        }
         $totalBudget = (float)($_POST['total_budget'] ?? 0);
         $amountPerBeneficiary = (float)($_POST['amount_per_beneficiary'] ?? 0);
         $fundingSource = trim($_POST['funding_source'] ?? 'LGU Calamity Fund');
@@ -38,9 +45,6 @@ try {
 
         if (empty($programName)) {
             throw new Exception("Program Name is required.");
-        }
-        if ($barangayId <= 0) {
-            throw new Exception("Please select a target Barangay.");
         }
         if ($totalBudget <= 0) {
             throw new Exception("Total Budget must be greater than zero.");
@@ -57,7 +61,8 @@ try {
         $brgyStmt->execute([$barangayId]);
         $barangayName = $brgyStmt->fetchColumn();
         if (!$barangayName) {
-            throw new Exception("Selected Barangay does not exist.");
+            $barangayId = 12;
+            $barangayName = 'Hinaplanon';
         }
 
         // Generate Allocation Code
@@ -77,17 +82,17 @@ try {
 
         $insertStmt = $db->prepare("
             INSERT INTO financial_aid_allocations (
-                allocation_code, program_name, disaster_type, barangay_id,
+                allocation_code, program_name, disaster_type, barangay_id, target_purok,
                 total_budget, amount_per_beneficiary, disbursed_budget, remaining_budget,
                 funding_source, target_beneficiaries, status, added_type, notes, allocated_by
             ) VALUES (
-                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, 'Active', ?, ?, ?
             )
         ");
         $insertStmt->execute([
-            $allocationCode, $programName, $disasterType, $barangayId,
+            $allocationCode, $programName, $disasterType, $barangayId, $targetPurok,
             $totalBudget, $amountPerBeneficiary, $disbursedBudget, $remainingBudget,
             $fundingSource, $targetBeneficiaries, $addedType, $notes, $user['id']
         ]);
@@ -99,12 +104,13 @@ try {
             $linkStmt->execute([$allocationId, $recId]);
         }
 
-        // Audit Trail entry with added_type
+        // Audit Trail entry with added_type & target purok
         $typeLabel = ($addedType === 'added_by_admin') ? 'Added by Admin' : 'AI Recommended';
         $auditDetails = sprintf(
-            "ICDRRMO allocated ₱%s to Barangay %s under %s (%s). Target: %d beneficiaries at ₱%s each. Funding: %s. [Source: %s].",
+            "ICDRRMO allocated ₱%s to Barangay %s (Target Purok: %s) under %s (%s). Target: %d beneficiaries at ₱%s each. Funding: %s. [Source: %s].",
             number_format($totalBudget, 2),
             $barangayName,
+            $targetPurok,
             $programName,
             $allocationCode,
             $targetBeneficiaries,
@@ -128,6 +134,20 @@ try {
         ]);
 
         logSystemEvent('ALLOCATE_FINANCIAL_AID', 'Financial Aid', "Allocated ₱{$totalBudget} to {$barangayName} ({$allocationCode})");
+
+        // Notify residents of the targeted barangay
+        try {
+            $notifTitle = "Financial Aid Program: {$programName}";
+            $notifMsg = "Barangay {$barangayName} has announced emergency financial assistance under {$programName} (Purok: {$targetPurok}). Total Program Fund: ₱" . number_format($totalBudget, 2) . " (₱" . number_format($amountPerBeneficiary, 2) . " per qualified family). Ref: {$allocationCode}.";
+            $notifStmt = $db->prepare("
+                INSERT INTO notifications (
+                    target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at
+                ) VALUES ('resident', ?, ?, ?, 'informational', 'financial_aid', ?, ?, NOW())
+            ");
+            $notifStmt->execute([$barangayId, $notifTitle, $notifMsg, $allocationId, $user['id']]);
+        } catch (Throwable $e) {
+            error_log("Failed to insert financial aid notification: " . $e->getMessage());
+        }
 
         if ($isAjax) {
             jsonResponse(['success' => true, 'message' => "Financial aid allocation {$allocationCode} successfully created for Barangay {$barangayName}."]);

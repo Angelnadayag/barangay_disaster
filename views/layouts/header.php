@@ -8,27 +8,48 @@ require_once __DIR__ . '/../../backend/services/Auth.php';
 require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireLogin();
+if (!headers_sent()) {
+    header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+}
 $currentUser = getCurrentUser();
 $db = getDBConnection();
 
 // Fetch unread notifications count for this user
-$notifCountStmt = $db->prepare("
-    SELECT COUNT(*) FROM notifications n
-    LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
-    WHERE nr.id IS NULL
-    AND (
-        n.target_role = 'all' 
-        OR n.target_role = ? 
-        OR (n.target_barangay_id IS NOT NULL AND n.target_barangay_id = ?)
-        OR n.target_user_id = ?
-    )
-");
-$notifCountStmt->execute([
-    $currentUser['id'],
-    $currentUser['role'],
-    $currentUser['barangay_id'],
-    $currentUser['id']
-]);
+if (in_array($currentUser['role'] ?? '', ['resident', 'responder'], true)) {
+    $notifCountStmt = $db->prepare("
+        SELECT COUNT(*) FROM notifications n
+        LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+        WHERE nr.id IS NULL
+          AND n.target_barangay_id = ?
+          AND (n.target_role IN ('all', ?) OR n.target_user_id = ?)
+    ");
+    $notifCountStmt->execute([
+        $currentUser['id'],
+        (int)($currentUser['barangay_id'] ?? 0),
+        $currentUser['role'],
+        $currentUser['id']
+    ]);
+} else {
+    $notifCountStmt = $db->prepare("
+        SELECT COUNT(*) FROM notifications n
+        LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+        WHERE nr.id IS NULL
+        AND (
+            n.target_role = 'all' 
+            OR n.target_role = ? 
+            OR (n.target_barangay_id IS NOT NULL AND n.target_barangay_id = ?)
+            OR n.target_user_id = ?
+        )
+    ");
+    $notifCountStmt->execute([
+        $currentUser['id'],
+        $currentUser['role'],
+        $currentUser['barangay_id'] ?? null,
+        $currentUser['id']
+    ]);
+}
 $unreadCount = (int)$notifCountStmt->fetchColumn();
 
 // Role-based profile link
@@ -98,48 +119,43 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 
     <?php if ($isCitizenOrResponder): ?>
       <nav class="topbar-desktop-nav">
-        <?php if ($currentUser['role'] === 'resident'): ?>
-          <a href="<?= BASE_URL ?>/views/resident/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Dashboard</a>
-          <a href="<?= BASE_URL ?>/views/resident/evacuation.php" class="topbar-nav-pill <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">Evacuation Routing</a>
-          <a href="<?= BASE_URL ?>/views/resident/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events &amp; Drills</a>
-          <a href="<?= BASE_URL ?>/views/resident/risk-map.php" class="topbar-nav-pill <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">Hazard Map</a>
-          <a href="<?= BASE_URL ?>/views/resident/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">Advisories</a>
-        <?php elseif ($currentUser['role'] === 'responder'): ?>
-          <a href="<?= BASE_URL ?>/views/responder/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Field Dashboard</a>
-          <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="topbar-nav-pill <?= $currentPage === 'active-incidents.php' ? 'active' : '' ?>">Incidents</a>
-          <a href="<?= BASE_URL ?>/views/responder/evacuation.php" class="topbar-nav-pill <?= $currentPage === 'evacuation.php' ? 'active' : '' ?>">Evacuation Routing</a>
-          <a href="<?= BASE_URL ?>/views/responder/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events &amp; Drills</a>
-          <a href="<?= BASE_URL ?>/views/responder/risk-map.php" class="topbar-nav-pill <?= $currentPage === 'risk-map.php' ? 'active' : '' ?>">Hazard Map</a>
-          <a href="<?= BASE_URL ?>/views/responder/field-status.php" class="topbar-nav-pill <?= $currentPage === 'field-status.php' ? 'active' : '' ?>">Field Status</a>
-          <a href="<?= BASE_URL ?>/views/responder/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>">Alerts</a>
-        <?php endif; ?>
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Home</a>
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events</a>
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>" style="display:inline-flex;align-items:center;gap:5px;">
+          <span>Notification</span>
+          <?php if ($unreadCount > 0): ?>
+            <span style="display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#FFF;border-radius:10px;font-size:9.5px;font-weight:700;padding:1px 6px;line-height:1.2;min-width:16px;"><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
+          <?php endif; ?>
+        </a>
       </nav>
     <?php endif; ?>
 
     <div class="topbar-right">
-      <!-- Notification Bell -->
-      <div style="position:relative;">
-        <button class="notif-bell-btn" id="notifBellBtn" title="Notifications & Advisories">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-          <?php if ($unreadCount > 0): ?>
-            <span class="notif-badge" id="topNotifBadge"><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
-          <?php endif; ?>
-        </button>
+      <?php if (!$isCitizenOrResponder): ?>
+        <!-- Notification Bell (Admins and Staff Only) -->
+        <div style="position:relative;">
+          <button class="notif-bell-btn" id="notifBellBtn" title="Notifications & Advisories">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <?php if ($unreadCount > 0): ?>
+              <span class="notif-badge" id="topNotifBadge"><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
+            <?php endif; ?>
+          </button>
 
-        <!-- Dropdown Notifications Menu -->
-        <div id="notifDropdownMenu" style="display:none;position:absolute;right:0;top:38px;width:320px;background:#FFF;border:1px solid var(--color-border);border-radius:10px;box-shadow:var(--shadow-modal);z-index:1000;overflow:hidden;">
-          <div style="padding:8px 12px;background:var(--color-surface-subtle);border-bottom:1px solid var(--color-border-light);display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:10px;font-weight:700;color:var(--color-primary);text-transform:uppercase;">Recent Advisories & Alerts</span>
-            <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/notifications.php" style="font-size:9px;font-weight:600;color:var(--color-secondary);">View All</a>
-          </div>
-          <div id="notifDropdownList" style="max-height:260px;overflow-y:auto;padding:6px 0;">
-            <div style="padding:12px;text-align:center;font-size:10px;color:var(--color-text-muted);">Loading alerts...</div>
+          <!-- Dropdown Notifications Menu -->
+          <div id="notifDropdownMenu" style="display:none;position:absolute;right:0;top:38px;width:320px;background:#FFF;border:1px solid var(--color-border);border-radius:10px;box-shadow:var(--shadow-modal);z-index:1000;overflow:hidden;">
+            <div style="padding:8px 12px;background:var(--color-surface-subtle);border-bottom:1px solid var(--color-border-light);display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;font-weight:700;color:var(--color-primary);text-transform:uppercase;">Recent Advisories & Alerts</span>
+              <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/notifications.php" style="font-size:9px;font-weight:600;color:var(--color-secondary);">View All</a>
+            </div>
+            <div id="notifDropdownList" style="max-height:260px;overflow-y:auto;padding:6px 0;">
+              <div style="padding:12px;text-align:center;font-size:10px;color:var(--color-text-muted);">Loading alerts...</div>
+            </div>
           </div>
         </div>
-      </div>
+      <?php endif; ?>
 
       <!-- User Profile Dropdown Component -->
       <div class="user-profile-dropdown-wrap" id="userProfileWrap" style="position:relative;display:inline-block;">

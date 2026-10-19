@@ -20,8 +20,10 @@ if (!in_array($user['role'], ['icdrrmo', 'barangay_head'], true)) {
 }
 
 $title = trim($_POST['title'] ?? '');
-$type = trim($_POST['activity_type'] ?? 'Disaster Drill');
 $barangayId = !empty($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
+if (empty($barangayId) && !empty($user['barangay_id'])) {
+    $barangayId = (int)$user['barangay_id'];
+}
 
 // Venue handling from select or custom text input
 $venue = trim($_POST['venue'] ?? ($_POST['venue_select'] ?? ''));
@@ -71,13 +73,14 @@ try {
     ]);
     $actId = $db->lastInsertId();
 
-    // Broadcast in-app notification for this activity
+    // Broadcast in-app notification for this activity to barangay residents and responders
     $notif = $db->prepare("
         INSERT INTO notifications (target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at)
-        VALUES ('all', ?, ?, ?, 'informational', 'preparedness', ?, ?, NOW())
+        VALUES ('all', ?, ?, ?, 'informational', 'events', ?, ?, NOW())
     ");
-    $notifMsg = "New community preparedness activity scheduled: $title at $venue on $startDate.";
-    $notif->execute([$barangayId, "Scheduled: $title", $notifMsg, $actId, $user['id']]);
+    $notifTitle = "Community Event: $title";
+    $notifMsg = "Barangay event scheduled: $title ($type) at $venue on " . date('M d, Y h:i A', strtotime($startDate)) . ". Residents and responders are invited to participate.";
+    $notif->execute([$barangayId, $notifTitle, $notifMsg, $actId, $user['id']]);
 
     // Send SMS alerts to residents of this barangay
     $smsSentCount = 0;

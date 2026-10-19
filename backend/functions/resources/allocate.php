@@ -33,6 +33,13 @@ $subAction = trim($_POST['sub_action'] ?? ($_POST['action_type'] ?? ($_POST['act
 // ----------------------------------------------------------------------------
 if ($subAction === 'direct_allocation' || $subAction === 'direct') {
     $barangayId = (int)($_POST['barangay_id'] ?? 0);
+    if ($barangayId <= 0) {
+        $barangayId = 12; // Focus strictly on Hinaplanon
+    }
+    $purokName = trim($_POST['purok_name'] ?? ($_POST['target_purok'] ?? 'All Puroks'));
+    if (empty($purokName)) {
+        $purokName = 'All Puroks';
+    }
     $resourceId = (int)($_POST['resource_id'] ?? 0);
     $quantity = (int)($_POST['quantity'] ?? 0);
     $disasterType = trim($_POST['disaster_type'] ?? 'Typhoon');
@@ -151,11 +158,11 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
                 tracking_code, barangay_id, purok_name, disaster_type, severity, urgency,
                 affected_families, affected_individuals, displaced_families, requested_assistance,
                 situation_overview, status, submitted_by, created_at, updated_at
-            ) VALUES (?, ?, 'Barangay Wide', ?, 'Moderate', 'High', 0, 0, 0, ?, ?, 'Allocated', ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, 'Moderate', 'High', 0, 0, 0, ?, ?, 'Allocated', ?, NOW(), NOW())
         ");
         $insReq->execute([
-            $trackingCode, $barangayId, $disasterType, $purpose,
-            "Direct relief allocation by ICDRRMO Central Depot: {$remarks}",
+            $trackingCode, $barangayId, $purokName, $disasterType, $purpose,
+            "Direct relief allocation to Hinaplanon ({$purokName}) by ICDRRMO Central Depot: {$remarks}",
             $user['id']
         ]);
         $requestId = (int)$db->lastInsertId();
@@ -189,7 +196,7 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
             ) VALUES (?, 'Allocation', ?, 'disaster_request', ?, ?, ?, NOW())
         ")->execute([
             $resourceId, $quantity, $requestId,
-            "Direct allocation of {$quantity} {$centralRes['unit']} dispatched to Brgy. {$barangay['name']} ({$trackingCode})",
+            "Direct allocation of {$quantity} {$centralRes['unit']} dispatched to Brgy. {$barangay['name']} ({$purokName}) ({$trackingCode})",
             $user['id']
         ]);
 
@@ -199,25 +206,35 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
             ) VALUES (?, 'Restock', ?, 'icdrrmo_allocation', ?, ?, ?, NOW())
         ")->execute([
             $targetLocalResId, $quantity, $requestId,
-            "Received direct allocation of {$quantity} {$centralRes['unit']} from ICDRRMO Central Depot",
+            "Received direct allocation of {$quantity} {$centralRes['unit']} for {$purokName} from ICDRRMO Central Depot",
             $user['id']
         ]);
 
-        // 7. Dispatch Notification to Barangay Head
+        // 7. Dispatch Notification to Barangay Head & Residents
         $db->prepare("
             INSERT INTO notifications (
                 target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
             ) VALUES ('barangay_head', ?, 'Relief Allocation Dispatched', ?, 'informational', 'resources', ?, NOW())
         ")->execute([
             $barangayId,
-            "ICDRRMO has directly allocated and dispatched {$quantity} {$centralRes['unit']} of {$centralRes['name']} to your Barangay inventory ({$trackingCode}).",
+            "ICDRRMO has directly allocated and dispatched {$quantity} {$centralRes['unit']} of {$centralRes['name']} to Hinaplanon ({$purokName}) ({$trackingCode}).",
+            $requestId
+        ]);
+
+        $db->prepare("
+            INSERT INTO notifications (
+                target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
+            ) VALUES ('resident', ?, 'Relief Resources Dispatched', ?, 'informational', 'resources', ?, NOW())
+        ")->execute([
+            $barangayId,
+            "Relief supplies update: {$quantity} {$centralRes['unit']} of {$centralRes['name']} allocated for {$purokName}, Brgy. {$barangay['name']} ({$trackingCode}).",
             $requestId
         ]);
 
         logSystemEvent(
             'DIRECT_RESOURCE_ALLOCATION',
             'Resources',
-            "Allocated {$quantity} {$centralRes['unit']} of [{$centralRes['code']}] {$centralRes['name']} to Brgy. {$barangay['name']} ({$trackingCode})",
+            "Allocated {$quantity} {$centralRes['unit']} of [{$centralRes['code']}] {$centralRes['name']} to Brgy. {$barangay['name']} ({$purokName}) ({$trackingCode})",
             $user['id']
         );
 
@@ -230,7 +247,7 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
         $totalAllocUnits = (int)$db->query("SELECT COALESCE(SUM(allocated_quantity), 0) FROM recommended_items WHERE status = 'Allocated'")->fetchColumn();
         $totalAllocationsCount = (int)$db->query("SELECT COUNT(*) FROM recommended_items")->fetchColumn();
 
-        $successMsg = "Successfully allocated {$quantity} {$centralRes['unit']} of {$centralRes['name']} to Brgy. {$barangay['name']} ({$trackingCode}).";
+        $successMsg = "Successfully allocated {$quantity} {$centralRes['unit']} of {$centralRes['name']} to Brgy. {$barangay['name']} ({$purokName}) ({$trackingCode}).";
 
         if ($isAjax) {
             jsonResponse([
@@ -243,6 +260,7 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
                     'disaster_type' => $disasterType,
                     'severity' => 'Moderate',
                     'barangay_name' => $barangay['name'],
+                    'purok_name' => $purokName,
                     'resource_name' => $centralRes['name'],
                     'resource_code' => $centralRes['code'],
                     'category' => $centralRes['category'],
@@ -434,6 +452,16 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
             $rec['request_id']
         ]);
 
+        $db->prepare("
+            INSERT INTO notifications (
+                target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
+            ) VALUES ('resident', ?, 'Relief Package Dispatched', ?, 'informational', 'resources', ?, NOW())
+        ")->execute([
+            $rec['barangay_id'],
+            "Relief package of {$allocatedCount} essential supply items dispatched for incident relief in Brgy. {$rec['barangay_name']}.",
+            $rec['request_id']
+        ]);
+
         logSystemEvent(
             'BATCH_RESOURCE_ALLOCATION',
             'Resources',
@@ -622,7 +650,7 @@ else {
                 $user['id']
             ]);
 
-            // Notify Barangay Head
+            // Notify Barangay Head & Residents
             $db->prepare("
                 INSERT INTO notifications (
                     target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
@@ -630,6 +658,16 @@ else {
             ")->execute([
                 $item['barangay_id'],
                 "ICDRRMO has allocated {$allocQty} {$item['unit']} of {$item['resource_name']} for Incident {$item['tracking_code']}.",
+                $item['request_id']
+            ]);
+
+            $db->prepare("
+                INSERT INTO notifications (
+                    target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_at
+                ) VALUES ('resident', ?, 'Relief Allocation Dispatched', ?, 'informational', 'resources', ?, NOW())
+            ")->execute([
+                $item['barangay_id'],
+                "Emergency relief update: {$allocQty} {$item['unit']} of {$item['resource_name']} allocated to Brgy. {$item['barangay_name']}.",
                 $item['request_id']
             ]);
 

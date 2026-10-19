@@ -2348,8 +2348,6 @@ body.citizen-responder-shell h6 {
 
 /* Body text, descriptions, details: strictly 9px to 11px */
 body.citizen-responder-shell p,
-body.citizen-responder-shell .page-header-desc,
-body.citizen-responder-shell .card-subtitle,
 body.citizen-responder-shell .desc,
 body.citizen-responder-shell .meta-text,
 body.citizen-responder-shell .protocol-item,
@@ -2358,6 +2356,12 @@ body.citizen-responder-shell .list-group-item,
 body.citizen-responder-shell .alert-body {
   font-size: 10.5px !important;
   line-height: 1.48 !important;
+}
+
+/* Hide verbose statements & subtitles completely in citizen/responder views */
+body.citizen-responder-shell .page-header-desc,
+body.citizen-responder-shell .card-subtitle {
+  display: none !important;
 }
 
 /* Form controls, inputs, buttons: 11px */
@@ -2459,4 +2463,567 @@ body.citizen-responder-shell .tac-date-day {
   }
 }
 
+/* ==========================================================================
+   Preparedness Schedule - Calendar Style Component
+   Strict typography (14-16px headings, 9-11px labels/text), anti-slop
+   ========================================================================== */
+.prep-calendar-card {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  margin-bottom: var(--space-3, 12px);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(23, 50, 77, 0.04);
+}
 
+.prep-calendar-header {
+  padding: 10px 14px;
+  background: var(--color-surface, #FFFFFF);
+  border-bottom: 1px solid var(--color-border-light, #E2E8F0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prep-calendar-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prep-calendar-title {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--color-primary, #17324D) !important;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prep-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prep-cal-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: 6px;
+  color: var(--color-primary, #17324D);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  font-size: 11px;
+}
+.prep-cal-btn:hover {
+  background: var(--color-surface-subtle, #F0F3F4);
+  border-color: var(--color-secondary, #2F6F73);
+}
+
+.prep-cal-month-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary, #17324D);
+  min-width: 115px;
+  text-align: center;
+}
+
+.prep-calendar-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+@media (min-width: 860px) {
+  .prep-calendar-body {
+    grid-template-columns: 310px 1fr;
+  }
+}
+
+.prep-cal-grid-pane {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-light, #E2E8F0);
+  background: #FAFBFC;
+}
+
+@media (min-width: 860px) {
+  .prep-cal-grid-pane {
+    border-bottom: none;
+    border-right: 1px solid var(--color-border-light, #E2E8F0);
+  }
+}
+
+.prep-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.prep-cal-weekday {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-secondary, #66737D);
+  padding: 2px 0;
+}
+
+.prep-cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.prep-cal-day {
+  min-height: 33px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--color-text, #1E293B);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+  user-select: none;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 2px 0;
+}
+
+.prep-cal-day:hover:not(.empty-day) {
+  background: #EAF0F2;
+}
+
+.prep-cal-day.empty-day {
+  cursor: default;
+  opacity: 0.25;
+}
+
+.prep-cal-day.is-today {
+  border: 1.5px solid var(--color-secondary, #2F6F73);
+  font-weight: 700;
+}
+
+.prep-cal-day.is-selected {
+  background: var(--color-primary, #17324D) !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+}
+
+.prep-cal-day.has-event::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-secondary, #2F6F73);
+  position: absolute;
+  bottom: 2px;
+}
+
+.prep-cal-day.is-selected.has-event::after {
+  background: #FFFFFF;
+}
+
+.prep-cal-details-pane {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  background: #FFFFFF;
+}
+
+.prep-cal-pane-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border-light, #E2E8F0);
+}
+
+.prep-cal-pane-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #66737D);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.prep-drill-card {
+  background: var(--color-surface-subtle, #F0F3F4);
+  border: 1px solid var(--color-border-light, #E2E8F0);
+  border-radius: 6px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  transition: all 0.15s ease;
+}
+
+.prep-drill-card:hover {
+  border-color: var(--color-border, #D9E0E3);
+}
+
+.prep-drill-date-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: 6px;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.prep-drill-month {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-secondary, #2F6F73);
+  line-height: 1;
+}
+
+.prep-drill-day {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  line-height: 1.1;
+  margin-top: 1px;
+}
+
+.prep-drill-info {
+  flex: 1;
+  min-width: 170px;
+}
+
+.prep-drill-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary, #17324D);
+  margin-bottom: 2px;
+  line-height: 1.25;
+}
+
+.prep-drill-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: var(--color-text-secondary, #66737D);
+}
+
+.prep-drill-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Evacuation Routing Component (Home Page Scroll-Down Section)
+   Mobile-First, strictly 9-11px details, 14-16px headings, anti-slop
+   ========================================================================== */
+.evac-routing-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 10px);
+  margin-top: var(--space-4, 16px);
+  padding-top: var(--space-3, 12px);
+  border-top: 1px solid var(--color-border-light, #E2E8F0);
+}
+
+.evac-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evac-section-title {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: var(--color-primary, #17324D) !important;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.evac-filter-deck {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evac-filter-pills {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.evac-filter-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.evac-pill-btn {
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border, #D9E0E3);
+  background: var(--color-surface, #FFFFFF);
+  color: var(--color-text-secondary, #66737D);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+.evac-pill-btn.active,
+.evac-pill-btn:hover {
+  background: var(--color-primary, #17324D);
+  border-color: var(--color-primary, #17324D);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.evac-content-split {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 901px) {
+  .evac-content-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.evac-shelters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.evac-shelter-card {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.evac-shelter-card:hover {
+  border-color: var(--color-secondary, #2F6F73);
+}
+.evac-shelter-card.active-routed {
+  border: 2px solid var(--color-primary, #17324D);
+  background: #FDFEFE;
+}
+
+.evac-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.evac-card-title {
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  color: var(--color-primary, #17324D) !important;
+  line-height: 1.25;
+  margin: 0 !important;
+}
+
+.evac-card-subtitle {
+  font-size: 10px;
+  color: var(--color-text-secondary, #66737D);
+  margin-top: 1px;
+}
+
+.evac-occupancy-wrap {
+  background: var(--color-surface-subtle, #F0F3F4);
+  border: 1px solid var(--color-border-light, #E7EDF0);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+
+.evac-progress-bar-bg {
+  width: 100%;
+  height: 5px;
+  background: #D9E0E3;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 3px;
+}
+
+.evac-progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.evac-amenities-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 9.5px;
+}
+
+.evac-utility-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.evac-utility-badge.avail {
+  background: #EAF4EB;
+  color: #2E7D32;
+  border-color: #BCE3C1;
+}
+.evac-utility-badge.unavail {
+  background: var(--color-surface-subtle, #F0F3F4);
+  color: var(--color-text-muted, #8A96A0);
+  border-color: var(--color-border-light, #E7EDF0);
+}
+
+.evac-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--color-border-light, #E7EDF0);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.evac-route-btn {
+  background: var(--color-primary, #17324D) !important;
+  color: #FFFFFF !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  padding: 5px 12px !important;
+  border: 1px solid #102336 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  text-decoration: none !important;
+}
+.evac-route-btn:hover {
+  background: #214364 !important;
+}
+
+.evac-map-wrapper {
+  background: var(--color-surface, #FFFFFF);
+  border: 1px solid var(--color-border, #D9E0E3);
+  border-radius: var(--radius-primary, 10px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.evac-map-header {
+  padding: 8px 12px;
+  background: var(--color-surface-subtle, #F0F3F4);
+  border-bottom: 1px solid var(--color-border-light, #E2E8F0);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-primary, #17324D);
+}
+
+.evac-live-map-box {
+  width: 100%;
+  height: 380px;
+}
+@media (min-width: 901px) {
+  .evac-live-map-box {
+    height: 470px;
+  }
+}
+
+.evac-route-sheet {
+  background: #FFFFFF;
+  border-top: 1px solid var(--color-border, #D9E0E3);
+  padding: 10px 12px;
+  display: none;
+}
+.evac-route-sheet.active {
+  display: block;
+}
+
+.route-stat-box {
+  background: var(--color-surface-subtle, #F0F3F4);
+  border: 1px solid var(--color-border-light, #E7EDF0);
+  border-radius: 6px;
+  padding: 6px;
+  text-align: center;
+}
+.route-stat-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  line-height: 1.1;
+}
+.route-stat-lbl {
+  font-size: 9px;
+  color: var(--color-text-secondary, #66737D);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+/* Smooth Auto-Scroll & Topbar Offset */
+html {
+  scroll-behavior: smooth;
+}
+
+.evac-routing-section,
+.evac-map-wrapper {
+  scroll-margin-top: 65px;
+}

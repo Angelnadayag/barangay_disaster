@@ -70,7 +70,7 @@ if ($user && password_verify($password, $user['password'])) {
 
     $targetFolder = getRoleFolder($user['role']);
     if ($user['role'] === 'icdrrmo') {
-        $redirectUrl = BASE_URL . '/views/icdrrmo/users.php';
+        $redirectUrl = BASE_URL . '/views/icdrrmo/dashboard.php';
     } elseif ($user['role'] === 'barangay_head') {
         $redirectUrl = BASE_URL . '/views/barangay/dashboard.php';
     } else {

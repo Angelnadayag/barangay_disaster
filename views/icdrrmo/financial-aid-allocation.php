@@ -19,23 +19,30 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 
 $activeTab = in_array($_GET['tab'] ?? '', ['allocations', 'audits'], true) ? $_GET['tab'] : 'allocations';
 
-$filterBarangay = !empty($_GET['barangay_id']) ? (int)$_GET['barangay_id'] : 0;
+$filterPurok = trim($_GET['purok'] ?? '');
 $filterStatus = trim($_GET['status'] ?? '');
 $filterAction = trim($_GET['action_type'] ?? '');
 $search = trim($_GET['search'] ?? '');
 
-// Fetch all active barangays for filter & creation dropdowns
-$brgyStmt = $db->query("SELECT id, name FROM barangays WHERE status = 'active' ORDER BY name ASC");
+// Focus exclusively on Hinaplanon (Barangay ID 12)
+$brgyStmt = $db->query("SELECT id, name FROM barangays WHERE id = 12");
 $allBarangays = $brgyStmt->fetchAll(PDO::FETCH_ASSOC);
+if (empty($allBarangays)) {
+    $allBarangays = [['id' => 12, 'name' => 'Hinaplanon']];
+}
 
-// Metrics
-$totalAllocationsCount = (int)$db->query("SELECT COUNT(*) FROM financial_aid_allocations")->fetchColumn();
-$totalBudgetSum = (float)$db->query("SELECT COALESCE(SUM(total_budget), 0) FROM financial_aid_allocations WHERE status != 'Archived'")->fetchColumn();
-$totalDisbursedSum = (float)$db->query("SELECT COALESCE(SUM(disbursed_budget), 0) FROM financial_aid_allocations WHERE status != 'Archived'")->fetchColumn();
-$totalRemainingSum = (float)$db->query("SELECT COALESCE(SUM(remaining_budget), 0) FROM financial_aid_allocations WHERE status != 'Archived'")->fetchColumn();
-$totalBeneficiariesClaimed = (int)$db->query("SELECT COUNT(*) FROM financial_aid_distributions WHERE claim_status = 'Claimed'")->fetchColumn();
+// Fetch Hinaplanon Puroks
+$purokStmt = $db->query("SELECT id, name FROM puroks WHERE barangay_id = 12 ORDER BY name ASC");
+$hinaplanonPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Allocations Query
+// Metrics (Strictly Hinaplanon)
+$totalAllocationsCount = (int)$db->query("SELECT COUNT(*) FROM financial_aid_allocations WHERE barangay_id = 12")->fetchColumn();
+$totalBudgetSum = (float)$db->query("SELECT COALESCE(SUM(total_budget), 0) FROM financial_aid_allocations WHERE barangay_id = 12 AND status != 'Archived'")->fetchColumn();
+$totalDisbursedSum = (float)$db->query("SELECT COALESCE(SUM(disbursed_budget), 0) FROM financial_aid_allocations WHERE barangay_id = 12 AND status != 'Archived'")->fetchColumn();
+$totalRemainingSum = (float)$db->query("SELECT COALESCE(SUM(remaining_budget), 0) FROM financial_aid_allocations WHERE barangay_id = 12 AND status != 'Archived'")->fetchColumn();
+$totalBeneficiariesClaimed = (int)$db->query("SELECT COUNT(*) FROM financial_aid_distributions WHERE barangay_id = 12 AND claim_status = 'Claimed'")->fetchColumn();
+
+// Fetch Allocations Query (Strictly Hinaplanon)
 $allocSql = "
     SELECT a.*, b.name AS barangay_name, u.full_name AS allocator_name,
            (SELECT COUNT(*) FROM financial_aid_distributions d WHERE d.allocation_id = a.id) AS registered_count,
@@ -43,20 +50,21 @@ $allocSql = "
     FROM financial_aid_allocations a
     JOIN barangays b ON a.barangay_id = b.id
     LEFT JOIN users u ON a.allocated_by = u.id
-    WHERE 1=1
+    WHERE a.barangay_id = 12
 ";
 $allocParams = [];
 
-if ($filterBarangay > 0) {
-    $allocSql .= " AND a.barangay_id = ?";
-    $allocParams[] = $filterBarangay;
+if (!empty($filterPurok)) {
+    $allocSql .= " AND (a.target_purok = ? OR a.target_purok = 'All Puroks' OR a.notes LIKE ?)";
+    $allocParams[] = $filterPurok;
+    $allocParams[] = "%{$filterPurok}%";
 }
 if (!empty($filterStatus)) {
     $allocSql .= " AND a.status = ?";
     $allocParams[] = $filterStatus;
 }
 if (!empty($search)) {
-    $allocSql .= " AND (a.allocation_code LIKE ? OR a.program_name LIKE ? OR b.name LIKE ? OR a.funding_source LIKE ?)";
+    $allocSql .= " AND (a.allocation_code LIKE ? OR a.program_name LIKE ? OR a.target_purok LIKE ? OR a.funding_source LIKE ?)";
     $allocParams[] = "%{$search}%";
     $allocParams[] = "%{$search}%";
     $allocParams[] = "%{$search}%";
@@ -68,27 +76,26 @@ $allocStmt = $db->prepare($allocSql);
 $allocStmt->execute($allocParams);
 $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch Audits Query (Cross-barangay audit records)
+// Fetch Audits Query (Strictly Hinaplanon audit records)
 $auditSql = "
     SELECT aud.*, b.name AS barangay_name, a.allocation_code, a.program_name
     FROM financial_aid_audits aud
     JOIN barangays b ON aud.barangay_id = b.id
     LEFT JOIN financial_aid_allocations a ON aud.allocation_id = a.id
-    WHERE 1=1
+    WHERE aud.barangay_id = 12
 ";
 $auditParams = [];
 
-if ($filterBarangay > 0) {
-    $auditSql .= " AND aud.barangay_id = ?";
-    $auditParams[] = $filterBarangay;
+if (!empty($filterPurok)) {
+    $auditSql .= " AND aud.details LIKE ?";
+    $auditParams[] = "%{$filterPurok}%";
 }
 if (!empty($filterAction)) {
     $auditSql .= " AND aud.action = ?";
     $auditParams[] = $filterAction;
 }
 if (!empty($search)) {
-    $auditSql .= " AND (aud.details LIKE ? OR aud.actor_name LIKE ? OR b.name LIKE ? OR a.allocation_code LIKE ?)";
-    $auditParams[] = "%{$search}%";
+    $auditSql .= " AND (aud.details LIKE ? OR aud.actor_name LIKE ? OR a.allocation_code LIKE ?)";
     $auditParams[] = "%{$search}%";
     $auditParams[] = "%{$search}%";
     $auditParams[] = "%{$search}%";
@@ -296,7 +303,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="page-header-title-wrap">
       <h1>Financial Aid Allocation</h1>
       <p class="page-header-desc">
-        Centralized disaster cash assistance programming, barangay fund allocation, and cross-barangay distribution audits.
+        Centralized disaster cash assistance programming, Hinaplanon purok fund allocation, and distribution audits.
       </p>
     </div>
     <div class="page-header-actions">
@@ -322,17 +329,17 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="kpi-card">
       <div class="kpi-title">Undisbursed Balance</div>
       <div class="kpi-val">&#8369;<?= number_format($totalRemainingSum, 2) ?></div>
-      <div class="kpi-sub">Remaining balance across all barangays</div>
+      <div class="kpi-sub">Remaining balance for Barangay Hinaplanon</div>
     </div>
   </div>
 
   <!-- Navigation Tabs -->
   <div class="nav-tabs">
-    <a href="?tab=allocations<?= $filterBarangay ? '&barangay_id='.$filterBarangay : '' ?>" class="nav-tab-item <?= $activeTab === 'allocations' ? 'active' : '' ?>">
-      Barangay Allocations
+    <a href="?tab=allocations<?= !empty($filterPurok) ? '&purok='.urlencode($filterPurok) : '' ?>" class="nav-tab-item <?= $activeTab === 'allocations' ? 'active' : '' ?>">
+      Hinaplanon Purok Allocations
       <span class="nav-tab-badge"><?= count($allocations) ?></span>
     </a>
-    <a href="?tab=audits<?= $filterBarangay ? '&barangay_id='.$filterBarangay : '' ?>" class="nav-tab-item <?= $activeTab === 'audits' ? 'active' : '' ?>">
+    <a href="?tab=audits<?= !empty($filterPurok) ? '&purok='.urlencode($filterPurok) : '' ?>" class="nav-tab-item <?= $activeTab === 'audits' ? 'active' : '' ?>">
       Distribution Audit Records
       <span class="nav-tab-badge"><?= count($audits) ?></span>
     </a>
@@ -344,14 +351,14 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       <input type="hidden" name="tab" value="<?= htmlspecialchars($activeTab) ?>">
       
       <div style="flex: 1; min-width: 220px;">
-        <input type="text" name="search" class="form-control" placeholder="Search by program, code, or barangay..." value="<?= htmlspecialchars($search) ?>" style="font-size: 11px;">
+        <input type="text" name="search" class="form-control" placeholder="Search by program, code, or purok..." value="<?= htmlspecialchars($search) ?>" style="font-size: 11px;">
       </div>
 
-      <div style="min-width: 170px;">
-        <select name="barangay_id" class="form-control" style="font-size: 11px;">
-          <option value="">All Barangays</option>
-          <?php foreach ($allBarangays as $b): ?>
-            <option value="<?= $b['id'] ?>" <?= $filterBarangay === (int)$b['id'] ? 'selected' : '' ?>><?= htmlspecialchars($b['name']) ?></option>
+      <div style="min-width: 190px;">
+        <select name="purok" class="form-control" style="font-size: 11px;">
+          <option value="">All Puroks (Hinaplanon)</option>
+          <?php foreach ($hinaplanonPuroks as $p): ?>
+            <option value="<?= htmlspecialchars($p['name']) ?>" <?= $filterPurok === $p['name'] ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -378,7 +385,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       <?php endif; ?>
 
       <button type="submit" class="btn btn-outline" style="font-size: 11px; padding: 7px 12px;">Filter</button>
-      <?php if (!empty($search) || !empty($filterBarangay) || !empty($filterStatus) || !empty($filterAction)): ?>
+      <?php if (!empty($search) || !empty($filterPurok) || !empty($filterStatus) || !empty($filterAction)): ?>
         <a href="?tab=<?= $activeTab ?>" class="btn btn-outline" style="font-size: 11px; padding: 7px 12px; color: var(--color-text-muted);">Reset</a>
       <?php endif; ?>
     </form>
@@ -393,7 +400,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <tr style="border-bottom: 1px solid var(--color-border); background: #FAFCFC;">
               <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary);">Code</th>
               <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary);">Program & Disaster</th>
-              <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary);">Target Barangay</th>
+              <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary);">Target Purok (Hinaplanon)</th>
               <th style="padding: 10px 14px; text-align: right; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary);">Total Fund</th>
               <th style="padding: 10px 14px; text-align: right; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary);">Rate / Family</th>
               <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary); width: 170px;">Disbursement Progress</th>
@@ -430,7 +437,8 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                   </td>
                   <td style="padding: 10px 14px; font-size: 11px; font-weight: 500; color: var(--color-text);">
-                    <?= htmlspecialchars($row['barangay_name']) ?>
+                    <div style="font-weight: 600; color: var(--color-primary);"><?= htmlspecialchars($row['target_purok'] ?: 'All Puroks') ?></div>
+                    <div style="font-size: 9.5px; color: var(--color-text-muted);">Brgy. <?= htmlspecialchars($row['barangay_name']) ?></div>
                   </td>
                   <td style="padding: 10px 14px; text-align: right; font-family: var(--font-secondary); font-weight: 600; font-size: 11px; color: var(--color-text);">
                     &#8369;<?= number_format($row['total_budget'], 2) ?>
@@ -553,13 +561,15 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <input type="text" name="program_name" id="alloc_program_name" class="form-control" placeholder="e.g. Typhoon Kristine Emergency Cash Relief" required style="font-size: 11px;">
           </div>
 
+          <input type="hidden" name="barangay_id" id="alloc_barangay_id" value="12">
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
-              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Target Barangay</label>
-              <select name="barangay_id" id="alloc_barangay_id" class="form-control" required style="font-size: 11px;">
-                <option value="">-- Select Barangay --</option>
-                <?php foreach ($allBarangays as $b): ?>
-                  <option value="<?= $b['id'] ?>"><?= htmlspecialchars($b['name']) ?></option>
+              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Allocate to Purok (Hinaplanon)</label>
+              <select name="target_purok" id="alloc_target_purok" class="form-control" required style="font-size: 11px;">
+                <option value="All Puroks">All Puroks (Hinaplanon)</option>
+                <?php foreach ($hinaplanonPuroks as $p): ?>
+                  <option value="<?= htmlspecialchars($p['name']) ?>"><?= htmlspecialchars($p['name']) ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -631,7 +641,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
     <div class="modal-body">
       <div style="display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-bottom: 1px solid var(--color-border-light); padding-bottom: 10px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; border-bottom: 1px solid var(--color-border-light); padding-bottom: 10px;">
           <div>
             <div style="font-size: 10px; color: var(--color-text-muted);">PROGRAM</div>
             <div id="view_alloc_program" style="font-size: 12px; font-weight: 600; color: var(--color-primary);"></div>
@@ -639,6 +649,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
           <div>
             <div style="font-size: 10px; color: var(--color-text-muted);">BARANGAY</div>
             <div id="view_alloc_barangay" style="font-size: 12px; font-weight: 600; color: var(--color-primary);"></div>
+          </div>
+          <div>
+            <div style="font-size: 10px; color: var(--color-text-muted);">TARGET PUROK</div>
+            <div id="view_alloc_purok" style="font-size: 12px; font-weight: 600; color: var(--color-primary);"></div>
           </div>
         </div>
 
@@ -742,6 +756,7 @@ function viewAllocationDetails(data) {
   document.getElementById('view_alloc_code_title').textContent = data.allocation_code + ' — Details';
   document.getElementById('view_alloc_program').textContent = data.program_name;
   document.getElementById('view_alloc_barangay').textContent = data.barangay_name;
+  document.getElementById('view_alloc_purok').textContent = data.target_purok || 'All Puroks';
   document.getElementById('view_alloc_total').textContent = '₱' + Number(data.total_budget).toLocaleString('en-US', {minimumFractionDigits: 2});
   document.getElementById('view_alloc_disbursed').textContent = '₱' + Number(data.disbursed_budget).toLocaleString('en-US', {minimumFractionDigits: 2});
   document.getElementById('view_alloc_balance').textContent = '₱' + Number(data.remaining_budget).toLocaleString('en-US', {minimumFractionDigits: 2});
@@ -781,7 +796,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('action') === 'new') {
     const progInput = document.querySelector('input[name="program_name"]');
-    const brgySelect = document.querySelector('select[name="barangay_id"]');
+    const brgyInput = document.getElementById('alloc_barangay_id');
     const disasterSelect = document.querySelector('select[name="disaster_type"]');
     const budgetInput = document.getElementById('alloc_total_budget');
     const rateInput = document.getElementById('alloc_rate_budget');
@@ -789,8 +804,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const typeSelect = document.getElementById('alloc_added_type');
     const recInput = document.getElementById('alloc_recommendation_id');
 
+    const purokSelect = document.getElementById('alloc_target_purok');
+
+    if (brgyInput) brgyInput.value = '12';
     if (params.get('program_name') && progInput) progInput.value = params.get('program_name');
-    if (params.get('barangay_id') && brgySelect) brgySelect.value = params.get('barangay_id');
+    if (params.get('target_purok') && purokSelect) purokSelect.value = params.get('target_purok');
     if (params.get('disaster_type') && disasterSelect) disasterSelect.value = params.get('disaster_type');
     if (params.get('budget') && budgetInput) budgetInput.value = parseFloat(params.get('budget')).toFixed(2);
     if (params.get('per_family') && rateInput) rateInput.value = parseFloat(params.get('per_family')).toFixed(2);

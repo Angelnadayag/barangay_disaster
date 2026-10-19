@@ -68,17 +68,25 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
       <div class="sidebar-section-title">Admin Management</div>
       <ul class="nav-list">
         <li class="nav-item">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/dashboard.php" class="nav-link <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></span>
+            Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/users.php" class="nav-link <?= $currentPage === 'users.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
             Manage User
           </a>
         </li>
+        <?php if (false): // Hidden from left sidebar as requested; module code preserved ?>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/barangays.php" class="nav-link <?= $currentPage === 'barangays.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
             Manage Barangay
           </a>
         </li>
+        <?php endif; ?>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-reports.php" class="nav-link <?= in_array($currentPage, ['disaster-reports.php', 'disaster-requests.php'], true) ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
