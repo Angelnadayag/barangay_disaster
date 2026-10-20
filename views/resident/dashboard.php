@@ -136,12 +136,12 @@ $myRsvps = [];
 if (!empty($scheduleEvents)) {
     $rsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_id = ? OR (phone != '' AND phone = ?)");
     $rsvpStmt->execute([(int)$user['id'], $user['phone'] ?? '']);
-    $myRsvps = $rsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $myRsvps = array_map('intval', $rsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 }
 
-// All Joinable Upcoming Events for Home display (today onwards)
-$upcomingJoinEvents = array_filter($scheduleEvents, function($ev) {
-    return strtotime($ev['start_datetime']) >= strtotime('today');
+// Only upcoming events that the resident has NOT joined yet (apply to join pa)
+$upcomingJoinEvents = array_filter($scheduleEvents, function($ev) use ($myRsvps) {
+    return strtotime($ev['start_datetime']) >= strtotime('today') && !in_array((int)$ev['id'], $myRsvps, true);
 });
 
 // Format events for client-side calendar
@@ -248,7 +248,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   </div>
 
-  <!-- Upcoming Community Events to Join Section (All join events displayed on Home) -->
+  <!-- Events to Apply / Join Section (Directly below Preparedness Schedule) -->
   <section class="home-join-events-section" id="upcoming-join-events" style="margin-top:14px;margin-bottom:14px;">
     <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-primary, 10px);padding:14px 16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -260,97 +260,101 @@ require_once __DIR__ . '/../layouts/header.php';
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
               <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
-            Upcoming Community Events to Join
+            Events to Apply / Join
           </h2>
           <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">
-            Browse and join community disaster drills, flood simulations, and relief distributions in your barangay.
+            Open community disaster drills and relief distributions in your barangay that you have not joined yet. Once you join, they move to your Events module under Attending.
           </div>
         </div>
-        <a href="events.php?tab=attending" class="btn btn-secondary btn-sm" style="font-size:11px;padding:5px 12px;display:inline-flex;align-items:center;gap:4px;">
-          View Attending Events (<?= count($myRsvps) ?>) &rarr;
+        <?php
+          $attendingUpcomingCount = count(array_filter($scheduleEvents, fn($e) => in_array((int)$e['id'], $myRsvps, true) && strtotime($e['start_datetime']) >= strtotime('today')));
+        ?>
+        <a href="events.php?tab=attending" class="btn btn-secondary btn-sm" id="homeAttendingCountBadge" style="font-size:11px;padding:5px 12px;display:inline-flex;align-items:center;gap:4px;">
+          View Attending in Events (<span id="homeAttendingCountNum"><?= $attendingUpcomingCount ?></span>) &rarr;
         </a>
       </div>
 
-      <?php if (empty($upcomingJoinEvents)): ?>
-        <div style="padding:24px;text-align:center;color:var(--color-text-muted);font-size:11.5px;background:var(--color-surface-subtle);border-radius:6px;border:1px dashed var(--color-border);">
-          No upcoming community events or drills currently open to join.
-        </div>
-      <?php else: ?>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <?php foreach ($upcomingJoinEvents as $act):
-            $eventId = (int)$act['id'];
-            $isAttending = in_array($eventId, $myRsvps, true);
-            $startDt = strtotime($act['start_datetime']);
-            $endDt = strtotime($act['end_datetime']);
-            $target = max(1, (int)$act['target_participants']);
-            $actual = (int)$act['actual_participants'];
-            $pctAtt = min(100, round(($actual / $target) * 100));
-          ?>
-            <div class="resident-join-card" id="home-event-card-<?= $eventId ?>"
-                 style="border:1px solid var(--color-border-light, #E7EDF0);border-radius:8px;padding:12px 14px;background:#FAFCFD;display:flex;flex-direction:column;gap:8px;">
-              <div style="display:flex;gap:12px;align-items:flex-start;">
-                <!-- Date Box -->
-                <div style="background:#FFFFFF;border:1px solid #D9E0E3;border-radius:6px;padding:5px 9px;text-align:center;min-width:52px;flex-shrink:0;">
-                  <div style="font-size:9.5px;font-weight:700;color:var(--color-primary);text-transform:uppercase;"><?= date('M', $startDt) ?></div>
-                  <div style="font-family:var(--font-secondary);font-size:16px;font-weight:700;color:var(--color-text);line-height:1.1;margin:1px 0;"><?= date('d', $startDt) ?></div>
-                  <div style="font-size:9px;color:var(--color-text-muted);"><?= date('Y', $startDt) ?></div>
-                </div>
-
-                <!-- Event Details -->
-                <div style="flex:1;min-width:0;">
-                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px;">
-                    <h3 style="font-family:var(--font-primary);font-size:13px;font-weight:600;color:var(--color-primary);margin:0;line-height:1.35;">
-                      <?= clean($act['title']) ?>
-                    </h3>
-                    <span class="badge" style="background:#EBF3F5;color:var(--color-secondary);font-size:9.5px;padding:2px 7px;white-space:nowrap;">
-                      <?= clean($act['activity_type']) ?>
-                    </span>
+      <div id="upcoming-join-cards-container">
+        <?php if (empty($upcomingJoinEvents)): ?>
+          <div style="padding:24px;text-align:center;color:var(--color-text-muted);font-size:11.5px;background:var(--color-surface-subtle);border-radius:6px;border:1px dashed var(--color-border);">
+            No open events to join right now. You are already attending all available community drills!
+          </div>
+        <?php else: ?>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <?php foreach ($upcomingJoinEvents as $act):
+              $eventId = (int)$act['id'];
+              $startDt = strtotime($act['start_datetime']);
+              $endDt = strtotime($act['end_datetime']);
+              $target = max(1, (int)$act['target_participants']);
+              $actual = (int)$act['actual_participants'];
+              $pctAtt = min(100, round(($actual / $target) * 100));
+            ?>
+              <div class="resident-join-card" id="home-event-card-<?= $eventId ?>"
+                   style="border:1px solid var(--color-border-light, #E7EDF0);border-radius:8px;padding:12px 14px;background:#FAFCFD;display:flex;flex-direction:column;gap:8px;transition:all 0.3s ease;">
+                <div style="display:flex;gap:12px;align-items:flex-start;">
+                  <!-- Date Box -->
+                  <div style="background:#FFFFFF;border:1px solid #D9E0E3;border-radius:6px;padding:5px 9px;text-align:center;min-width:52px;flex-shrink:0;">
+                    <div style="font-size:9.5px;font-weight:700;color:var(--color-primary);text-transform:uppercase;"><?= date('M', $startDt) ?></div>
+                    <div style="font-family:var(--font-secondary);font-size:16px;font-weight:700;color:var(--color-text);line-height:1.1;margin:1px 0;"><?= date('d', $startDt) ?></div>
+                    <div style="font-size:9px;color:var(--color-text-muted);"><?= date('Y', $startDt) ?></div>
                   </div>
 
-                  <div style="font-size:10.5px;color:var(--color-text-secondary);margin-bottom:4px;">
-                    🕒 <?= date('h:i A', $startDt) ?> &ndash; <?= date('h:i A', $endDt) ?> &bull; 📍 <?= clean($act['venue']) ?>
-                    <?php if (!empty($act['barangay_name'])): ?>
-                      (Brgy. <?= clean($act['barangay_name']) ?>)
-                    <?php endif; ?>
-                  </div>
-
-                  <?php if (!empty($act['description'])): ?>
-                    <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.4;margin-bottom:6px;">
-                      <?= clean($act['description']) ?>
-                    </div>
-                  <?php endif; ?>
-
-                  <!-- Community Turnout -->
-                  <div style="background:#FFFFFF;border:1px solid #E7EDF0;border-radius:6px;padding:5px 8px;font-size:10px;margin-top:4px;">
-                    <div style="display:flex;justify-content:space-between;">
-                      <span style="font-weight:600;color:var(--color-text-secondary);">Turnout</span>
-                      <span style="font-weight:700;color:var(--color-primary);" id="home-actual-count-<?= $eventId ?>">
-                        <?= number_format($actual) ?> / <?= number_format($target) ?> Registered
+                  <!-- Event Details -->
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px;">
+                      <h3 style="font-family:var(--font-primary);font-size:13px;font-weight:600;color:var(--color-primary);margin:0;line-height:1.35;">
+                        <?= clean($act['title']) ?>
+                      </h3>
+                      <span class="badge" style="background:#EBF3F5;color:var(--color-secondary);font-size:9.5px;padding:2px 7px;white-space:nowrap;">
+                        <?= clean($act['activity_type']) ?>
                       </span>
                     </div>
+
+                    <div style="font-size:10.5px;color:var(--color-text-secondary);margin-bottom:4px;">
+                      🕒 <?= date('h:i A', $startDt) ?> &ndash; <?= date('h:i A', $endDt) ?> &bull; 📍 <?= clean($act['venue']) ?>
+                      <?php if (!empty($act['barangay_name'])): ?>
+                        (Brgy. <?= clean($act['barangay_name']) ?>)
+                      <?php endif; ?>
+                    </div>
+
+                    <?php if (!empty($act['description'])): ?>
+                      <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.4;margin-bottom:6px;">
+                        <?= clean($act['description']) ?>
+                      </div>
+                    <?php endif; ?>
+
+                    <!-- Community Turnout -->
+                    <div style="background:#FFFFFF;border:1px solid #E7EDF0;border-radius:6px;padding:5px 8px;font-size:10px;margin-top:4px;">
+                      <div style="display:flex;justify-content:space-between;">
+                        <span style="font-weight:600;color:var(--color-text-secondary);">Turnout</span>
+                        <span style="font-weight:700;color:var(--color-primary);" id="home-actual-count-<?= $eventId ?>">
+                          <?= number_format($actual) ?> / <?= number_format($target) ?> Registered
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Action Row -->
+                <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #E7EDF0;padding-top:8px;margin-top:2px;">
+                  <a href="events.php?tab=attending" style="font-size:10.5px;color:var(--color-secondary);font-weight:600;text-decoration:none;">
+                    View Attending in Events &rarr;
+                  </a>
+                  <div>
+                    <button type="button"
+                            id="home-join-btn-<?= $eventId ?>"
+                            class="btn btn-sm btn-primary"
+                            style="font-size:11px;padding:5px 14px;"
+                            onclick="handleHomeJoin(<?= $eventId ?>, this)">
+                      + Apply / Join Event
+                    </button>
                   </div>
                 </div>
               </div>
-
-              <!-- Action Row -->
-              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #E7EDF0;padding-top:8px;margin-top:2px;">
-                <a href="events.php?tab=attending" style="font-size:10.5px;color:var(--color-secondary);font-weight:600;text-decoration:none;">
-                  Manage in Events Module &rarr;
-                </a>
-                <div>
-                  <button type="button"
-                          id="home-join-btn-<?= $eventId ?>"
-                          class="btn btn-sm <?= $isAttending ? 'btn-secondary' : 'btn-primary' ?>"
-                          style="font-size:11px;padding:5px 14px;<?= $isAttending ? 'background:#EAF4EB;color:#2E7D32;border:1px solid #BCE3C1;' : '' ?>"
-                          onclick="handleHomeJoin(<?= $eventId ?>, this)">
-                    <?= $isAttending ? '✓ Attending' : '+ Join Event' ?>
-                  </button>
-                </div>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        </div>
-      <?php endif; ?>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
     </div>
   </section>
   <section class="evac-routing-section" id="evacuation-routing">
@@ -708,7 +712,28 @@ require_once __DIR__ . '/../layouts/header.php';
     }
   }
 
-  // RSVP AJAX Handler
+  function checkEmptyHomeCards() {
+    const remaining = document.querySelectorAll('#upcoming-join-cards-container .resident-join-card');
+    if (remaining.length === 0) {
+      const container = document.getElementById('upcoming-join-cards-container');
+      if (container) {
+        container.innerHTML = `
+          <div style="padding:24px;text-align:center;color:var(--color-primary);font-size:11.5px;background:#F8FAFB;border-radius:6px;border:1px dashed #D9E0E3;">
+            <div style="font-size:18px;margin-bottom:4px;">✓</div>
+            <strong>You are attending all open community drills!</strong>
+            <div style="color:var(--color-text-secondary);font-size:11px;margin-top:2px;margin-bottom:10px;">
+              You can view and manage your attendance in the Events module.
+            </div>
+            <a href="events.php?tab=attending" class="btn btn-primary btn-sm" style="font-size:10.5px;padding:5px 12px;">
+              View Attending in Events &rarr;
+            </a>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // RSVP AJAX Handler from Calendar
   window.handleResidentRsvp = async function(eventId, btnElem) {
     const origText = btnElem.innerHTML;
     btnElem.disabled = true;
@@ -736,41 +761,38 @@ require_once __DIR__ . '/../layouts/header.php';
           btnElem.style.color = '#2E7D32';
           btnElem.style.border = '1px solid #BCE3C1';
           btnElem.textContent = '✓ Attending';
+
+          // Animate card removal from the Home "Events to Apply / Join" list
+          const homeCard = document.getElementById(`home-event-card-${eventId}`);
+          if (homeCard) {
+            homeCard.style.transition = 'all 0.35s ease';
+            homeCard.style.opacity = '0';
+            homeCard.style.transform = 'translateY(-10px) scale(0.98)';
+            setTimeout(() => {
+              homeCard.remove();
+              checkEmptyHomeCards();
+            }, 350);
+          }
+          const badgeNum = document.getElementById('homeAttendingCountNum');
+          if (badgeNum) {
+            badgeNum.textContent = (parseInt(badgeNum.textContent, 10) || 0) + 1;
+          }
         } else {
           btnElem.className = 'btn btn-primary btn-sm';
           btnElem.style.background = '';
           btnElem.style.color = '';
           btnElem.style.border = '';
-          btnElem.textContent = '+ Join Event';
-        }
-
-        // Sync with the Home join card button if present
-        const homeBtn = document.getElementById(`home-join-btn-${eventId}`);
-        if (homeBtn) {
-          if (isAttending) {
-            homeBtn.className = 'btn btn-sm btn-secondary';
-            homeBtn.style.background = '#EAF4EB';
-            homeBtn.style.color = '#2E7D32';
-            homeBtn.style.border = '1px solid #BCE3C1';
-            homeBtn.textContent = '✓ Attending';
-          } else {
-            homeBtn.className = 'btn btn-sm btn-primary';
-            homeBtn.style.background = '';
-            homeBtn.style.color = '';
-            homeBtn.style.border = '';
-            homeBtn.textContent = '+ Join Event';
+          btnElem.textContent = '+ Apply / Join';
+          const badgeNum = document.getElementById('homeAttendingCountNum');
+          if (badgeNum) {
+            badgeNum.textContent = Math.max(0, (parseInt(badgeNum.textContent, 10) || 1) - 1);
           }
         }
 
-        const countEl = document.getElementById(`home-actual-count-${eventId}`);
-        if (countEl && data.actual_participants !== undefined) {
-          countEl.innerText = `${data.actual_participants} Registered`;
-        }
-
         if (typeof showToast === 'function') {
-          showToast(data.message || 'Event registration updated successfully.', 'success');
+          showToast(data.message || (isAttending ? 'Event joined! Moved to Events under Attending.' : 'Cancelled attendance.'), 'success');
         } else {
-          alert(data.message || 'Event registration updated successfully.');
+          alert(data.message || 'Updated attendance.');
         }
       } else {
         btnElem.innerHTML = origText;
@@ -796,7 +818,7 @@ require_once __DIR__ . '/../layouts/header.php';
   window.handleHomeJoin = async function(eventId, btnElem) {
     const origText = btnElem.innerHTML;
     btnElem.disabled = true;
-    btnElem.textContent = '...';
+    btnElem.textContent = 'Joining...';
 
     try {
       const fd = new FormData();
@@ -809,28 +831,25 @@ require_once __DIR__ . '/../layouts/header.php';
       });
 
       const data = await res.json();
-      if (data.success) {
-        const isAttending = data.is_attending;
+      if (data.success && data.is_attending) {
         const targetEv = events.find(e => e.id === eventId);
-        if (targetEv) targetEv.is_registered = isAttending;
+        if (targetEv) targetEv.is_registered = true;
 
-        if (isAttending) {
-          btnElem.className = 'btn btn-sm btn-secondary';
-          btnElem.style.background = '#EAF4EB';
-          btnElem.style.color = '#2E7D32';
-          btnElem.style.border = '1px solid #BCE3C1';
-          btnElem.textContent = '✓ Attending';
-        } else {
-          btnElem.className = 'btn btn-sm btn-primary';
-          btnElem.style.background = '';
-          btnElem.style.color = '';
-          btnElem.style.border = '';
-          btnElem.textContent = '+ Join Event';
+        // Card animates out from Home since it moves to Attending in Events module
+        const card = document.getElementById(`home-event-card-${eventId}`);
+        if (card) {
+          card.style.transition = 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(-10px) scale(0.98)';
+          setTimeout(() => {
+            card.remove();
+            checkEmptyHomeCards();
+          }, 350);
         }
 
-        const countEl = document.getElementById(`home-actual-count-${eventId}`);
-        if (countEl && data.actual_participants !== undefined) {
-          countEl.innerText = `${data.actual_participants} Registered`;
+        const badgeNum = document.getElementById('homeAttendingCountNum');
+        if (badgeNum) {
+          badgeNum.textContent = (parseInt(badgeNum.textContent, 10) || 0) + 1;
         }
 
         // Re-render calendar drills if currently open for that date
@@ -839,19 +858,21 @@ require_once __DIR__ . '/../layouts/header.php';
         }
 
         if (typeof showToast === 'function') {
-          showToast(data.message || 'Event registration updated successfully.', 'success');
+          showToast('Successfully applied! Event moved to your Events module under Attending.', 'success');
         } else {
-          alert(data.message || 'Event registration updated successfully.');
+          alert('Successfully applied! Event moved to your Events module under Attending.');
         }
       } else {
+        btnElem.disabled = false;
         btnElem.innerHTML = origText;
         if (typeof showToast === 'function') {
-          showToast(data.message || 'Could not update registration.', 'danger');
+          showToast(data.message || 'Could not join event.', 'danger');
         } else {
-          alert(data.message || 'Could not update registration.');
+          alert(data.message || 'Could not join event.');
         }
       }
     } catch (err) {
+      btnElem.disabled = false;
       btnElem.innerHTML = origText;
       console.error(err);
       if (typeof showToast === 'function') {
@@ -859,8 +880,6 @@ require_once __DIR__ . '/../layouts/header.php';
       } else {
         alert('Network error updating registration.');
       }
-    } finally {
-      btnElem.disabled = false;
     }
   };
 

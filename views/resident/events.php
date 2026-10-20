@@ -17,7 +17,7 @@ $userPurok = trim($user['purok'] ?? '');
 $db = getDBConnection();
 
 $filterTab = $_GET['tab'] ?? 'attending';
-if ($filterTab === 'upcoming' || $filterTab === 'my_drills') {
+if (!in_array($filterTab, ['attending', 'missed', 'completed'], true)) {
   $filterTab = 'attending';
 }
 $searchQuery = trim($_GET['q'] ?? '');
@@ -25,7 +25,7 @@ $searchQuery = trim($_GET['q'] ?? '');
 // Fetch Resident's Registered Event IDs
 $myRsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_id = ? OR (phone != '' AND phone = ?)");
 $myRsvpStmt->execute([$userId, $user['phone'] ?? '']);
-$myRegisteredEventIds = $myRsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+$myRegisteredEventIds = array_map('intval', $myRsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
 // Base Query: Scoped strictly to resident's barangay, created by Barangay Head
 // AND relevant to the resident (their purok, barangay-wide events, or events they registered for)
@@ -97,9 +97,6 @@ if (!empty($myRegisteredEventIds)) {
   $countCompleted = (int) $countCompStmt->fetchColumn();
 }
 
-// 4. All My Events Count (Attending + Missed + Completed)
-$countAllMy = $countAttending + $countMissed + $countCompleted;
-
 // Fetch most recent missed event for instant top alert banner
 $recentMissedEvent = null;
 if ($countMissed > 0) {
@@ -150,19 +147,6 @@ if ($filterTab === 'attending') {
   } else {
     $feedSql .= " AND 1=0";
   }
-} elseif ($filterTab === 'all') {
-  // Strictly Attending + Missed + Completed (strictly no unjoined upcoming events!)
-  if (!empty($myRegisteredEventIds)) {
-    $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
-    $feedSql .= " AND (
-      (e.id IN ($inPlaceholders) AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled')
-      OR ((e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled')
-    )";
-    $feedParams = array_merge($feedParams, $myRegisteredEventIds);
-  } else {
-    $feedSql .= " AND (e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled'";
-  }
-  $feedSql .= " ORDER BY (e.start_datetime >= CURDATE()) DESC, e.start_datetime DESC";
 }
 
 if (!empty($searchQuery)) {
@@ -750,9 +734,6 @@ require_once __DIR__ . '/../layouts/header.php';
       <a href="events.php?tab=completed" class="event-pill-link <?= ($filterTab === 'completed') ? 'active' : '' ?>">
         Completed Events (<?= $countCompleted ?>)
       </a>
-      <a href="events.php?tab=all" class="event-pill-link <?= ($filterTab === 'all') ? 'active' : '' ?>">
-        All My Events (<?= $countAllMy ?>)
-      </a>
     </div>
   </div>
 
@@ -838,7 +819,9 @@ require_once __DIR__ . '/../layouts/header.php';
                     <?php if ($isMissed): ?>
                       <span class="badge" style="font-size:10px;padding:3px 7px;background:#FFF3CD;color:#856404;font-weight:600;border:1px solid #FFEEBA;white-space:nowrap;">Missed Event</span>
                     <?php elseif ($isPast && $isAttending): ?>
-                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#E8F5E9;color:#2E7D32;font-weight:600;border:1px solid #C8E6C9;white-space:nowrap;">Attended</span>
+                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#E8F5E9;color:#2E7D32;font-weight:600;border:1px solid #C8E6C9;white-space:nowrap;">Completed</span>
+                    <?php elseif ($isAttending): ?>
+                      <span class="badge" style="font-size:10px;padding:3px 7px;background:#EAF4EB;color:#2E7D32;font-weight:600;border:1px solid #BCE3C1;white-space:nowrap;">Attending</span>
                     <?php else: ?>
                       <?= renderStatusBadge($act['status']) ?>
                     <?php endif; ?>
@@ -910,10 +893,10 @@ require_once __DIR__ . '/../layouts/header.php';
 
                 <?php if ($isMissed): ?>
                   <span style="font-size:10.5px;color:#856404;font-weight:600;padding:4px 8px;background:#FFF3CD;border-radius:4px;border:1px solid #FFEEBA;">Missed Activity</span>
-                <?php elseif ($isCancelled || $isPast): ?>
-                  <span class="badge badge-neutral" style="font-size:10px;">
-                    <?= $isCancelled ? 'Event Cancelled' : 'Completed Activity' ?>
-                  </span>
+                <?php elseif ($isCancelled): ?>
+                  <span class="badge badge-neutral" style="font-size:10px;">Event Cancelled</span>
+                <?php elseif ($isPast && $isAttending): ?>
+                  <span class="badge" style="font-size:10px;background:#E8F5E9;color:#2E7D32;border:1px solid #C8E6C9;padding:3px 8px;font-weight:600;">Completed Activity</span>
                 <?php elseif ($isAttending): ?>
                   <button type="button" class="btn-cancel-join" id="cancel-btn-<?= $eventId ?>"
                     onclick="event.stopPropagation(); promptCancelJoin(<?= $eventId ?>, '<?= htmlspecialchars(addslashes($act['title']), ENT_QUOTES) ?>')">
