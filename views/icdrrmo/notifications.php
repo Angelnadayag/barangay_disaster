@@ -143,7 +143,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     </div>
     <form id="broadcastForm" method="POST" action="<?= BASE_URL ?>/backend/functions/notifications/broadcast.php">
       <input type="hidden" name="action" value="broadcast">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label form-label-required">Advisory Headline / Title</label>

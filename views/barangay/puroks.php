@@ -583,7 +583,7 @@ require_once __DIR__ . '/../layouts/header.php';
     <form id="createPurokForm" method="POST" action="<?= BASE_URL ?>/backend/functions/puroks/create.php"
       onsubmit="handleCreatePurok(event)">
       <input type="hidden" name="action" value="create">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+    <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body"
         style="padding:18px 20px;display:flex;flex-direction:column;gap:12px;max-height:75vh;overflow-y:auto;">
 
@@ -748,7 +748,7 @@ require_once __DIR__ . '/../layouts/header.php';
   <form class="modal-dialog" id="viewPurokForm" method="POST"
     action="<?= BASE_URL ?>/backend/functions/puroks/update.php" onsubmit="handleViewPurokSave(event)">
     <input type="hidden" name="action" value="update">
-    <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+    <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
     <input type="hidden" name="id" id="view_purok_id">
 
     <div class="modal-header">

@@ -58,7 +58,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <div class="card-body">
         <form id="fieldReportForm" method="POST" action="<?= BASE_URL ?>/backend/functions/responder/submit_report.php">
           <input type="hidden" name="action" value="submit_report">
-          <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+          <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
           <div class="form-group">
             <label class="form-label form-label-required">Operational Status</label>
             <select name="operational_status" class="form-control" required>

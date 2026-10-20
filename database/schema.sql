@@ -283,9 +283,11 @@ CREATE TABLE `hazard_type_options` (
   `name` varchar(150) NOT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `purok_id` (`purok_id`),
-  KEY `barangay_id` (`barangay_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  KEY `fk_hazard_type_barangay` (`barangay_id`),
+  KEY `idx_purok_hazard` (`purok_id`,`barangay_id`),
+  CONSTRAINT `fk_hazard_type_barangay` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_hazard_type_purok` FOREIGN KEY (`purok_id`) REFERENCES `puroks` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `notification_reads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -684,6 +686,98 @@ CREATE TABLE `users` (
   CONSTRAINT `fk_users_agency` FOREIGN KEY (`agency_id`) REFERENCES `agencies` (`id`) ON DELETE SET NULL,
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `financial_aid_allocations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `financial_aid_allocations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `allocation_code` varchar(50) NOT NULL,
+  `program_name` varchar(150) NOT NULL,
+  `disaster_type` varchar(100) DEFAULT NULL,
+  `barangay_id` int(11) NOT NULL,
+  `target_purok` varchar(100) DEFAULT 'All Puroks',
+  `total_budget` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `amount_per_beneficiary` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `disbursed_budget` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `remaining_budget` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `funding_source` varchar(150) NOT NULL DEFAULT 'LGU Calamity Fund',
+  `target_beneficiaries` int(11) NOT NULL DEFAULT 0,
+  `status` enum('Active','Completed','Archived') NOT NULL DEFAULT 'Active',
+  `added_type` enum('ai_recommended','added_by_admin') NOT NULL DEFAULT 'ai_recommended',
+  `notes` text DEFAULT NULL,
+  `allocated_by` int(11) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `allocation_code` (`allocation_code`),
+  KEY `idx_alloc_barangay` (`barangay_id`),
+  KEY `idx_alloc_status` (`status`),
+  KEY `fk_alloc_user` (`allocated_by`),
+  CONSTRAINT `fk_alloc_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_alloc_user` FOREIGN KEY (`allocated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `financial_aid_distributions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `financial_aid_distributions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `allocation_id` int(11) NOT NULL,
+  `barangay_id` int(11) NOT NULL,
+  `resident_id` int(11) DEFAULT NULL,
+  `beneficiary_name` varchar(150) NOT NULL,
+  `purok` varchar(100) NOT NULL,
+  `phone` varchar(30) NOT NULL,
+  `amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `claim_status` enum('Pending','Claimed','Unclaimed') NOT NULL DEFAULT 'Pending',
+  `claim_date` datetime DEFAULT NULL,
+  `reference_no` varchar(60) DEFAULT NULL,
+  `sms_status` enum('not_sent','sent','failed') NOT NULL DEFAULT 'not_sent',
+  `disbursed_by` int(11) DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_dist_alloc` (`allocation_id`),
+  KEY `idx_dist_brgy` (`barangay_id`),
+  KEY `idx_dist_status` (`claim_status`),
+  KEY `fk_dist_user` (`disbursed_by`),
+  CONSTRAINT `fk_dist_alloc` FOREIGN KEY (`allocation_id`) REFERENCES `financial_aid_allocations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dist_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dist_user` FOREIGN KEY (`disbursed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `financial_aid_audits`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `financial_aid_audits` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `allocation_id` int(11) DEFAULT NULL,
+  `distribution_id` int(11) DEFAULT NULL,
+  `barangay_id` int(11) NOT NULL,
+  `action` enum('Allocated','Disbursed','Status Change','Voided') NOT NULL,
+  `details` text NOT NULL,
+  `amount` decimal(10,2) DEFAULT 0.00,
+  `actor_id` int(11) DEFAULT NULL,
+  `actor_name` varchar(100) NOT NULL,
+  `actor_role` varchar(50) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_alloc` (`allocation_id`),
+  KEY `idx_audit_dist` (`distribution_id`),
+  KEY `idx_audit_brgy` (`barangay_id`),
+  KEY `idx_audit_action` (`action`),
+  KEY `idx_audit_created` (`created_at`),
+  KEY `fk_audit_actor` (`actor_id`),
+  CONSTRAINT `fk_audit_actor` FOREIGN KEY (`actor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_audit_alloc` FOREIGN KEY (`allocation_id`) REFERENCES `financial_aid_allocations` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_audit_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_audit_dist` FOREIGN KEY (`distribution_id`) REFERENCES `financial_aid_distributions` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

@@ -741,24 +741,78 @@ unset($_SESSION['login_error']);
     }
 
     /* Responsive */
-    @media (max-width: 860px) {
+    @media (max-width: 900px) {
+      html, body {
+        height: auto;
+        min-height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
       .login-wrapper {
         flex-direction: column;
+        min-height: 100vh;
+        height: auto;
+        width: 100%;
         overflow-y: auto;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--color-background, #F7F8F7);
       }
+
+      /* Hide mapping display completely on mobile devices */
       .map-pane {
-        height: 380px;
-        min-height: 380px;
-        flex: none;
+        display: none !important;
       }
+
+      /* Tablet portrait card layout */
       .login-pane {
         width: 100%;
-        min-width: 100%;
-        max-width: 100%;
+        min-width: unset;
+        max-width: 480px;
+        min-height: auto;
         height: auto;
-        padding: 32px 24px;
-        border-left: none;
-        border-top: 1px solid var(--color-border, #D9E0E3);
+        margin: 32px auto;
+        padding: 40px 32px;
+        border-radius: 12px;
+        border: 1px solid var(--color-border, #D9E0E3);
+        box-shadow: 0 4px 20px rgba(23, 50, 77, 0.06);
+        box-sizing: border-box;
+      }
+    }
+
+    /* Small mobile devices (smartphones) */
+    @media (max-width: 600px) {
+      .login-wrapper {
+        background-color: var(--color-surface, #FFFFFF);
+      }
+
+      .login-pane {
+        max-width: 100%;
+        min-height: 100vh;
+        margin: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 36px 22px 28px 22px;
+        justify-content: space-between;
+      }
+
+      .login-title {
+        font-size: 17px;
+      }
+
+      .login-subtitle {
+        font-size: 11.5px;
+      }
+
+      .form-control {
+        font-size: 16px; /* Prevents auto-zoom on mobile iOS Safari */
+        height: 44px;
+      }
+
+      .btn-submit {
+        height: 44px;
       }
     }
   </style>
@@ -870,7 +924,15 @@ const DEFAULT_ZOOM = 12;
 let map;
 let evacMarkerGroup;
 
-document.addEventListener('DOMContentLoaded', function() {
+function initMap() {
+  const mapEl = document.getElementById('map');
+  if (!mapEl || map) return;
+
+  // On mobile viewports where .map-pane is hidden, do not initialize the map
+  if (window.innerWidth <= 900 || mapEl.offsetParent === null) {
+    return;
+  }
+
   // 1. Initialize OpenStreetMap centered on Iligan City
   map = L.map('map', {
     zoomControl: true
@@ -931,8 +993,20 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   setTimeout(() => {
-    map.invalidateSize();
+    if (map) map.invalidateSize();
   }, 250);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initMap();
+});
+
+window.addEventListener('resize', function() {
+  if (!map && window.innerWidth > 900) {
+    initMap();
+  } else if (map && window.innerWidth > 900) {
+    map.invalidateSize();
+  }
 });
 
 // Generate clean HTML for hover tooltip and click popup strictly adhering to the palette
@@ -1105,11 +1179,11 @@ function escapeHtml(text) {
 
 // Fit map view to encompass all evacuation shelters
 function fitAllCenters() {
-  if (evacMarkerGroup && evacMarkerGroup.getLayers().length > 0) {
+  if (map && evacMarkerGroup && evacMarkerGroup.getLayers().length > 0) {
     map.fitBounds(evacMarkerGroup.getBounds().pad(0.12), {
       duration: 1.0
     });
-  } else {
+  } else if (map) {
     resetMapView();
   }
 }

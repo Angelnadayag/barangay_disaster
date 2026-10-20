@@ -240,7 +240,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     </div>
     <form id="updateEvacForm" method="POST" action="<?= BASE_URL ?>/backend/functions/evacuation/update_status.php">
       <input type="hidden" name="action" value="update_status">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="center_id" id="editCenterId">
       <div class="modal-body">
         <div class="form-group">
@@ -285,7 +285,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     </div>
     <form id="createEvacForm" method="POST" action="<?= BASE_URL ?>/backend/functions/evacuation/create.php">
       <input type="hidden" name="action" value="create">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label form-label-required">Shelter / Center Name</label>

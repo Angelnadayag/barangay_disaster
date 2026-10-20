@@ -165,13 +165,13 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                 onclick="toggleUserDropdown(event)" 
                 aria-haspopup="true" 
                 aria-expanded="false" 
-                title="<?= clean($currentUser['full_name']) ?> — Account & Profile Settings">
+                title="<?= clean($currentUser['full_name'] ?? ($currentUser['username'] ?? 'User')) ?> — Account & Profile Settings">
           <!-- Circular Avatar Icon -->
           <div class="user-avatar-sm circle-avatar">
             <?php if (!empty($currentUser['image'])): ?>
-              <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="<?= clean($currentUser['full_name']) ?>">
+              <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="<?= clean($currentUser['full_name'] ?? 'User') ?>">
             <?php else: ?>
-              <?= strtoupper(substr($currentUser['full_name'] ?? 'U', 0, 1)) ?>
+              <?= strtoupper(substr($currentUser['full_name'] ?? ($currentUser['username'] ?? 'U'), 0, 1)) ?>
             <?php endif; ?>
           </div>
         </button>
@@ -187,12 +187,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
               <?php if (!empty($currentUser['image'])): ?>
                 <img src="<?= BASE_URL ?>/<?= clean($currentUser['image']) ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
               <?php else: ?>
-                <?= strtoupper(substr($currentUser['full_name'] ?? 'U', 0, 1)) ?>
+                <?= strtoupper(substr($currentUser['full_name'] ?? ($currentUser['username'] ?? 'U'), 0, 1)) ?>
               <?php endif; ?>
             </div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:11px;font-weight:700;color:#17324D;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                <?= clean($currentUser['full_name']) ?>
+                <?= clean($currentUser['full_name'] ?? ($currentUser['username'] ?? 'User')) ?>
               </div>
               <div style="font-size:9.5px;color:#2F6F73;font-weight:600;margin-top:1px;">
                 <?= clean(formatRoleName($currentUser['role'])) ?>

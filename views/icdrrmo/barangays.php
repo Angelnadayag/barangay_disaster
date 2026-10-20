@@ -420,7 +420,7 @@ foreach ($registeredNamesRaw as $rName) {
     </div>
     <form id="createBarangayForm" method="POST" action="<?= BASE_URL ?>/backend/functions/barangays/create.php">
       <input type="hidden" name="action" value="create">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <!-- Auto-located coordinates passed to backend -->
       <input type="hidden" name="coordinates_lat" id="create_b_lat" value="">
       <input type="hidden" name="coordinates_lng" id="create_b_lng" value="">
@@ -511,7 +511,7 @@ foreach ($registeredNamesRaw as $rName) {
     </div>
     <form id="viewBarangayForm" method="POST" action="<?= BASE_URL ?>/backend/functions/barangays/update.php">
       <input type="hidden" name="action" value="update">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="id" id="view_b_id">
       
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">

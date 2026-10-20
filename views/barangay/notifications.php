@@ -114,7 +114,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <form id="broadcastForm" method="POST" action="<?= BASE_URL ?>/backend/functions/notifications/broadcast.php">
       <input type="hidden" name="action" value="broadcast">
-      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
       <input type="hidden" name="target_role" value="resident">
 
