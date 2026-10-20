@@ -12,17 +12,17 @@ require_once __DIR__ . '/../../backend/services/Auth.php';
 require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 if (isLoggedIn()) {
-    $u = getCurrentUser();
-    $folder = getRoleFolder($u['role']);
-    if ($u['role'] === 'icdrrmo') {
-        $redir = BASE_URL . '/views/icdrrmo/dashboard.php';
-    } elseif ($u['role'] === 'barangay_head') {
-        $redir = BASE_URL . '/views/barangay/dashboard.php';
-    } else {
-        $redir = BASE_URL . "/views/{$folder}/dashboard.php";
-    }
-    header('Location: ' . $redir);
-    exit;
+  $u = getCurrentUser();
+  $folder = getRoleFolder($u['role']);
+  if ($u['role'] === 'icdrrmo') {
+    $redir = BASE_URL . '/views/icdrrmo/dashboard.php';
+  } elseif ($u['role'] === 'barangay_head') {
+    $redir = BASE_URL . '/views/barangay/dashboard.php';
+  } else {
+    $redir = BASE_URL . "/views/{$folder}/dashboard.php";
+  }
+  header('Location: ' . $redir);
+  exit;
 }
 
 $db = getDBConnection();
@@ -49,7 +49,7 @@ $resourcesStmt = $db->query("
 ");
 $evacResources = [];
 while ($row = $resourcesStmt->fetch(PDO::FETCH_ASSOC)) {
-    $evacResources[$row['evacuation_area_id']][] = $row;
+  $evacResources[$row['evacuation_area_id']][] = $row;
 }
 
 // Also check for any approved/allocated disaster request supplies for host barangays
@@ -65,43 +65,43 @@ $allocStmt = $db->query("
 ");
 $barangayAllocations = [];
 while ($row = $allocStmt->fetch(PDO::FETCH_ASSOC)) {
-    $barangayAllocations[$row['barangay_id']][] = $row;
+  $barangayAllocations[$row['barangay_id']][] = $row;
 }
 
 // Compute capacity metrics & attach resources
 foreach ($evacCenters as &$ec) {
-    $cId = (int)$ec['id'];
-    $bId = (int)$ec['barangay_id'];
-    
-    $combined = $evacResources[$cId] ?? [];
-    if (!empty($barangayAllocations[$bId])) {
-        foreach ($barangayAllocations[$bId] as $allocItem) {
-            $found = false;
-            foreach ($combined as &$existing) {
-                if (strcasecmp($existing['resource_name'], $allocItem['resource_name']) === 0) {
-                    $found = true;
-                    break;
-                }
-            }
-            if (!$found) {
-                $combined[] = $allocItem;
-            }
+  $cId = (int) $ec['id'];
+  $bId = (int) $ec['barangay_id'];
+
+  $combined = $evacResources[$cId] ?? [];
+  if (!empty($barangayAllocations[$bId])) {
+    foreach ($barangayAllocations[$bId] as $allocItem) {
+      $found = false;
+      foreach ($combined as &$existing) {
+        if (strcasecmp($existing['resource_name'], $allocItem['resource_name']) === 0) {
+          $found = true;
+          break;
         }
+      }
+      if (!$found) {
+        $combined[] = $allocItem;
+      }
     }
-    $ec['resources'] = $combined;
+  }
+  $ec['resources'] = $combined;
 
-    $capInd = max(1, (int)$ec['capacity_individuals']);
-    $curEvac = max(0, (int)$ec['current_evacuees_count']);
-    $remInd = max(0, $capInd - $curEvac);
-    $capFam = max(1, (int)$ec['capacity_families']);
-    $remFam = max(0, (int)round($capFam * ($remInd / $capInd)));
-    $occupancyPct = min(100, (int)round(($curEvac / $capInd) * 100));
-    $remainingPct = max(0, 100 - $occupancyPct);
+  $capInd = max(1, (int) $ec['capacity_individuals']);
+  $curEvac = max(0, (int) $ec['current_evacuees_count']);
+  $remInd = max(0, $capInd - $curEvac);
+  $capFam = max(1, (int) $ec['capacity_families']);
+  $remFam = max(0, (int) round($capFam * ($remInd / $capInd)));
+  $occupancyPct = min(100, (int) round(($curEvac / $capInd) * 100));
+  $remainingPct = max(0, 100 - $occupancyPct);
 
-    $ec['remaining_capacity_individuals'] = $remInd;
-    $ec['remaining_capacity_families'] = $remFam;
-    $ec['occupancy_percentage'] = $occupancyPct;
-    $ec['remaining_percentage'] = $remainingPct;
+  $ec['remaining_capacity_individuals'] = $remInd;
+  $ec['remaining_capacity_families'] = $remFam;
+  $ec['occupancy_percentage'] = $occupancyPct;
+  $ec['remaining_percentage'] = $remainingPct;
 }
 unset($ec);
 
@@ -110,6 +110,7 @@ unset($_SESSION['login_error']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -118,20 +119,23 @@ unset($_SESSION['login_error']);
   <!-- Google Fonts: Poppins (Primary) & Roboto (Secondary) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap"
+    rel="stylesheet">
 
   <!-- Project CSS & Fonts -->
   <link rel="stylesheet" href="<?= BASE_URL ?>/frontend/css/app.css">
-  
+
   <!-- Favicon & Touch Icons -->
   <link rel="icon" type="image/png" sizes="32x32" href="<?= BASE_URL ?>/frontend/images/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="<?= BASE_URL ?>/frontend/images/favicon-16x16.png">
   <link rel="icon" type="image/png" href="<?= BASE_URL ?>/frontend/images/favicon.png">
   <link rel="shortcut icon" href="<?= BASE_URL ?>/favicon.ico">
   <link rel="apple-touch-icon" sizes="180x180" href="<?= BASE_URL ?>/frontend/images/apple-touch-icon.png">
-  
+
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
   <style>
     :root {
@@ -139,7 +143,8 @@ unset($_SESSION['login_error']);
       --font-secondary: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
-    html, body {
+    html,
+    body {
       height: 100%;
       margin: 0;
       padding: 0;
@@ -280,10 +285,21 @@ unset($_SESSION['login_error']);
       flex-shrink: 0;
     }
 
-    .legend-dot.status-open { background: var(--color-success, #2E7D32); }
-    .legend-dot.status-standby { background: var(--color-secondary, #2F6F73); }
-    .legend-dot.status-capacity { background: var(--color-danger, #C62828); }
-    .legend-dot.status-closed { background: var(--color-text-muted, #8A96A0); }
+    .legend-dot.status-open {
+      background: var(--color-success, #2E7D32);
+    }
+
+    .legend-dot.status-standby {
+      background: var(--color-secondary, #2F6F73);
+    }
+
+    .legend-dot.status-capacity {
+      background: var(--color-danger, #C62828);
+    }
+
+    .legend-dot.status-closed {
+      background: var(--color-text-muted, #8A96A0);
+    }
 
     /* Custom Evacuation Pin Styling */
     .custom-evac-marker {
@@ -347,6 +363,7 @@ unset($_SESSION['login_error']);
     .leaflet-tooltip-top.evac-hover-tooltip::before {
       border-top-color: var(--color-border, #D9E0E3);
     }
+
     .leaflet-tooltip-bottom.evac-hover-tooltip::before {
       border-bottom-color: var(--color-border, #D9E0E3);
     }
@@ -359,11 +376,13 @@ unset($_SESSION['login_error']);
       border: 1px solid var(--color-border, #D9E0E3);
       font-family: var(--font-primary);
     }
+
     .leaflet-popup.evac-click-popup .leaflet-popup-content {
       margin: 0;
       line-height: inherit;
       width: 320px !important;
     }
+
     .leaflet-popup.evac-click-popup .leaflet-popup-close-button {
       top: 8px;
       right: 8px;
@@ -637,6 +656,9 @@ unset($_SESSION['login_error']);
 
     .login-header-group {
       margin-bottom: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .login-badge {
@@ -742,7 +764,9 @@ unset($_SESSION['login_error']);
 
     /* Responsive */
     @media (max-width: 900px) {
-      html, body {
+
+      html,
+      body {
         height: auto;
         min-height: 100%;
         overflow-y: auto;
@@ -807,7 +831,8 @@ unset($_SESSION['login_error']);
       }
 
       .form-control {
-        font-size: 16px; /* Prevents auto-zoom on mobile iOS Safari */
+        font-size: 16px;
+        /* Prevents auto-zoom on mobile iOS Safari */
         height: 44px;
       }
 
@@ -817,268 +842,271 @@ unset($_SESSION['login_error']);
     }
   </style>
 </head>
+
 <body>
 
-<div class="login-wrapper">
+  <div class="login-wrapper">
 
-  <!-- ===================================================================== -->
-  <!-- COLUMN 1: OPENSTREETMAP (DESIGNATED EVACUATION CENTERS ONLY)          -->
-  <!-- ===================================================================== -->
-  <div class="map-pane">
-    <div class="map-header-badge">
-      <span class="status-pulse"></span>
-      <span>Iligan City &bull; Designated Evacuation Centers</span>
-    </div>
-
-    <!-- Map Controls Group (Top Right) -->
-    <div class="map-top-controls">
-      <button class="map-control-btn" onclick="fitAllCenters()" title="View all evacuation shelters across Iligan City">
-        Fit All Shelters
-      </button>
-
-      <button class="map-control-btn" onclick="resetMapView()" title="Reset to Iligan City center">
-        Center City
-      </button>
-    </div>
-
-    <div id="map"></div>
-
-    <div class="map-legend">
-      <div class="map-legend-title">
-        <span>Designated Evacuation Shelters</span>
-        <span style="color:var(--color-secondary);font-weight:600;"><?= count($evacCenters) ?> Shelters Tracked</span>
-      </div>
-      <div class="map-legend-row">
-        <span class="map-legend-item"><span class="legend-dot status-open"></span> Open / Active</span>
-        <span class="map-legend-item"><span class="legend-dot status-standby"></span> Standby</span>
-        <span class="map-legend-item"><span class="legend-dot status-capacity"></span> At Capacity</span>
-        <span class="map-legend-item"><span class="legend-dot status-closed"></span> Closed</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================================================================== -->
-  <!-- COLUMN 2: LOGIN BOX                                                  -->
-  <!-- ===================================================================== -->
-  <div class="login-pane">
-    <div>
-      <div class="login-header-group">
-        <div class="login-brand-logo" style="margin-bottom: 16px;">
-          <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender" style="max-width: 150px; height: auto; display: block; object-fit: contain;">
-        </div>
-        <span class="login-badge">ICDRRMO &bull; City Government of Iligan</span>
-        <h1 class="login-title" style="font-size: 16px; margin-top: 6px;">Portal Access Authentication</h1>
-        <p class="login-subtitle">
-          Official decision-support and emergency resource recommender portal for all 44 barangays of Iligan City and municipal emergency responders.
-        </p>
+    <!-- ===================================================================== -->
+    <!-- COLUMN 1: OPENSTREETMAP (DESIGNATED EVACUATION CENTERS ONLY)          -->
+    <!-- ===================================================================== -->
+    <div class="map-pane">
+      <div class="map-header-badge">
+        <span class="status-pulse"></span>
+        <span>Iligan City &bull; Designated Evacuation Centers</span>
       </div>
 
-      <?php if ($errorMessage): ?>
-        <div style="background-color:var(--color-danger-bg, #FDE8E8);border:1px solid var(--color-danger-border, #F8B4B4);color:var(--color-danger, #C62828);padding:10px 12px;border-radius:6px;font-size:11px;margin-bottom:18px;font-family:var(--font-secondary);">
-          <?= clean($errorMessage) ?>
-        </div>
-      <?php endif; ?>
-
-      <form action="<?= BASE_URL ?>/backend/functions/auth/login.php" method="POST">
-        <input type="hidden" name="action" value="login">
-
-        <div class="form-group">
-          <label class="form-label" for="username">Username or Email</label>
-          <input type="text" class="form-control" id="username" name="username" placeholder="e.g. icdrrmo_admin or brgy_hinaplanon" required autofocus>
-        </div>
-
-        <div class="form-group">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <label class="form-label" for="password" style="margin-bottom:0;">Password</label>
-            <a href="javascript:void(0)" onclick="togglePasswordVisibility()" style="font-size:10px;color:var(--color-secondary, #2F6F73);text-decoration:none;font-weight:600;font-family:var(--font-primary);">Show/Hide</a>
-          </div>
-          <input type="password" class="form-control" id="password" name="password" placeholder="Enter your account password" required>
-        </div>
-
-        <button type="submit" class="btn-submit">
-          Sign In to Portal
+      <!-- Map Controls Group (Top Right) -->
+      <div class="map-top-controls">
+        <button class="map-control-btn" onclick="fitAllCenters()"
+          title="View all evacuation shelters across Iligan City">
+          Fit All Shelters
         </button>
-      </form>
+
+        <button class="map-control-btn" onclick="resetMapView()" title="Reset to Iligan City center">
+          Center City
+        </button>
+      </div>
+
+      <div id="map"></div>
+
+      <div class="map-legend">
+        <div class="map-legend-title">
+          <span>Designated Evacuation Shelters</span>
+          <span style="color:var(--color-secondary);font-weight:600;"><?= count($evacCenters) ?> Shelters Tracked</span>
+        </div>
+        <div class="map-legend-row">
+          <span class="map-legend-item"><span class="legend-dot status-open"></span> Open / Active</span>
+          <span class="map-legend-item"><span class="legend-dot status-standby"></span> Standby</span>
+          <span class="map-legend-item"><span class="legend-dot status-capacity"></span> At Capacity</span>
+          <span class="map-legend-item"><span class="legend-dot status-closed"></span> Closed</span>
+        </div>
+      </div>
     </div>
 
-    <div class="login-footer-info">
-      <strong>Iligan City Disaster Risk Reduction & Management Office</strong><br>
-      Republic of the Philippines &bull; RA 10121 Compliance<br>
-      Emergency Hotline: <strong>161</strong> or <strong>(063) 221-1234</strong>
+    <!-- ===================================================================== -->
+    <!-- COLUMN 2: LOGIN BOX                                                  -->
+    <!-- ===================================================================== -->
+    <div class="login-pane">
+      <div>
+        <div class="login-header-group">
+          <div class="login-brand-logo" style="margin-bottom: 16px;">
+            <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender"
+              style="max-width: 150px; height: auto; display: block; object-fit: contain;">
+          </div>
+        </div>
+
+        <?php if ($errorMessage): ?>
+          <div
+            style="background-color:var(--color-danger-bg, #FDE8E8);border:1px solid var(--color-danger-border, #F8B4B4);color:var(--color-danger, #C62828);padding:10px 12px;border-radius:6px;font-size:11px;margin-bottom:18px;font-family:var(--font-secondary);">
+            <?= clean($errorMessage) ?>
+          </div>
+        <?php endif; ?>
+
+        <form action="<?= BASE_URL ?>/backend/functions/auth/login.php" method="POST">
+          <input type="hidden" name="action" value="login">
+
+          <div class="form-group">
+            <label class="form-label" for="username">Username or Email</label>
+            <input type="text" class="form-control" id="username" name="username"
+              placeholder="e.g. icdrrmo_admin or brgy_hinaplanon" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label class="form-label" for="password" style="margin-bottom:0;">Password</label>
+              <a href="javascript:void(0)" onclick="togglePasswordVisibility()"
+                style="font-size:10px;color:var(--color-secondary, #2F6F73);text-decoration:none;font-weight:600;font-family:var(--font-primary);">Show/Hide</a>
+            </div>
+            <input type="password" class="form-control" id="password" name="password"
+              placeholder="Enter your account password" required>
+          </div>
+
+          <button type="submit" class="btn-submit">
+            Sign In to Portal
+          </button>
+        </form>
+      </div>
+
+      <div class="login-footer-info">
+        <strong>Iligan City Disaster Risk Reduction & Management Office</strong><br>
+        Republic of the Philippines &bull; RA 10121 Compliance<br>
+        Emergency Hotline: <strong>161</strong> or <strong>(063) 221-1234</strong>
+      </div>
     </div>
+
   </div>
 
-</div>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Evacuation Centers data injected directly from database
+    const evacCentersData = <?= json_encode($evacCenters) ?>;
 
-<script>
-// Evacuation Centers data injected directly from database
-const evacCentersData = <?= json_encode($evacCenters) ?>;
+    // Iligan City Coordinates, Mindanao, Philippines
+    const ILIGAN_CENTER = [8.2280, 124.2452];
+    const DEFAULT_ZOOM = 12;
 
-// Iligan City Coordinates, Mindanao, Philippines
-const ILIGAN_CENTER = [8.2280, 124.2452];
-const DEFAULT_ZOOM = 12;
+    let map;
+    let evacMarkerGroup;
 
-let map;
-let evacMarkerGroup;
+    function initMap() {
+      const mapEl = document.getElementById('map');
+      if (!mapEl || map) return;
 
-function initMap() {
-  const mapEl = document.getElementById('map');
-  if (!mapEl || map) return;
-
-  // On mobile viewports where .map-pane is hidden, do not initialize the map
-  if (window.innerWidth <= 900 || mapEl.offsetParent === null) {
-    return;
-  }
-
-  // 1. Initialize OpenStreetMap centered on Iligan City
-  map = L.map('map', {
-    zoomControl: true
-  }).setView(ILIGAN_CENTER, DEFAULT_ZOOM);
-
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
-  }).addTo(map);
-
-  evacMarkerGroup = L.featureGroup().addTo(map);
-
-  // 2. Plot ONLY Evacuation Centers
-  evacCentersData.forEach(ec => {
-    if (ec.coordinates_lat && ec.coordinates_lng) {
-      const lat = parseFloat(ec.coordinates_lat);
-      const lng = parseFloat(ec.coordinates_lng);
-
-      // Determine styling class based on shelter status using palette tokens
-      let statusClass = 'status-standby';
-      if (ec.status === 'Open / Active') {
-        statusClass = 'status-open';
-      } else if (ec.status === 'At Capacity') {
-        statusClass = 'status-capacity';
-      } else if (ec.status === 'Closed') {
-        statusClass = 'status-closed';
+      // On mobile viewports where .map-pane is hidden, do not initialize the map
+      if (window.innerWidth <= 900 || mapEl.offsetParent === null) {
+        return;
       }
 
-      // Custom Evacuation Marker without emoji icons
-      const displayName = ec.name.length > 24 ? ec.name.substring(0, 22) + '...' : ec.name;
-      const evacIcon = L.divIcon({
-        className: 'custom-evac-marker',
-        html: `
+      // 1. Initialize OpenStreetMap centered on Iligan City
+      map = L.map('map', {
+        zoomControl: true
+      }).setView(ILIGAN_CENTER, DEFAULT_ZOOM);
+
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      evacMarkerGroup = L.featureGroup().addTo(map);
+
+      // 2. Plot ONLY Evacuation Centers
+      evacCentersData.forEach(ec => {
+        if (ec.coordinates_lat && ec.coordinates_lng) {
+          const lat = parseFloat(ec.coordinates_lat);
+          const lng = parseFloat(ec.coordinates_lng);
+
+          // Determine styling class based on shelter status using palette tokens
+          let statusClass = 'status-standby';
+          if (ec.status === 'Open / Active') {
+            statusClass = 'status-open';
+          } else if (ec.status === 'At Capacity') {
+            statusClass = 'status-capacity';
+          } else if (ec.status === 'Closed') {
+            statusClass = 'status-closed';
+          }
+
+          // Custom Evacuation Marker without emoji icons
+          const displayName = ec.name.length > 24 ? ec.name.substring(0, 22) + '...' : ec.name;
+          const evacIcon = L.divIcon({
+            className: 'custom-evac-marker',
+            html: `
           <div class="evac-pin-badge ${statusClass}">
             <span>${escapeHtml(displayName)}</span>
           </div>
         `,
-        iconSize: [140, 26],
-        iconAnchor: [70, 13]
+            iconSize: [140, 26],
+            iconAnchor: [70, 13]
+          });
+
+          const marker = L.marker([lat, lng], { icon: evacIcon }).addTo(evacMarkerGroup);
+
+          // Hover Tooltip Box
+          marker.bindTooltip(generateEvacInfoHtml(ec, false), {
+            direction: 'auto',
+            offset: [0, -12],
+            className: 'evac-hover-tooltip',
+            opacity: 1
+          });
+
+          // Interactive Click Popup
+          marker.bindPopup(generateEvacInfoHtml(ec, true), {
+            maxWidth: 340,
+            className: 'evac-click-popup'
+          });
+        }
       });
 
-      const marker = L.marker([lat, lng], { icon: evacIcon }).addTo(evacMarkerGroup);
-
-      // Hover Tooltip Box
-      marker.bindTooltip(generateEvacInfoHtml(ec, false), {
-        direction: 'auto',
-        offset: [0, -12],
-        className: 'evac-hover-tooltip',
-        opacity: 1
-      });
-
-      // Interactive Click Popup
-      marker.bindPopup(generateEvacInfoHtml(ec, true), {
-        maxWidth: 340,
-        className: 'evac-click-popup'
-      });
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 250);
     }
-  });
 
-  setTimeout(() => {
-    if (map) map.invalidateSize();
-  }, 250);
-}
+    document.addEventListener('DOMContentLoaded', function () {
+      initMap();
+    });
 
-document.addEventListener('DOMContentLoaded', function() {
-  initMap();
-});
+    window.addEventListener('resize', function () {
+      if (!map && window.innerWidth > 900) {
+        initMap();
+      } else if (map && window.innerWidth > 900) {
+        map.invalidateSize();
+      }
+    });
 
-window.addEventListener('resize', function() {
-  if (!map && window.innerWidth > 900) {
-    initMap();
-  } else if (map && window.innerWidth > 900) {
-    map.invalidateSize();
-  }
-});
+    // Generate clean HTML for hover tooltip and click popup strictly adhering to the palette
+    function generateEvacInfoHtml(ec, isPopup = false) {
+      let statusBg = 'var(--color-secondary, #2F6F73)';
 
-// Generate clean HTML for hover tooltip and click popup strictly adhering to the palette
-function generateEvacInfoHtml(ec, isPopup = false) {
-  let statusBg = 'var(--color-secondary, #2F6F73)';
-
-  if (ec.status === 'Open / Active') {
-    statusBg = 'var(--color-success, #2E7D32)';
-  } else if (ec.status === 'At Capacity') {
-    statusBg = 'var(--color-danger, #C62828)';
-  } else if (ec.status === 'Closed') {
-    statusBg = 'var(--color-text-muted, #8A96A0)';
-  }
-
-  const capacityInd = parseInt(ec.capacity_individuals) || 1;
-  const currentEvac = parseInt(ec.current_evacuees_count) || 0;
-  const remainingInd = ec.remaining_capacity_individuals !== undefined ? parseInt(ec.remaining_capacity_individuals) : Math.max(0, capacityInd - currentEvac);
-  const capacityFam = parseInt(ec.capacity_families) || 1;
-  const remainingFam = ec.remaining_capacity_families !== undefined ? parseInt(ec.remaining_capacity_families) : Math.max(0, Math.round(capacityFam * (remainingInd / capacityInd)));
-  const occupancyPct = ec.occupancy_percentage !== undefined ? parseInt(ec.occupancy_percentage) : Math.min(100, Math.round((currentEvac / capacityInd) * 100));
-  const remainingPct = ec.remaining_percentage !== undefined ? parseInt(ec.remaining_percentage) : Math.max(0, 100 - occupancyPct);
-
-  const isFull = (remainingInd === 0 || ec.status === 'At Capacity');
-
-  // Format resource list cleanly without emojis
-  const resourcesList = Array.isArray(ec.resources) ? ec.resources : [];
-  let resItemsHtml = '';
-
-  if (resourcesList.length > 0) {
-    const displayResources = resourcesList.slice(0, 8);
-    resItemsHtml = displayResources.map(r => {
-      let label = r.resource_name;
-      const lower = label.toLowerCase();
-      if (lower.includes('food') || lower.includes('ration') || lower.includes('meal')) {
-        label = 'Food Packs';
-      } else if (lower.includes('water')) {
-        label = 'Drinking Water';
-      } else if (lower.includes('hygiene') || lower.includes('sanitation')) {
-        label = 'Hygiene Kits';
-      } else if (lower.includes('tent') || lower.includes('shelter') || lower.includes('modular')) {
-        label = 'Modular Tents';
-      } else if (lower.includes('medicine') || lower.includes('dispensing')) {
-        label = 'Medicine Packs';
-      } else if (lower.includes('first aid') || lower.includes('trauma') || lower.includes('medical')) {
-        label = 'First Aid Kits';
-      } else if (lower.includes('life vest') || lower.includes('boat') || lower.includes('flotation') || lower.includes('pfd')) {
-        label = 'Life Vests';
-      } else if (lower.includes('generator') || lower.includes('power')) {
-        label = 'Generator';
-      } else if (lower.includes('searchlight') || lower.includes('floodlight')) {
-        label = 'Floodlights';
+      if (ec.status === 'Open / Active') {
+        statusBg = 'var(--color-success, #2E7D32)';
+      } else if (ec.status === 'At Capacity') {
+        statusBg = 'var(--color-danger, #C62828)';
+      } else if (ec.status === 'Closed') {
+        statusBg = 'var(--color-text-muted, #8A96A0)';
       }
 
-      return `
+      const capacityInd = parseInt(ec.capacity_individuals) || 1;
+      const currentEvac = parseInt(ec.current_evacuees_count) || 0;
+      const remainingInd = ec.remaining_capacity_individuals !== undefined ? parseInt(ec.remaining_capacity_individuals) : Math.max(0, capacityInd - currentEvac);
+      const capacityFam = parseInt(ec.capacity_families) || 1;
+      const remainingFam = ec.remaining_capacity_families !== undefined ? parseInt(ec.remaining_capacity_families) : Math.max(0, Math.round(capacityFam * (remainingInd / capacityInd)));
+      const occupancyPct = ec.occupancy_percentage !== undefined ? parseInt(ec.occupancy_percentage) : Math.min(100, Math.round((currentEvac / capacityInd) * 100));
+      const remainingPct = ec.remaining_percentage !== undefined ? parseInt(ec.remaining_percentage) : Math.max(0, 100 - occupancyPct);
+
+      const isFull = (remainingInd === 0 || ec.status === 'At Capacity');
+
+      // Format resource list cleanly without emojis
+      const resourcesList = Array.isArray(ec.resources) ? ec.resources : [];
+      let resItemsHtml = '';
+
+      if (resourcesList.length > 0) {
+        const displayResources = resourcesList.slice(0, 8);
+        resItemsHtml = displayResources.map(r => {
+          let label = r.resource_name;
+          const lower = label.toLowerCase();
+          if (lower.includes('food') || lower.includes('ration') || lower.includes('meal')) {
+            label = 'Food Packs';
+          } else if (lower.includes('water')) {
+            label = 'Drinking Water';
+          } else if (lower.includes('hygiene') || lower.includes('sanitation')) {
+            label = 'Hygiene Kits';
+          } else if (lower.includes('tent') || lower.includes('shelter') || lower.includes('modular')) {
+            label = 'Modular Tents';
+          } else if (lower.includes('medicine') || lower.includes('dispensing')) {
+            label = 'Medicine Packs';
+          } else if (lower.includes('first aid') || lower.includes('trauma') || lower.includes('medical')) {
+            label = 'First Aid Kits';
+          } else if (lower.includes('life vest') || lower.includes('boat') || lower.includes('flotation') || lower.includes('pfd')) {
+            label = 'Life Vests';
+          } else if (lower.includes('generator') || lower.includes('power')) {
+            label = 'Generator';
+          } else if (lower.includes('searchlight') || lower.includes('floodlight')) {
+            label = 'Floodlights';
+          }
+
+          return `
         <div class="evac-resource-card">
           <div class="evac-resource-name" title="${escapeHtml(r.resource_name)}">${escapeHtml(label)}</div>
           <div class="evac-resource-qty">${Number(r.quantity).toLocaleString()} <span style="font-size:8.5px;font-weight:normal;color:var(--color-text-muted);">${escapeHtml(r.unit)}</span></div>
         </div>
       `;
-    }).join('');
-  } else {
-    resItemsHtml = `
+        }).join('');
+      } else {
+        resItemsHtml = `
       <div style="grid-column:1/-1;background:var(--color-surface-subtle);border:1px dashed var(--color-border);border-radius:4px;padding:6px;text-align:center;color:var(--color-text-secondary);font-size:9.5px;font-family:var(--font-secondary);">
         Central Depot reserves on standby
       </div>
     `;
-  }
+      }
 
-  const lat = parseFloat(ec.coordinates_lat || 0);
-  const lng = parseFloat(ec.coordinates_lng || 0);
+      const lat = parseFloat(ec.coordinates_lat || 0);
+      const lng = parseFloat(ec.coordinates_lng || 0);
 
-  return `
+      return `
     <div class="evac-card-wrapper">
       <!-- Header -->
       <div class="evac-card-header">
@@ -1164,46 +1192,46 @@ function generateEvacInfoHtml(ec, isPopup = false) {
       </div>
     </div>
   `;
-}
+    }
 
-// Helper to escape HTML characters safely
-function escapeHtml(text) {
-  if (!text) return '';
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+    // Helper to escape HTML characters safely
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
-// Fit map view to encompass all evacuation shelters
-function fitAllCenters() {
-  if (map && evacMarkerGroup && evacMarkerGroup.getLayers().length > 0) {
-    map.fitBounds(evacMarkerGroup.getBounds().pad(0.12), {
-      duration: 1.0
-    });
-  } else if (map) {
-    resetMapView();
-  }
-}
+    // Fit map view to encompass all evacuation shelters
+    function fitAllCenters() {
+      if (map && evacMarkerGroup && evacMarkerGroup.getLayers().length > 0) {
+        map.fitBounds(evacMarkerGroup.getBounds().pad(0.12), {
+          duration: 1.0
+        });
+      } else if (map) {
+        resetMapView();
+      }
+    }
 
-// Reset map view to default Iligan City coordinates
-function resetMapView() {
-  if (map) {
-    map.flyTo(ILIGAN_CENTER, DEFAULT_ZOOM, {
-      duration: 1.0
-    });
-  }
-}
+    // Reset map view to default Iligan City coordinates
+    function resetMapView() {
+      if (map) {
+        map.flyTo(ILIGAN_CENTER, DEFAULT_ZOOM, {
+          duration: 1.0
+        });
+      }
+    }
 
-// Show/Hide password toggle
-function togglePasswordVisibility() {
-  const pwd = document.getElementById('password');
-  pwd.type = pwd.type === 'password' ? 'text' : 'password';
-}
-</script>
+    // Show/Hide password toggle
+    function togglePasswordVisibility() {
+      const pwd = document.getElementById('password');
+      pwd.type = pwd.type === 'password' ? 'text' : 'password';
+    }
+  </script>
 
 </body>
-</html>
 
+</html>

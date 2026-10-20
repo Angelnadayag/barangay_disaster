@@ -33,6 +33,7 @@ if (!$barangay) {
 $pStmt = $db->prepare("SELECT * FROM puroks WHERE barangay_id = ? ORDER BY name ASC");
 $pStmt->execute([$barangayId]);
 $puroks = $pStmt->fetchAll();
+sortPuroksMainFirst($puroks);
 
 // Fetch Evacuation Centers in this Barangay
 $eStmt = $db->prepare("SELECT * FROM evacuation_areas WHERE barangay_id = ? ORDER BY name ASC");
