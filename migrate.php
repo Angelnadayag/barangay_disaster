@@ -155,6 +155,14 @@ try {
 
         // Table: events
         if (in_array('events', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'events', 'latitude')) {
+                echo "  [+] Adding column `latitude` to `events`...\n";
+                $pdo->exec("ALTER TABLE `events` ADD COLUMN `latitude` decimal(10,6) DEFAULT NULL AFTER `venue`;");
+            }
+            if (!$hasColumn($pdo, 'events', 'longitude')) {
+                echo "  [+] Adding column `longitude` to `events`...\n";
+                $pdo->exec("ALTER TABLE `events` ADD COLUMN `longitude` decimal(10,6) DEFAULT NULL AFTER `latitude`;");
+            }
             if (!$hasColumn($pdo, 'events', 'is_archived')) {
                 echo "  [+] Adding column `is_archived` to `events`...\n";
                 $pdo->exec("ALTER TABLE `events` ADD COLUMN `is_archived` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`;");
@@ -174,6 +182,11 @@ try {
             // Update status enum if needed to support Archived
             try {
                 $pdo->exec("ALTER TABLE `events` MODIFY COLUMN `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived') DEFAULT 'Scheduled';");
+            } catch (Throwable $e) {}
+            // Ensure activity_type is VARCHAR(100) to support all 13 activity categories
+            try {
+                echo "  [+] Ensuring `events.activity_type` is VARCHAR(100)...\n";
+                $pdo->exec("ALTER TABLE `events` MODIFY COLUMN `activity_type` varchar(100) NOT NULL DEFAULT 'Disaster Preparedness and Safety';");
             } catch (Throwable $e) {}
         }
 

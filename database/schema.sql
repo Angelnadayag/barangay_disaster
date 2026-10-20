@@ -337,6 +337,8 @@ CREATE TABLE `events` (
   `activity_type` varchar(100) NOT NULL DEFAULT 'Disaster Drill',
   `barangay_id` int(11) DEFAULT NULL,
   `venue` varchar(150) NOT NULL,
+  `latitude` decimal(10,6) DEFAULT NULL,
+  `longitude` decimal(10,6) DEFAULT NULL,
   `start_datetime` datetime NOT NULL,
   `end_datetime` datetime NOT NULL,
   `assigned_personnel` varchar(150) NOT NULL,
