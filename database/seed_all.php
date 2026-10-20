@@ -32,22 +32,36 @@ try {
     echo "Starting master database seeding...\n\n";
 
     // -------------------------------------------------------------------------
-    // 1. EXACTLY 10 PUROKS (All belonging to Hinaplanon, Barangay ID: 12)
+    // 1. EXACTLY 24 PUROKS (All belonging to Hinaplanon, Barangay ID: 12)
     // -------------------------------------------------------------------------
-    echo "[1/10] Seeding Exactly 10 Hinaplanon Puroks...\n";
+    echo "[1/10] Seeding 24 Hinaplanon Puroks...\n";
     $pdo->exec("TRUNCATE TABLE `puroks`");
 
     $puroks = [
-        1  => ['name' => 'Purok Riverside 1', 'hazard' => 'Flash Flood, Mandulog River Overflow', 'risk' => 'Critical', 'hh' => 450, 'pop' => 2050, 'lat' => 8.246800, 'lng' => 124.258800],
-        2  => ['name' => 'Purok Riverside 2', 'hazard' => 'Flash Flood, River Inundation', 'risk' => 'Critical', 'hh' => 520, 'pop' => 2350, 'lat' => 8.248200, 'lng' => 124.260500],
-        3  => ['name' => 'Purok Sambag',       'hazard' => 'Flash Flood, Riverbank Erosion', 'risk' => 'Critical', 'hh' => 430, 'pop' => 1940, 'lat' => 8.249800, 'lng' => 124.262000],
-        4  => ['name' => 'Purok Baybay',       'hazard' => 'Coastal Storm Surge, Tidal Overflow', 'risk' => 'Critical', 'hh' => 480, 'pop' => 2150, 'lat' => 8.251500, 'lng' => 124.254200],
-        5  => ['name' => 'Purok San Miguel',   'hazard' => 'Urban Flood, Creek Drainage Overflow', 'risk' => 'High', 'hh' => 680, 'pop' => 3010, 'lat' => 8.245500, 'lng' => 124.259800],
-        6  => ['name' => 'Purok Katipunan',    'hazard' => 'Flash Flood, Drainage Congestion', 'risk' => 'High', 'hh' => 390, 'pop' => 1720, 'lat' => 8.249000, 'lng' => 124.258000],
-        7  => ['name' => 'Purok Orchids',      'hazard' => 'High Inundation Zone, Saturated Silt', 'risk' => 'High', 'hh' => 360, 'pop' => 1610, 'lat' => 8.242000, 'lng' => 124.260500],
-        8  => ['name' => 'Purok Mahayahay',    'hazard' => 'Localized Ponding, Heavy Siltation', 'risk' => 'Moderate', 'hh' => 410, 'pop' => 1850, 'lat' => 8.244800, 'lng' => 124.261000],
-        9  => ['name' => 'Purok Sto. Niño',    'hazard' => 'Monsoon Flooding, Heavy Rainfall', 'risk' => 'Moderate', 'hh' => 510, 'pop' => 2280, 'lat' => 8.243500, 'lng' => 124.257500],
-        10 => ['name' => 'Purok Centro',       'hazard' => 'High Density Urban Fire, Strong Winds', 'risk' => 'Moderate', 'hh' => 620, 'pop' => 2780, 'lat' => 8.246200, 'lng' => 124.261800],
+        1  => ['name' => 'Purok 1',  'hazard' => 'Flash Flood, Mandulog River Overflow', 'risk' => 'Critical', 'hh' => 450, 'pop' => 2050, 'lat' => 8.246800, 'lng' => 124.258800],
+        2  => ['name' => 'Purok 2',  'hazard' => 'Flash Flood, River Inundation', 'risk' => 'Critical', 'hh' => 520, 'pop' => 2350, 'lat' => 8.248200, 'lng' => 124.260500],
+        3  => ['name' => 'Purok 3',  'hazard' => 'Flash Flood, Riverbank Erosion', 'risk' => 'Critical', 'hh' => 430, 'pop' => 1940, 'lat' => 8.249800, 'lng' => 124.262000],
+        4  => ['name' => 'Purok 4',  'hazard' => 'Coastal Storm Surge, Tidal Overflow', 'risk' => 'Critical', 'hh' => 480, 'pop' => 2150, 'lat' => 8.251500, 'lng' => 124.254200],
+        5  => ['name' => 'Purok 5',  'hazard' => 'Urban Flood, Creek Drainage Overflow', 'risk' => 'High', 'hh' => 680, 'pop' => 3010, 'lat' => 8.245500, 'lng' => 124.259800],
+        6  => ['name' => 'Purok 6',  'hazard' => 'Flash Flood, Drainage Congestion', 'risk' => 'High', 'hh' => 390, 'pop' => 1720, 'lat' => 8.249000, 'lng' => 124.258000],
+        7  => ['name' => 'Purok 1a', 'hazard' => 'High Inundation Zone, Saturated Silt', 'risk' => 'High', 'hh' => 360, 'pop' => 1610, 'lat' => 8.242000, 'lng' => 124.260500],
+        8  => ['name' => 'Purok 2a', 'hazard' => 'Localized Ponding, Heavy Siltation', 'risk' => 'Moderate', 'hh' => 410, 'pop' => 1850, 'lat' => 8.244800, 'lng' => 124.261000],
+        9  => ['name' => 'Purok 3a', 'hazard' => 'Monsoon Flooding, Heavy Rainfall', 'risk' => 'Moderate', 'hh' => 510, 'pop' => 2280, 'lat' => 8.243500, 'lng' => 124.257500],
+        10 => ['name' => 'Purok 4a', 'hazard' => 'High Density Urban Fire, Strong Winds', 'risk' => 'Moderate', 'hh' => 620, 'pop' => 2780, 'lat' => 8.246200, 'lng' => 124.261800],
+        11 => ['name' => 'Purok 5a', 'hazard' => 'Flash Flood, River Overflow', 'risk' => 'Critical', 'hh' => 440, 'pop' => 1980, 'lat' => 8.247200, 'lng' => 124.263500],
+        12 => ['name' => 'Purok 6a', 'hazard' => 'Coastal Storm Surge, High Tide', 'risk' => 'High', 'hh' => 380, 'pop' => 1700, 'lat' => 8.250500, 'lng' => 124.255500],
+        13 => ['name' => 'Purok 7a', 'hazard' => 'Riverbank Scouring, Flash Flood', 'risk' => 'Critical', 'hh' => 420, 'pop' => 1890, 'lat' => 8.248800, 'lng' => 124.261200],
+        14 => ['name' => 'Purok 8a', 'hazard' => 'Heavy Monsoon Inundation, Drainage Block', 'risk' => 'Moderate', 'hh' => 350, 'pop' => 1580, 'lat' => 8.244000, 'lng' => 124.259000],
+        15 => ['name' => 'Purok 9a', 'hazard' => 'Urban Drainage Congestion, Localized Ponding', 'risk' => 'Moderate', 'hh' => 400, 'pop' => 1800, 'lat' => 8.245000, 'lng' => 124.262500],
+        16 => ['name' => 'Purok 1b', 'hazard' => 'Mandulog Riverbank Overflow, Siltation', 'risk' => 'Critical', 'hh' => 470, 'pop' => 2120, 'lat' => 8.247800, 'lng' => 124.259500],
+        17 => ['name' => 'Purok 2b', 'hazard' => 'Low-Lying Runoff Inundation', 'risk' => 'High', 'hh' => 500, 'pop' => 2250, 'lat' => 8.246000, 'lng' => 124.258200],
+        18 => ['name' => 'Purok 3b', 'hazard' => 'Flash Flood, Creek Swell', 'risk' => 'High', 'hh' => 410, 'pop' => 1840, 'lat' => 8.249200, 'lng' => 124.263000],
+        19 => ['name' => 'Purok 4b', 'hazard' => 'Storm Surge Vulnerable, Coastal Wind', 'risk' => 'Moderate', 'hh' => 390, 'pop' => 1750, 'lat' => 8.252000, 'lng' => 124.256000],
+        20 => ['name' => 'Purok 5b', 'hazard' => 'Urban Waterlogging, Silt Congestion', 'risk' => 'Moderate', 'hh' => 460, 'pop' => 2070, 'lat' => 8.244500, 'lng' => 124.260200],
+        21 => ['name' => 'Purok 6b', 'hazard' => 'Flash Flood Swell, Riverine Hazard', 'risk' => 'Critical', 'hh' => 530, 'pop' => 2390, 'lat' => 8.248500, 'lng' => 124.259000],
+        22 => ['name' => 'Purok 7b', 'hazard' => 'Inland Ponding, Monsoon Flooding', 'risk' => 'High', 'hh' => 370, 'pop' => 1670, 'lat' => 8.243000, 'lng' => 124.258500],
+        23 => ['name' => 'Purok 8b', 'hazard' => 'Creek Bank Inundation, Flash Flood', 'risk' => 'High', 'hh' => 430, 'pop' => 1940, 'lat' => 8.246500, 'lng' => 124.262200],
+        24 => ['name' => 'Purok 9b', 'hazard' => 'Residential Structural Fire, High Density', 'risk' => 'Moderate', 'hh' => 550, 'pop' => 2480, 'lat' => 8.245800, 'lng' => 124.261200],
     ];
 
     $purokStmt = $pdo->prepare("INSERT INTO `puroks` (`id`, `barangay_id`, `name`, `hazard_types`, `risk_level`, `households`, `population`, `coordinates_lat`, `coordinates_lng`, `status`) VALUES (?, 12, ?, ?, ?, ?, ?, ?, ?, 'active')");
@@ -96,10 +110,10 @@ try {
     $uStmt->execute([
         2, 'brgy_hinaplanon', $passwordHash, 'Hon. Rodrigo', 'Almonte', 'Hon. Rodrigo Almonte',
         'captain.almonte@hinaplanon.iligan.gov.ph', '+63 917 234 5678', 'Male', 52, 'barangay_head', 13,
-        'Punong Barangay / BDRRMC Chairman', 'Available', 12, 'Purok Centro'
+        'Punong Barangay / BDRRMC Chairman', 'Available', 12, 'Purok 1'
     ]);
 
-    // 50 Responders divided across 10 puroks (5 responders per purok)
+    // 50 Responders divided across 24 puroks
     // User IDs: 3 to 52
     $responderSpecializations = [
         'Team Alpha Search & Rescue Lead', 'Emergency Medical Technician (EMT)', 'Water Rescue & Boat Operator',
@@ -109,63 +123,58 @@ try {
     $firstNamesF = ['Sarah', 'Elena', 'Maria', 'Lorna', 'Corazon', 'Teresa', 'Remedios', 'Grace', 'Carmen', 'Filomena', 'Rosario', 'Fatima', 'Beatrice', 'Divina', 'Esperanza', 'Gemma', 'Imelda', 'Jocelyn', 'Leila', 'Nenita'];
     $lastNames = ['Morales', 'Reyes', 'Villanueva', 'Mendoza', 'Soriano', 'Ramos', 'Gomez', 'Tan', 'Fernandez', 'Sotto', 'Balgos', 'Badelles', 'Cañete', 'Delos Reyes', 'Castillo', 'Dela Torre', 'Magno', 'Panganiban', 'Corpuz', 'Valderrama', 'Alcantara', 'Celdran', 'Pimentel', 'Santos', 'Padilla'];
 
-    $responderId = 3;
-    for ($pId = 1; $pId <= 10; $pId++) {
+    $purokCount = count($puroks);
+    for ($i = 0; $i < 50; $i++) {
+        $responderId = 3 + $i;
+        $pId = ($i % $purokCount) + 1;
         $pName = $puroks[$pId]['name'];
-        for ($rIdx = 0; $rIdx < 5; $rIdx++) {
-            $isFemale = ($responderId % 2 == 0);
-            $fn = $isFemale ? $firstNamesF[($responderId * 3) % count($firstNamesF)] : $firstNamesM[($responderId * 2) % count($firstNamesM)];
-            $ln = $lastNames[($responderId * 5) % count($lastNames)];
-            $fnFull = $fn . ' ' . $ln;
-            $username = 'responder_' . ($responderId - 2);
-            $email = "responder{$responderId}@bdrrmc.hinaplanon.gov.ph";
-            $phone = '+63 929 ' . str_pad($responderId * 17, 3, '0', STR_PAD_LEFT) . ' ' . str_pad($responderId * 29, 4, '0', STR_PAD_LEFT);
-            $position = $responderSpecializations[$rIdx];
-            $gender = $isFemale ? 'Female' : 'Male';
-            $age = 24 + (($responderId * 3) % 25);
+        $isFemale = ($responderId % 2 == 0);
+        $fn = $isFemale ? $firstNamesF[($responderId * 3) % count($firstNamesF)] : $firstNamesM[($responderId * 2) % count($firstNamesM)];
+        $ln = $lastNames[($responderId * 5) % count($lastNames)];
+        $fnFull = $fn . ' ' . $ln;
+        $username = 'responder_' . ($i + 1);
+        $email = "responder{$responderId}@bdrrmc.hinaplanon.gov.ph";
+        $phone = '+63 929 ' . str_pad($responderId * 17, 3, '0', STR_PAD_LEFT) . ' ' . str_pad($responderId * 29, 4, '0', STR_PAD_LEFT);
+        $position = $responderSpecializations[$i % count($responderSpecializations)];
+        $gender = $isFemale ? 'Female' : 'Male';
+        $age = 24 + (($responderId * 3) % 25);
 
-            $uStmt->execute([
-                $responderId, $username, $passwordHash, $fn, $ln, $fnFull,
-                $email, $phone, $gender, $age, 'responder', 13,
-                $position, 'Available', 12, $pName
-            ]);
-            $responderId++;
-        }
+        $uStmt->execute([
+            $responderId, $username, $passwordHash, $fn, $ln, $fnFull,
+            $email, $phone, $gender, $age, 'responder', 13,
+            $position, 'Available', 12, $pName
+        ]);
     }
 
-    // 50 Residents divided across 10 puroks (5 residents per purok)
+    // 50 Residents divided across 24 puroks
     // User IDs: 53 to 102 (and resident IDs: 1 to 50)
-    $residentUserId = 53;
-    $residentTableId = 1;
-    for ($pId = 1; $pId <= 10; $pId++) {
+    for ($i = 0; $i < 50; $i++) {
+        $residentTableId = 1 + $i;
+        $residentUserId = 53 + $i;
+        $pId = ($i % $purokCount) + 1;
         $pName = $puroks[$pId]['name'];
-        for ($resIdx = 0; $resIdx < 5; $resIdx++) {
-            $isFemale = ($residentTableId % 2 != 0);
-            $fn = $isFemale ? $firstNamesF[($residentTableId * 7) % count($firstNamesF)] : $firstNamesM[($residentTableId * 4) % count($firstNamesM)];
-            $ln = $lastNames[($residentTableId * 3) % count($lastNames)];
-            $fnFull = $fn . ' ' . $ln;
-            $username = 'resident_' . $residentTableId;
-            $email = "resident{$residentTableId}@gmail.com";
-            $phone = '+63 970 ' . str_pad($residentTableId * 31, 3, '0', STR_PAD_LEFT) . ' ' . str_pad($residentTableId * 43, 4, '0', STR_PAD_LEFT);
-            $gender = $isFemale ? 'Female' : 'Male';
-            $age = 20 + (($residentTableId * 5) % 50);
+        $isFemale = ($residentTableId % 2 != 0);
+        $fn = $isFemale ? $firstNamesF[($residentTableId * 7) % count($firstNamesF)] : $firstNamesM[($residentTableId * 4) % count($firstNamesM)];
+        $ln = $lastNames[($residentTableId * 3) % count($lastNames)];
+        $fnFull = $fn . ' ' . $ln;
+        $username = 'resident_' . $residentTableId;
+        $email = "resident{$residentTableId}@gmail.com";
+        $phone = '+63 970 ' . str_pad($residentTableId * 31, 3, '0', STR_PAD_LEFT) . ' ' . str_pad($residentTableId * 43, 4, '0', STR_PAD_LEFT);
+        $gender = $isFemale ? 'Female' : 'Male';
+        $age = 20 + (($residentTableId * 5) % 50);
 
-            // Insert into residents table
-            $resStmt->execute([
-                $residentTableId, $username, $passwordHash, $fn, $ln, $fnFull,
-                $email, $phone, $gender, $age, $pName
-            ]);
+        // Insert into residents table
+        $resStmt->execute([
+            $residentTableId, $username, $passwordHash, $fn, $ln, $fnFull,
+            $email, $phone, $gender, $age, $pName
+        ]);
 
-            // Mirror into users table for seamless authentication and FK relations
-            $uStmt->execute([
-                $residentUserId, $username, $passwordHash, $fn, $ln, $fnFull,
-                $email, $phone, $gender, $age, 'resident', NULL,
-                'Barangay Resident', 'Available', 12, $pName
-            ]);
-
-            $residentUserId++;
-            $residentTableId++;
-        }
+        // Mirror into users table for seamless authentication and FK relations
+        $uStmt->execute([
+            $residentUserId, $username, $passwordHash, $fn, $ln, $fnFull,
+            $email, $phone, $gender, $age, 'resident', NULL,
+            'Barangay Resident', 'Available', 12, $pName
+        ]);
     }
 
     // -------------------------------------------------------------------------
@@ -209,11 +218,11 @@ try {
     $pdo->exec("TRUNCATE TABLE `evacuation_areas`");
     $evacAreas = [
         [1, 'Hinaplanon National High School Gymnasium', 12, 'National Highway, Brgy. Hinaplanon, Iligan City', 'School Gym', 1200, 280, 250, 'Open / Active', 'Accessible (All Vehicles)', 1, 1, 1, 'Mr. Alberto Tan', '+63 917 444 5566', 8.246800, 124.261500],
-        [2, 'Hinaplanon Barangay Multi-Purpose Covered Court', 12, 'Purok San Miguel, Hinaplanon, Iligan City', 'Barangay Multi-Purpose Hall', 800, 180, 110, 'Open / Active', 'Accessible (All Vehicles)', 1, 1, 1, 'Hon. Rodrigo Almonte', '+63 917 555 6677', 8.245800, 124.260000],
-        [3, 'Hinaplanon Central Elementary School Building A', 12, 'Purok Centro, Hinaplanon, Iligan City', 'School Gym', 950, 210, 0, 'Standby', 'Accessible (All Vehicles)', 1, 1, 1, 'Principal Marissa Cruz', '+63 917 666 7788', 8.246300, 124.261900],
-        [4, 'Purok San Miguel Community Chapel & Hall', 12, 'Purok San Miguel Interior, Hinaplanon, Iligan City', 'Church / Chapel', 400, 90, 0, 'Standby', 'Accessible (All Vehicles)', 1, 1, 1, 'Pastor Danilo Cruz', '+63 917 777 8899', 8.245200, 124.259200],
-        [5, 'St. Michael Parish Pastoral Evacuation Hall', 12, 'Purok Sambag Boundary, Hinaplanon, Iligan City', 'Civic Center', 650, 150, 0, 'Standby', 'Accessible (All Vehicles)', 1, 1, 1, 'Sr. Maria Lopez', '+63 917 888 9900', 8.247500, 124.263000],
-        [6, 'Hinaplanon Upland Covered Sports Pavilion', 12, 'Purok Orchids Perimeter, Hinaplanon, Iligan City', 'Designated Open Ground', 1100, 250, 0, 'Standby', 'High-Clearance / 4x4 Only', 1, 1, 0, 'Officer Kurt Morales', '+63 917 234 5678', 8.243000, 124.262000]
+        [2, 'Hinaplanon Barangay Multi-Purpose Covered Court', 12, 'Purok 5, Hinaplanon, Iligan City', 'Barangay Multi-Purpose Hall', 800, 180, 110, 'Open / Active', 'Accessible (All Vehicles)', 1, 1, 1, 'Hon. Rodrigo Almonte', '+63 917 555 6677', 8.245800, 124.260000],
+        [3, 'Hinaplanon Central Elementary School Building A', 12, 'Purok 1, Hinaplanon, Iligan City', 'School Gym', 950, 210, 0, 'Standby', 'Accessible (All Vehicles)', 1, 1, 1, 'Principal Marissa Cruz', '+63 917 666 7788', 8.246300, 124.261900],
+        [4, 'Purok 2 Community Chapel & Hall', 12, 'Purok 2 Interior, Hinaplanon, Iligan City', 'Church / Chapel', 400, 90, 0, 'Standby', 'Accessible (All Vehicles)', 1, 1, 1, 'Pastor Danilo Cruz', '+63 917 777 8899', 8.245200, 124.259200],
+        [5, 'St. Michael Parish Pastoral Evacuation Hall', 12, 'Purok 3 Boundary, Hinaplanon, Iligan City', 'Civic Center', 650, 150, 0, 'Standby', 'Accessible (All Vehicles)', 1, 1, 1, 'Sr. Maria Lopez', '+63 917 888 9900', 8.247500, 124.263000],
+        [6, 'Hinaplanon Upland Covered Sports Pavilion', 12, 'Purok 1a Perimeter, Hinaplanon, Iligan City', 'Designated Open Ground', 1100, 250, 0, 'Standby', 'High-Clearance / 4x4 Only', 1, 1, 0, 'Officer Kurt Morales', '+63 917 234 5678', 8.243000, 124.262000]
     ];
     $evacStmt = $pdo->prepare("INSERT INTO `evacuation_areas` (`id`, `name`, `barangay_id`, `location_address`, `center_type`, `capacity_individuals`, `capacity_families`, `current_evacuees_count`, `status`, `accessibility`, `has_potable_water`, `has_electricity`, `has_medical_station`, `contact_officer`, `contact_number`, `coordinates_lat`, `coordinates_lng`) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -222,9 +231,9 @@ try {
     }
 
     // -------------------------------------------------------------------------
-    // 5. INCIDENT REPORTS (>= 5 Incidents per Purok = 50+ total)
+    // 5. INCIDENT REPORTS (>= 2 Incidents per Purok across all 24 Puroks = 50 total)
     // -------------------------------------------------------------------------
-    echo "[5/10] Seeding 50+ Incident Reports (>= 5 per Purok)...\n";
+    echo "[5/10] Seeding 50 Incident Reports across all 24 Puroks...\n";
     $pdo->exec("TRUNCATE TABLE `disaster_reports`");
 
     $repStmt = $pdo->prepare("INSERT INTO `disaster_reports` (
@@ -240,11 +249,12 @@ try {
     $urgencies = ['Immediate', 'High', 'Medium'];
 
     $reportId = 1;
-    for ($pId = 1; $pId <= 10; $pId++) {
+    for ($pId = 1; $pId <= $purokCount; $pId++) {
         $p = $puroks[$pId];
         $pName = $p['name'];
+        $numIncidents = ($pId <= 2) ? 3 : 2;
 
-        for ($incIdx = 1; $incIdx <= 5; $incIdx++) {
+        for ($incIdx = 1; $incIdx <= $numIncidents; $incIdx++) {
             $trackCode = 'REQ-2026-HIN-' . str_pad($reportId, 3, '0', STR_PAD_LEFT);
             $lat = $p['lat'] + (rand(-40, 40) / 100000);
             $lng = $p['lng'] + (rand(-40, 40) / 100000);
@@ -256,13 +266,13 @@ try {
             $dispFam = ($sev === 'Critical') ? (int)($affFam * 0.7) : (int)($affFam * 0.3);
             $injuries = ($sev === 'Critical') ? rand(1, 4) : 0;
             
-            $status = ($incIdx <= 3) ? 'Ongoing' : 'Completed';
+            $status = ($incIdx <= 2) ? 'Ongoing' : 'Completed';
             $resolved = ($status === 'Completed') ? "Flood waters receded and debris cleared by BDRRMC team. Relief food packs successfully distributed." : NULL;
             $completedAt = ($status === 'Completed') ? '2026-10-14 17:00:00' : NULL;
             
             // Assign submitter from resident/responder in that purok
             $submitterId = 2; // Hon. Rodrigo Almonte
-            $daysAgo = (10 - $incIdx);
+            $daysAgo = (10 - ($reportId % 8));
             $createdAt = date('Y-m-d H:i:s', strtotime("2026-10-18 10:00:00 - {$daysAgo} days"));
 
             $overview = "Incident alert in {$pName}: Reported {$dtype} condition affecting {$affFam} households. Flood / hazard telemetry actively monitored by BDRRMC responders.";
@@ -279,9 +289,9 @@ try {
     }
 
     // -------------------------------------------------------------------------
-    // 6. RESOURCE TRANSACTIONS (>= 5 Transactions per Purok = 50+ total)
+    // 6. RESOURCE TRANSACTIONS (50 Transactions across all 24 Puroks)
     // -------------------------------------------------------------------------
-    echo "[6/10] Seeding 50+ Resource Transactions (>= 5 per Purok)...\n";
+    echo "[6/10] Seeding 50 Resource Transactions across all 24 Puroks...\n";
     $pdo->exec("TRUNCATE TABLE `resource_transactions`");
 
     $trxStmt = $pdo->prepare("INSERT INTO `resource_transactions` (
@@ -291,16 +301,18 @@ try {
 
     $trxTypes = ['Dispatched', 'Allocation', 'Restock', 'Allocation', 'Dispatched'];
 
-    for ($pId = 1; $pId <= 10; $pId++) {
+    $tCounter = 1;
+    for ($pId = 1; $pId <= $purokCount; $pId++) {
         $pName = $puroks[$pId]['name'];
+        $numTrx = ($pId <= 2) ? 3 : 2;
 
-        for ($tIdx = 1; $tIdx <= 5; $tIdx++) {
+        for ($tIdx = 1; $tIdx <= $numTrx; $tIdx++) {
             $resId = (($pId * 5 + $tIdx) % 20) + 1; // Pick core items (Food, Water, Tents, Medical, etc.)
             $trxType = $trxTypes[($tIdx - 1) % count($trxTypes)];
             $qty = 20 + ($tIdx * 15);
             $actorId = ($tIdx % 2 == 0) ? 1 : 2; // ICDRRMO or Barangay Head
             $addedType = ($tIdx % 2 == 0) ? 'ai_recommended' : 'added_by_admin';
-            $daysAgo = (12 - $tIdx);
+            $daysAgo = (12 - ($tCounter % 10));
             $createdAt = date('Y-m-d H:i:s', strtotime("2026-10-18 14:00:00 - {$daysAgo} days"));
 
             $remarks = "{$trxType} {$qty} units of emergency supplies specifically allocated for {$pName}, Hinaplanon disaster response.";
@@ -308,6 +320,7 @@ try {
             $trxStmt->execute([
                 $resId, $trxType, $qty, $pId, $addedType, $remarks, $actorId, $createdAt
             ]);
+            $tCounter++;
         }
     }
 
@@ -353,39 +366,34 @@ try {
         ]);
     }
 
-    // Seed 50 distributions: exactly 5 beneficiaries per purok for all 10 puroks
+    // Seed 50 distributions: exactly 1 per resident across all 50 residents in all 24 puroks
     $distId = 1;
-    $resCounter = 1;
-    for ($pId = 1; $pId <= 10; $pId++) {
-        $pName = $puroks[$pId]['name'];
+    for ($resCounter = 1; $resCounter <= 50; $resCounter++) {
+        $resRow = $pdo->query("SELECT * FROM residents WHERE id = {$resCounter}")->fetch(PDO::FETCH_ASSOC);
+        $pName = $resRow['purok'];
+        $allocId = (($distId - 1) % 5) + 1;
+        $amt = $allocations[$allocId - 1][7];
+        $isClaimed = ($distId % 5 != 0); // 80% claimed rate
+        $claimStatus = $isClaimed ? 'Claimed' : 'Pending';
+        $claimDate = $isClaimed ? date('Y-m-d H:i:s', strtotime("2026-10-15 09:00:00 + " . ($distId * 25) . " minutes")) : NULL;
+        $refNo = $isClaimed ? ('REF-2026-HIN-' . str_pad($distId, 4, '0', STR_PAD_LEFT)) : NULL;
+        $remarks = $isClaimed ? "Disbursed to resident of {$pName}. Verified via PhilSys National ID." : "Scheduled for upcoming barangay payout batch.";
+        $disbursedBy = $isClaimed ? 2 : NULL;
+        $createdAt = date('Y-m-d H:i:s', strtotime("2026-10-14 08:30:00 + " . ($distId * 10) . " minutes"));
 
-        for ($bIdx = 1; $bIdx <= 5; $bIdx++) {
-            $resRow = $pdo->query("SELECT * FROM residents WHERE id = {$resCounter}")->fetch(PDO::FETCH_ASSOC);
-            $allocId = (($distId - 1) % 5) + 1;
-            $amt = $allocations[$allocId - 1][7];
-            $isClaimed = ($bIdx <= 4); // 4 Claimed, 1 Pending per purok (80% claimed rate)
-            $claimStatus = $isClaimed ? 'Claimed' : 'Pending';
-            $claimDate = $isClaimed ? date('Y-m-d H:i:s', strtotime("2026-10-15 09:00:00 + " . ($distId * 25) . " minutes")) : NULL;
-            $refNo = $isClaimed ? ('REF-2026-HIN-' . str_pad($distId, 4, '0', STR_PAD_LEFT)) : NULL;
-            $remarks = $isClaimed ? "Disbursed to resident of {$pName}. Verified via PhilSys National ID." : "Scheduled for upcoming barangay payout batch.";
-            $disbursedBy = $isClaimed ? 2 : NULL;
-            $createdAt = date('Y-m-d H:i:s', strtotime("2026-10-14 08:30:00 + " . ($distId * 10) . " minutes"));
+        $distStmt->execute([
+            $allocId, $resCounter, $resRow['full_name'], $pName, $resRow['phone'],
+            $amt, $claimStatus, $claimDate, $refNo, $disbursedBy, $remarks, $createdAt
+        ]);
 
-            $distStmt->execute([
-                $allocId, $resCounter, $resRow['full_name'], $pName, $resRow['phone'],
-                $amt, $claimStatus, $claimDate, $refNo, $disbursedBy, $remarks, $createdAt
+        if ($isClaimed) {
+            $auditStmt->execute([
+                $allocId, $distId, 'Disbursed', "Released PHP " . number_format($amt, 2) . " aid to {$resRow['full_name']} ({$pName}) Ref #{$refNo}",
+                $amt, 2, 'Hon. Rodrigo Almonte', 'barangay_head', $claimDate
             ]);
-
-            if ($isClaimed) {
-                $auditStmt->execute([
-                    $allocId, $distId, 'Disbursed', "Released PHP " . number_format($amt, 2) . " aid to {$resRow['full_name']} ({$pName}) Ref #{$refNo}",
-                    $amt, 2, 'Hon. Rodrigo Almonte', 'barangay_head', $claimDate
-                ]);
-            }
-
-            $distId++;
-            $resCounter++;
         }
+
+        $distId++;
     }
 
     // -------------------------------------------------------------------------
@@ -458,14 +466,14 @@ try {
             'activities' => ['Free Seed Distribution', 'Urban Gardening Program', 'Organic Farming Seminar', 'Seedling Distribution']
         ],
         [
-            'suffix' => 'Purok Consultation & Barangay Assembly Day',
+            'suffix' => 'Barangay Community Consultation & Assembly Day',
             'type' => 'Government and Community Services',
-            'activities' => ['Barangay Assembly', 'Purok Assembly', 'Community Consultation', 'Public Information Campaign']
+            'activities' => ['Barangay Assembly', 'Community Consultation', 'Public Information Campaign']
         ],
         [
-            'suffix' => 'Inter-Purok Sportsfest & Community Fitness Zumba',
+            'suffix' => 'Community Sportsfest & Fitness Zumba',
             'type' => 'Sports and Recreation',
-            'activities' => ['Barangay Sportsfest', 'Inter-Purok Basketball Tournament', 'Zumba Session', 'Community Aerobics']
+            'activities' => ['Barangay Sportsfest', 'Basketball Tournament', 'Zumba Session', 'Community Aerobics']
         ],
         [
             'suffix' => 'Barangay Community Day & Special Gathering',
@@ -475,17 +483,21 @@ try {
     ];
 
     $eventId = 1;
-    for ($pId = 1; $pId <= 10; $pId++) {
+    for ($pId = 1; $pId <= $purokCount; $pId++) {
         $p = $puroks[$pId];
         $pName = $p['name'];
-        $lat = (float) $p['lat'];
-        $lng = (float) $p['lng'];
 
-        for ($evIdx = 0; $evIdx < 5; $evIdx++) {
+        for ($evIdx = 0; $evIdx < 2; $evIdx++) {
             $theme = $eventThemes[($eventId - 1) % count($eventThemes)];
-            $title = "{$pName} {$theme['suffix']}";
+            $title = $theme['suffix'];
             $actType = $theme['type'];
-            $venue = "{$pName} Community Covered Area & Assembly Grounds";
+            
+            // Pick venue strictly from evacuation_areas table
+            $selectedEvac = $evacAreas[($eventId - 1) % count($evacAreas)];
+            $venue = $selectedEvac[1];
+            $lat = (float) $selectedEvac[15];
+            $lng = (float) $selectedEvac[16];
+            
             $activitiesJson = json_encode($theme['activities'], JSON_UNESCAPED_UNICODE);
             
             $daysOffset = ($eventId % 2 == 0) ? (15 - $eventId) : (-1 * (($eventId % 8) + 1));
@@ -496,9 +508,9 @@ try {
             $status = $isPast ? 'Completed' : 'Scheduled';
             $targetPart = 60 + ($eventId * 2);
             $actualPart = $isPast ? ($targetPart - 5) : 0;
-            $eval = $isPast ? "High community turnout in {$pName}. Evacuation timing benchmarks successfully met." : NULL;
-            $assigned = "Responders Team Alpha ({$pName} Unit)";
-            $desc = "Dedicated community activity for {$pName} residents, emphasizing practical engagement and preparedness for {$p['hazard']}.";
+            $eval = $isPast ? "High community turnout. Evacuation timing benchmarks successfully met." : NULL;
+            $assigned = "BDRRMC Responders Team Alpha";
+            $desc = "Community preparedness activity emphasizing practical engagement and disaster resilience.";
             $createdAt = date('Y-m-d H:i:s', strtotime("2026-10-01 08:00:00 + " . ($eventId * 6) . " hours"));
 
             $evStmt->execute([
@@ -508,12 +520,10 @@ try {
                 $lat, $lng
             ]);
 
-            // Register the 5 residents of this purok as attendees
-            $baseResidentId = (($pId - 1) * 5) + 1;
-            for ($rOffset = 0; $rOffset < 5; $rOffset++) {
-                $curResId = $baseResidentId + $rOffset;
-                $curUserId = 52 + $curResId; // maps resident_1 (id 1) to user id 53
-                $rData = $pdo->query("SELECT * FROM residents WHERE id = {$curResId}")->fetch(PDO::FETCH_ASSOC);
+            // Register residents of this purok as attendees
+            $purokResidents = $pdo->query("SELECT * FROM residents WHERE purok = " . $pdo->quote($pName))->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($purokResidents as $rData) {
+                $curUserId = 52 + (int)$rData['id'];
                 $msg = "BARANGAY DISASTER ADVISORY\nHi {$rData['first_name']}!\nYou are registered for {$title} at {$venue}.\nDate: {$startDate}.";
                 $attStmt->execute([
                     $eventId, $curUserId, $rData['full_name'], $rData['phone'], $createdAt, $msg
@@ -524,8 +534,8 @@ try {
         }
     }
 
-    // Event 51: Financial Aid Distribution (Scheduled / Active)
-    $ev51Activities = json_encode([
+    // Event 49: Financial Aid Distribution (Scheduled / Active)
+    $ev49Activities = json_encode([
         'Financial Assistance Distribution',
         'Food Assistance Distribution',
         'Relief Goods Distribution',
@@ -533,10 +543,10 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 
     $evStmt->execute([
-        51,
-        'Hinaplanon Emergency Flood Relief Cash Assistance Distribution',
+        49,
+        'Emergency Flood Relief Cash Assistance Distribution',
         'Social Welfare and Assistance',
-        'Hinaplanon Covered Court & Gymnasium',
+        'Hinaplanon Barangay Multi-Purpose Covered Court',
         '2026-10-24 09:00:00',
         '2026-10-24 16:00:00',
         'Hon. Rodrigo Almonte (Barangay Head) & City Social Welfare Officers',
@@ -545,15 +555,15 @@ try {
         'Official payout and releasing of the Emergency Flood Relief Financial Assistance (₱5,000 per verified household). Beneficiaries must bring a valid government ID and Barangay Certificate upon claiming.',
         'Scheduled',
         NULL,
-        $ev51Activities,
-        $ev51Activities,
+        $ev49Activities,
+        $ev49Activities,
         '2026-10-18 08:00:00',
-        8.246596,
-        124.259474
+        8.245800,
+        124.260000
     ]);
 
-    // Event 52: Missed Concluded Event ("natapos nah")
-    $ev52Activities = json_encode([
+    // Event 50: Concluded Evacuation Drill
+    $ev50Activities = json_encode([
         'Emergency Evacuation Drill',
         'Disaster Preparedness Seminar',
         'Flood Preparedness Seminar',
@@ -561,25 +571,24 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 
     $evStmt->execute([
-        52,
-        'Hinaplanon Riverine Flood Evacuation & Early Warning Drill',
+        50,
+        'Riverine Flood Evacuation & Early Warning Drill',
         'Disaster Preparedness and Safety',
-        'Purok Riverside 1 Multi-Purpose Assembly Area',
+        'Hinaplanon National High School Gymnasium',
         '2026-10-16 08:30:00',
         '2026-10-16 11:30:00',
-        'BDRRMC Rescue Alpha Team & Purok Leaders',
+        'BDRRMC Rescue Alpha Team',
         120,
         95,
         'Concluded comprehensive riverine flood response and siren evacuation drill for low-lying riverbank households along the Mandulog River.',
         'Completed',
         'Concluded with 95 community participants. Evacuation staging and siren protocols successfully tested.',
-        $ev52Activities,
-        $ev52Activities,
+        $ev50Activities,
+        $ev50Activities,
         '2026-10-10 08:00:00',
-        8.246596,
-        124.259474
+        8.246800,
+        124.261500
     ]);
-    // NOTE: Resident accounts (user 53..57) are NOT registered in event_attendees for Event 52, marking it as a missed event.
 
     // -------------------------------------------------------------------------
     // 9. CLEAN NOTIFICATIONS (Residents, Responders, ICDRRMO, Barangay Head)
@@ -599,12 +608,12 @@ try {
 
         // Responder notifications for Hinaplanon (target_barangay_id: 12)
         [7, 'responder', 12, NULL, 'Incident Alert: Heavy Rainfall & River Surge Warning', 'Mandulog River telemetry active. All 50 assigned purok responders are placed on heightened standby alert.', 'urgent', 'disaster_request', 1, 1, '2026-10-14 06:45:00'],
-        [8, 'responder', 12, NULL, 'Field Deployment: Team Alpha Assigned to Riverine Corridors', 'Water rescue units dispatched to Purok Riverside 1 and Purok Sambag for pre-emptive evacuation assistance.', 'urgent', 'disaster_request', 1, 2, '2026-10-15 02:30:00'],
+        [8, 'responder', 12, NULL, 'Field Deployment: Team Alpha Assigned to Riverine Corridors', 'Water rescue units dispatched to Purok 1 and Purok 3 for pre-emptive evacuation assistance.', 'urgent', 'disaster_request', 1, 2, '2026-10-15 02:30:00'],
         [9, 'responder', 12, NULL, 'Resource Dispatch: Emergency Medical Kits & Life Vests Prepositioned', 'Hinaplanon Operations Desk has prepositioned trauma bags, life jackets, and dewatering pumps across covered centers.', 'informational', 'resource_allocation', 1, 1, '2026-10-14 08:30:00'],
         [10, 'responder', 12, NULL, 'Training Schedule: Community First Aid & Rescuer Refresher', 'Mandatory refresher training for all active barangay emergency responders on water rescue and trauma stabilization.', 'informational', 'preparedness', 2, 1, '2026-10-12 10:00:00'],
 
         // ICDRRMO notifications
-        [11, 'icdrrmo', NULL, NULL, 'Hinaplanon Puroks Monitored: 10 Active Jurisdictions', 'All 10 Hinaplanon puroks report active GIS telemetry. AI heatmap reflects real-time susceptible zones.', 'informational', 'inventory', 1, 1, '2026-10-15 09:00:00'],
+        [11, 'icdrrmo', NULL, NULL, 'Hinaplanon Puroks Monitored: 24 Active Jurisdictions', 'All 24 Hinaplanon puroks report active GIS telemetry. AI heatmap reflects real-time susceptible zones.', 'informational', 'inventory', 1, 1, '2026-10-15 09:00:00'],
         [12, 'icdrrmo', NULL, NULL, 'Central & Barangay Inventory Synchronized: Complete Stock Parity', 'Logistics parity achieved: ICDRRMO Depot and Hinaplanon BDRRMC share full resource catalog availability.', 'informational', 'inventory', 1, 1, '2026-10-14 06:40:00'],
 
         // Barangay Head notifications
@@ -623,16 +632,17 @@ try {
     // -------------------------------------------------------------------------
     // 10. RESPONDER FIELD UPDATES & SYSTEM LOGS
     // -------------------------------------------------------------------------
-    echo "[10/10] Seeding Responder Field Updates & Audit Logs...\n";
+    echo "[10/10] Seeding Responder Field Updates & Audit Logs across all 24 Puroks...\n";
     $pdo->exec("TRUNCATE TABLE `responder_field_updates`");
     $fuStmt = $pdo->prepare("INSERT INTO `responder_field_updates` (
         `responder_id`, `disaster_request_id`, `barangay_id`, `purok`, `operational_status`, 
         `condition_overview`, `casualties`, `injuries`, `rescued_individuals`, `resources_utilized`, `remarks`, `created_at`
     ) VALUES (?, ?, 12, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    for ($pId = 1; $pId <= 10; $pId++) {
+    for ($pId = 1; $pId <= $purokCount; $pId++) {
         $pName = $puroks[$pId]['name'];
-        $respUserId = 2 + (($pId - 1) * 5) + 1; // Pick the first responder of that purok
+        $resp = $pdo->query("SELECT id FROM users WHERE role = 'responder' AND purok = " . $pdo->quote($pName) . " LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        $respUserId = $resp ? (int)$resp['id'] : 3;
         $fuStmt->execute([
             $respUserId, $pId, $pName, 'On Site',
             "Active responder field monitoring conducted at {$pName}. Water levels safe, pathways passable.",
@@ -644,7 +654,7 @@ try {
 
     $pdo->exec("TRUNCATE TABLE `system_logs`");
     $sysLogs = [
-        [1, 1, 'Engr. Armando Castillo', 'icdrrmo', 'SYSTEM_INIT', 'System', 'Master data seeding completed: 10 Hinaplanon puroks, 102 accounts, dense per-purok records.', '127.0.0.1', '2026-10-18 08:00:00'],
+        [1, 1, 'Engr. Armando Castillo', 'icdrrmo', 'SYSTEM_INIT', 'System', 'Master data seeding completed: 24 Hinaplanon puroks, 102 accounts, dense per-purok records.', '127.0.0.1', '2026-10-18 08:00:00'],
         [2, 2, 'Hon. Rodrigo Almonte', 'barangay_head', 'INVENTORY_SYNC', 'Inventory', 'Verified identical resources catalog between ICDRRMO and Barangay Hinaplanon.', '127.0.0.1', '2026-10-18 08:30:00'],
         [3, 2, 'Hon. Rodrigo Almonte', 'barangay_head', 'ALLOCATE_FINANCIAL_AID', 'Financial Aid', 'Initialized 5 comprehensive financial aid programs across all Hinaplanon puroks.', '127.0.0.1', '2026-10-18 09:00:00']
     ];
@@ -660,17 +670,17 @@ try {
     echo "🎉 SUCCESS: All database tables seeded successfully!\n";
     echo "========================================================\n";
     echo "Summary of populated test data:\n";
-    echo "  - Hinaplanon Puroks: " . count($puroks) . " (Strictly 10 Puroks in Hinaplanon only)\n";
+    echo "  - Hinaplanon Puroks: " . count($puroks) . " (Strictly 24 Puroks in Hinaplanon)\n";
     echo "  - Total Users: 102 (1 ICDRRMO, 1 Barangay Head, 50 Responders, 50 Residents)\n";
     echo "  - Passwords: All set to '12345678'\n";
-    echo "  - Resident Accounts: 50 (Divided 5 per purok)\n";
-    echo "  - Responder Accounts: 50 (Divided 5 per purok)\n";
+    echo "  - Resident Accounts: 50 (Distributed across 24 puroks)\n";
+    echo "  - Responder Accounts: 50 (Distributed across 24 puroks)\n";
     echo "  - Resource Catalog: " . count($allCatalogResources) . " items (Identical across ICDRRMO & Hinaplanon)\n";
-    echo "  - Disaster Reports: " . ($reportId - 1) . " (>= 5 reports per purok)\n";
-    echo "  - Resource Transactions: 50 (5 transactions per purok)\n";
+    echo "  - Disaster Reports: " . ($reportId - 1) . " (Across all 24 puroks)\n";
+    echo "  - Resource Transactions: 50 (Across all 24 puroks)\n";
     echo "  - Financial Aid Programs: " . count($allocations) . " (PHP 4.4M total budget)\n";
-    echo "  - Beneficiary Distributions: " . ($distId - 1) . " (5 distributions per purok)\n";
-    echo "  - Preparedness Events: " . ($eventId - 1) . " (5 events per purok with registered attendees)\n";
+    echo "  - Beneficiary Distributions: " . ($distId - 1) . " (Across all 24 puroks)\n";
+    echo "  - Preparedness Events: " . ($eventId - 1) . " (Across all 24 puroks with registered attendees)\n";
     echo "========================================================\n\n";
 
 } catch (Throwable $e) {

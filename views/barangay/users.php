@@ -721,6 +721,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
         <thead>
           <tr>
             <th>Resident Name</th>
+            <th>Family Name</th>
             <th>Purok Zone</th>
             <th>Contact Details</th>
             <th>Demographics</th>
@@ -731,7 +732,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
         <tbody>
           <?php if (empty($residentsList)): ?>
             <tr>
-              <td colspan="6" style="text-align:center;padding:36px;color:var(--color-text-muted);">
+              <td colspan="7" style="text-align:center;padding:36px;color:var(--color-text-muted);">
                 <div style="font-size:13px;font-weight:600;margin-bottom:4px;">No Residents Found</div>
                 <div style="font-size:11px;">No active citizen resident accounts match your current filters.</div>
               </td>
@@ -744,10 +745,15 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                     onclick="viewUserDetails(<?= htmlspecialchars(json_encode($res), ENT_QUOTES, 'UTF-8') ?>, 'resident')"
                     class="table-user-link">
                     <div class="table-user-name" style="font-weight:600;color:var(--color-primary);font-size:11.5px;">
-                      <?= clean($res['first_name'] . ' ' . $res['last_name']) ?>
+                      <?= clean($res['first_name']) ?>
                     </div>
                     <div style="font-size:10px;color:var(--color-text-muted);">@<?= clean($res['username']) ?></div>
                   </a>
+                </td>
+                <td>
+                  <div style="font-weight:600;color:var(--color-text);font-size:11.5px;">
+                    <?= clean($res['last_name']) ?>
+                  </div>
                 </td>
                 <td>
                   <span class="badge badge-neutral"
