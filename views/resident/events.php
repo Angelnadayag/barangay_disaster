@@ -750,7 +750,7 @@ require_once __DIR__ . '/../layouts/header.php';
             <div style="font-size:11.5px;color:var(--color-text-secondary);max-width:440px;line-height:1.5;">
               You have not joined any upcoming drills or community activities yet. All open disaster drills and aid distributions can be joined from your Home dashboard.
             </div>
-            <a href="dashboard.php#upcoming-join-events" class="btn btn-primary btn-sm" style="font-size:11px;padding:7px 18px;margin-top:6px;display:inline-flex;align-items:center;gap:6px;">
+            <a href="dashboard.php#residentCalendarWidget" class="btn btn-primary btn-sm" style="font-size:11px;padding:7px 18px;margin-top:6px;display:inline-flex;align-items:center;gap:6px;">
               Browse &amp; Join Events on Home &rarr;
             </a>
           </div>
