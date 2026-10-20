@@ -36,10 +36,18 @@ if (empty($colsAtt)) {
   $db->exec("ALTER TABLE event_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
 }
 
+$now = time();
+$nowStr = date('Y-m-d H:i:s');
+
 $viewTab = $_GET['tab'] ?? 'active';
 if (!in_array($viewTab, ['active', 'archived'], true)) {
   $viewTab = 'active';
 }
+
+$search = trim($_GET['search'] ?? '');
+$filterType = trim($_GET['type'] ?? '');
+$filterVenue = trim($_GET['venue'] ?? '');
+$filterStatus = trim($_GET['status'] ?? '');
 
 // Count active and archived events
 $activeCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE (barangay_id = ? OR barangay_id IS NULL) AND (is_archived = 0 OR is_archived IS NULL)");
@@ -50,7 +58,49 @@ $archivedCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE (barangay_i
 $archivedCountStmt->execute([$barangayId]);
 $archivedCount = (int) $archivedCountStmt->fetchColumn();
 
-// Fetch activities for this barangay based on tab
+// Fetch designated evacuation areas for this barangay as expected venue options & venue filter options
+$evacStmt = $db->prepare("
+    SELECT id, name, center_type, location_address 
+    FROM evacuation_areas 
+    WHERE (barangay_id = ? OR barangay_id IS NULL)
+    ORDER BY (barangay_id = ?) DESC, name ASC
+");
+$evacStmt->execute([$barangayId, $barangayId]);
+$evacuationVenues = $evacStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Status breakdown counts for current tab
+$baseWhere = "(barangay_id = ? OR barangay_id IS NULL)" . ($viewTab === 'archived' ? " AND is_archived = 1" : " AND (is_archived = 0 OR is_archived IS NULL)");
+
+$upcomingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime > ?");
+$upcomingCountStmt->execute([$barangayId, $nowStr]);
+$countUpcoming = (int)$upcomingCountStmt->fetchColumn();
+
+$ongoingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime <= ? AND end_datetime >= ?");
+$ongoingCountStmt->execute([$barangayId, $nowStr, $nowStr]);
+$countOngoing = (int)$ongoingCountStmt->fetchColumn();
+
+$completedCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status = 'Completed'");
+$completedCountStmt->execute([$barangayId]);
+$countCompleted = (int)$completedCountStmt->fetchColumn();
+
+$cancelledCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status = 'Cancelled'");
+$cancelledCountStmt->execute([$barangayId]);
+$countCancelled = (int)$cancelledCountStmt->fetchColumn();
+
+// Query String helper to preserve filters across actions
+function getEventFilterUrl($newParams = []) {
+  $params = $_GET;
+  foreach ($newParams as $k => $v) {
+    if ($v === null || $v === '') {
+      unset($params[$k]);
+    } else {
+      $params[$k] = $v;
+    }
+  }
+  return '?' . http_build_query($params);
+}
+
+// Fetch activities for this barangay based on tab and active filters
 $sql = "
     SELECT pa.*, b.name AS barangay_name, u.full_name AS creator_name 
     FROM events pa 
@@ -58,6 +108,7 @@ $sql = "
     LEFT JOIN users u ON pa.created_by = u.id 
     WHERE (pa.barangay_id = ? OR pa.barangay_id IS NULL)
 ";
+$params = [$barangayId];
 
 if ($viewTab === 'archived') {
   $sql .= " AND pa.is_archived = 1";
@@ -65,9 +116,42 @@ if ($viewTab === 'archived') {
   $sql .= " AND (pa.is_archived = 0 OR pa.is_archived IS NULL)";
 }
 
+if (!empty($filterType)) {
+  $sql .= " AND pa.activity_type = ?";
+  $params[] = $filterType;
+}
+
+if (!empty($filterVenue)) {
+  $sql .= " AND pa.venue = ?";
+  $params[] = $filterVenue;
+}
+
+if (!empty($filterStatus)) {
+  if ($filterStatus === 'Upcoming') {
+    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled') AND pa.start_datetime > ?";
+    $params[] = $nowStr;
+  } elseif ($filterStatus === 'Ongoing') {
+    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled') AND pa.start_datetime <= ? AND pa.end_datetime >= ?";
+    $params[] = $nowStr;
+    $params[] = $nowStr;
+  } else {
+    $sql .= " AND pa.status = ?";
+    $params[] = $filterStatus;
+  }
+}
+
+if (!empty($search)) {
+  $sql .= " AND (pa.title LIKE ? OR pa.venue LIKE ? OR pa.assigned_personnel LIKE ? OR pa.description LIKE ?)";
+  $like = "%$search%";
+  $params[] = $like;
+  $params[] = $like;
+  $params[] = $like;
+  $params[] = $like;
+}
+
 $sql .= " ORDER BY pa.start_datetime ASC";
 $stmt = $db->prepare($sql);
-$stmt->execute([$barangayId]);
+$stmt->execute($params);
 $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch registered residents of this barangay for quick selection in event registration
@@ -100,15 +184,7 @@ foreach ($rawAttendees as $att) {
 $smsLogsStmt = $db->query("SELECT * FROM sms_logs ORDER BY id DESC LIMIT 50");
 $recentSmsLogs = $smsLogsStmt ? $smsLogsStmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
-// Fetch designated evacuation areas for this barangay as expected venue options
-$evacStmt = $db->prepare("
-    SELECT id, name, center_type, location_address 
-    FROM evacuation_areas 
-    WHERE (barangay_id = ? OR barangay_id IS NULL)
-    ORDER BY (barangay_id = ?) DESC, name ASC
-");
-$evacStmt->execute([$barangayId, $barangayId]);
-$evacuationVenues = $evacStmt->fetchAll(PDO::FETCH_ASSOC);
+// Evacuation venues already fetched above
 
 $defaultExpectedByType = [
   "Health and Medical" => [
@@ -294,6 +370,7 @@ $defaultExpectedByType = [
   ]
 ];
 
+$filterActivityTypes = array_keys($defaultExpectedByType);
 $now = time();
 
 $pageTitle = "Manage Events — Barangay " . ($barangay['name'] ?? '');
@@ -500,8 +577,8 @@ require_once __DIR__ . '/../layouts/header.php';
 </div>
 
 <!-- Tabs Navigation: Active Events vs Archived Events -->
-<div class="nav-tabs" style="margin-bottom: var(--space-4, 16px);">
-  <a href="?tab=active" class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
+<div class="nav-tabs" style="margin-bottom: var(--space-3, 12px);">
+  <a href="<?= getEventFilterUrl(['tab' => 'active']) ?>" class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
       <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -511,7 +588,7 @@ require_once __DIR__ . '/../layouts/header.php';
     Active Events
     <span class="nav-tab-badge"><?= $activeCount ?></span>
   </a>
-  <a href="?tab=archived" class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
+  <a href="<?= getEventFilterUrl(['tab' => 'archived']) ?>" class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="21 8 21 21 3 21 3 8"></polyline>
       <rect x="1" y="3" width="22" height="5"></rect>
@@ -520,6 +597,162 @@ require_once __DIR__ . '/../layouts/header.php';
     Archived Events
     <span class="nav-tab-badge"><?= $archivedCount ?></span>
   </a>
+</div>
+
+<!-- Quick Status Filter Selection Buttons -->
+<div class="evac-filter-pills" style="margin-bottom: 12px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+  <span style="font-size:11px; font-weight:700; color:var(--color-text-secondary); margin-right:4px; text-transform:uppercase; letter-spacing:0.3px;">
+    Quick Status:
+  </span>
+  <a href="<?= getEventFilterUrl(['status' => '']) ?>" 
+     class="evac-pill-btn <?= empty($filterStatus) ? 'active' : '' ?>">
+    All Events <span class="badge <?= empty($filterStatus) ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $viewTab === 'archived' ? $archivedCount : $activeCount ?></span>
+  </a>
+  <a href="<?= getEventFilterUrl(['status' => 'Upcoming']) ?>" 
+     class="evac-pill-btn <?= $filterStatus === 'Upcoming' ? 'active' : '' ?>">
+    Upcoming <span class="badge <?= $filterStatus === 'Upcoming' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countUpcoming ?></span>
+  </a>
+  <a href="<?= getEventFilterUrl(['status' => 'Ongoing']) ?>" 
+     class="evac-pill-btn <?= $filterStatus === 'Ongoing' ? 'active' : '' ?>">
+    In Progress / Started <span class="badge <?= $filterStatus === 'Ongoing' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countOngoing ?></span>
+  </a>
+  <a href="<?= getEventFilterUrl(['status' => 'Completed']) ?>" 
+     class="evac-pill-btn <?= $filterStatus === 'Completed' ? 'active' : '' ?>">
+    Completed <span class="badge <?= $filterStatus === 'Completed' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countCompleted ?></span>
+  </a>
+  <?php if ($countCancelled > 0): ?>
+    <a href="<?= getEventFilterUrl(['status' => 'Cancelled']) ?>" 
+       class="evac-pill-btn <?= $filterStatus === 'Cancelled' ? 'active' : '' ?>">
+      Cancelled <span class="badge <?= $filterStatus === 'Cancelled' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countCancelled ?></span>
+    </a>
+  <?php endif; ?>
+</div>
+
+<!-- Search & Filter Selection Form Card -->
+<div class="card" style="margin-bottom: var(--space-4, 16px); background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 8px;">
+  <div class="card-body" style="padding: 12px 16px;">
+    <form method="GET" action="" class="filter-form" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+      <input type="hidden" name="tab" value="<?= clean($viewTab) ?>">
+
+      <!-- Search Input -->
+      <div style="flex:2; min-width:200px;">
+        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+          Search Activity
+        </label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <svg style="position:absolute; left:10px; width:14px; height:14px; color:#94A3B8; pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" name="search" class="form-control" style="padding-left:32px; font-size:12px; height:36px;" placeholder="Search title, facilitator, keyword..." value="<?= clean($search) ?>">
+        </div>
+      </div>
+
+      <!-- Activity Type Filter Selection -->
+      <div style="flex:1.2; min-width:170px;">
+        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+          Activity Type
+        </label>
+        <select name="type" class="form-control" style="font-size:12px; height:36px;">
+          <option value="">All Activity Types</option>
+          <?php foreach ($filterActivityTypes as $tName): ?>
+            <option value="<?= clean($tName) ?>" <?= $filterType === $tName ? 'selected' : '' ?>>
+              <?= clean($tName) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+
+      <!-- Venue Location Filter Selection (Strictly Evacuation Areas) -->
+      <div style="flex:1.5; min-width:200px;">
+        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+          Venue Location (Evacuation Areas)
+        </label>
+        <select name="venue" class="form-control" style="font-size:12px; height:36px;">
+          <option value="">All Evacuation Areas</option>
+          <?php foreach ($evacuationVenues as $ev): ?>
+            <option value="<?= htmlspecialchars($ev['name']) ?>" <?= $filterVenue === $ev['name'] ? 'selected' : '' ?>>
+              <?= htmlspecialchars($ev['name']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+
+      <!-- Status Filter Selection -->
+      <div style="flex:1; min-width:130px;">
+        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+          Status
+        </label>
+        <select name="status" class="form-control" style="font-size:12px; height:36px;">
+          <option value="">All Statuses</option>
+          <option value="Upcoming" <?= $filterStatus === 'Upcoming' ? 'selected' : '' ?>>Upcoming</option>
+          <option value="Ongoing" <?= $filterStatus === 'Ongoing' ? 'selected' : '' ?>>In Progress / Started</option>
+          <option value="Completed" <?= $filterStatus === 'Completed' ? 'selected' : '' ?>>Completed</option>
+          <option value="Cancelled" <?= $filterStatus === 'Cancelled' ? 'selected' : '' ?>>Cancelled</option>
+        </select>
+      </div>
+
+      <!-- Action Buttons: Filter Selection Button & Reset Button -->
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button type="submit" class="btn btn-primary" id="btnFilterSelection" style="height:36px; padding:0 15px; font-size:12px; display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          Filter Selection
+        </button>
+        <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
+          <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline" style="height:36px; padding:0 12px; font-size:12px; color:var(--color-text-muted); display:inline-flex; align-items:center; gap:4px;" title="Reset All Filters">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Reset
+          </a>
+        <?php endif; ?>
+      </div>
+    </form>
+
+    <!-- Active Filters Summary Line if any filter is set -->
+    <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
+      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #E2E8F0; display:flex; justify-content:space-between; align-items:center; font-size:11px; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <span style="font-weight:600; color:var(--color-text-secondary);">Applied Filters:</span>
+          <?php if (!empty($search)): ?>
+            <a href="<?= getEventFilterUrl(['search' => '']) ?>" class="badge badge-neutral" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+              Keyword: "<?= clean($search) ?>" &times;
+            </a>
+          <?php endif; ?>
+          <?php if (!empty($filterType)): ?>
+            <a href="<?= getEventFilterUrl(['type' => '']) ?>" class="badge badge-info" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+              Type: <?= clean($filterType) ?> &times;
+            </a>
+          <?php endif; ?>
+          <?php if (!empty($filterVenue)): ?>
+            <a href="<?= getEventFilterUrl(['venue' => '']) ?>" class="badge badge-success" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+              Venue: <?= clean($filterVenue) ?> &times;
+            </a>
+          <?php endif; ?>
+          <?php if (!empty($filterStatus)): ?>
+            <a href="<?= getEventFilterUrl(['status' => '']) ?>" class="badge badge-primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+              Status: <?= clean($filterStatus) ?> &times;
+            </a>
+          <?php endif; ?>
+          <a href="?tab=<?= clean($viewTab) ?>" style="font-size:10.5px; color:#DC2626; margin-left:6px; font-weight:600; text-decoration:underline;">
+            Clear All
+          </a>
+        </div>
+        <span style="color:var(--color-text-muted); font-size:10.5px; font-weight:600;">
+          Showing <?= count($activities) ?> event(s)
+        </span>
+      </div>
+    <?php else: ?>
+      <div style="margin-top:6px; display:flex; justify-content:flex-end;">
+        <span style="color:var(--color-text-muted); font-size:10px; font-weight:600;">
+          Total: <?= count($activities) ?> event(s) in <?= $viewTab === 'archived' ? 'archives' : 'active list' ?>
+        </span>
+      </div>
+    <?php endif; ?>
+  </div>
 </div>
 
 <div class="table-responsive">
@@ -539,8 +772,20 @@ require_once __DIR__ . '/../layouts/header.php';
     <tbody>
       <?php if (empty($activities)): ?>
         <tr>
-          <td colspan="8" style="text-align:center;padding:32px;">No preparedness activities found in
-            <?= $viewTab === 'archived' ? 'archived' : 'active' ?> list.
+          <td colspan="8" style="text-align:center;padding:36px;">
+            <div style="font-size:13px;font-weight:600;color:var(--color-text);">No preparedness events found</div>
+            <div style="font-size:11px;color:var(--color-text-muted);margin-top:4px;">
+              <?= (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus))
+                ? 'No activities match the current filter selection.'
+                : 'No activities found in ' . ($viewTab === 'archived' ? 'archived' : 'active') . ' list.' ?>
+            </div>
+            <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
+              <div style="margin-top:10px;">
+                <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline btn-xs" style="font-size:11px;padding:4px 10px;">
+                  Clear Filter Selection
+                </a>
+              </div>
+            <?php endif; ?>
           </td>
         </tr>
       <?php else: ?>
@@ -574,8 +819,7 @@ require_once __DIR__ . '/../layouts/header.php';
               <?php endif; ?>
             </td>
             <td>
-              <div style="font-weight:600;color:var(--color-primary);"><?= clean($act['title']) ?></div>
-              <div style="font-size:9.5px;color:var(--color-text-secondary);"><?= clean($act['description']) ?></div>
+              <div style="font-weight:600;color:var(--color-primary);"><?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?></div>
             </td>
             <td><span class="badge badge-info"><?= clean($act['activity_type']) ?></span></td>
             <td><?= clean($act['venue']) ?></td>
@@ -645,7 +889,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <div class="form-group">
           <label class="form-label form-label-required">Activity Title</label>
           <input type="text" name="title" class="form-control"
-            placeholder="e.g. Purok Riverside Flash Flood Evacuation Drill" required>
+            placeholder="e.g. Flood Evacuation & Early Warning Simulation Drill" required>
         </div>
 
         <div class="form-group">
@@ -696,40 +940,15 @@ require_once __DIR__ . '/../layouts/header.php';
         </div>
 
         <div class="form-group">
-          <label class="form-label form-label-required">Venue / Location</label>
-          <select name="venue_select" id="create_venue_select" class="form-control"
-            onchange="onVenueSelectChange(this, 'create_custom_venue_wrap', 'create_custom_venue_input', 'create_final_venue_input')"
-            required>
-            <option value="" disabled selected>-- Select Designated Evacuation Center or Venue --</option>
-            <?php if (!empty($evacuationVenues)): ?>
-              <optgroup label="Designated Evacuation Areas (Barangay Refuge Shelters)">
-                <?php foreach ($evacuationVenues as $ev): ?>
-                  <option value="<?= htmlspecialchars($ev['name']) ?>">
-                    <?= htmlspecialchars($ev['name']) ?>
-                    (<?= htmlspecialchars($ev['center_type'] ?? 'Evacuation Center') ?>)
-                  </option>
-                <?php endforeach; ?>
-              </optgroup>
-            <?php endif; ?>
-            <optgroup label="Barangay Facilities & Community Assembly Grounds">
-              <option value="Barangay Multi-Purpose Covered Court">Barangay Multi-Purpose Covered Court</option>
-              <option value="Barangay Session Hall & Disaster Operations Center">Barangay Session Hall & Disaster
-                Operations Center</option>
-              <option value="Barangay Health Center Grounds">Barangay Health Center Grounds</option>
-              <option value="Barangay Riverside / Coastal Assembly Grounds">Barangay Riverside / Coastal Assembly
-                Grounds</option>
-              <option value="Purok Central Open Grounds">Purok Central Open Grounds</option>
-            </optgroup>
-            <optgroup label="Custom Location">
-              <option value="__custom__">➕ Other Location (Specify Custom Venue)...</option>
-            </optgroup>
+          <label class="form-label form-label-required">Venue Location (Evacuation Areas)</label>
+          <select name="venue" id="create_venue_select" class="form-control" required>
+            <option value="" disabled selected>-- Select Evacuation Area --</option>
+            <?php foreach ($evacuationVenues as $ev): ?>
+              <option value="<?= htmlspecialchars($ev['name']) ?>">
+                <?= htmlspecialchars($ev['name']) ?> (<?= htmlspecialchars($ev['center_type'] ?? 'Evacuation Center') ?>)
+              </option>
+            <?php endforeach; ?>
           </select>
-          <div id="create_custom_venue_wrap" style="display:none;margin-top:6px;">
-            <input type="text" name="venue_custom" id="create_custom_venue_input" class="form-control"
-              placeholder="Specify custom venue or exact location address..."
-              oninput="document.getElementById('create_final_venue_input').value = this.value.trim();">
-          </div>
-          <input type="hidden" name="venue" id="create_final_venue_input">
         </div>
 
         <div class="form-row">
@@ -847,40 +1066,15 @@ require_once __DIR__ . '/../layouts/header.php';
         </div>
 
         <div class="form-group">
-          <label class="form-label form-label-required">Venue / Location</label>
-          <select name="venue_select" id="edit_venue_select" class="form-control"
-            onchange="onVenueSelectChange(this, 'edit_custom_venue_wrap', 'edit_custom_venue_input', 'edit_act_venue')"
-            required>
-            <option value="" disabled>-- Select Designated Evacuation Center or Venue --</option>
-            <?php if (!empty($evacuationVenues)): ?>
-              <optgroup label="Designated Evacuation Areas (Barangay Refuge Shelters)">
-                <?php foreach ($evacuationVenues as $ev): ?>
-                  <option value="<?= htmlspecialchars($ev['name']) ?>">
-                    <?= htmlspecialchars($ev['name']) ?>
-                    (<?= htmlspecialchars($ev['center_type'] ?? 'Evacuation Center') ?>)
-                  </option>
-                <?php endforeach; ?>
-              </optgroup>
-            <?php endif; ?>
-            <optgroup label="Barangay Facilities & Community Assembly Grounds">
-              <option value="Barangay Multi-Purpose Covered Court">Barangay Multi-Purpose Covered Court</option>
-              <option value="Barangay Session Hall & Disaster Operations Center">Barangay Session Hall & Disaster
-                Operations Center</option>
-              <option value="Barangay Health Center Grounds">Barangay Health Center Grounds</option>
-              <option value="Barangay Riverside / Coastal Assembly Grounds">Barangay Riverside / Coastal Assembly
-                Grounds</option>
-              <option value="Purok Central Open Grounds">Purok Central Open Grounds</option>
-            </optgroup>
-            <optgroup label="Custom Location">
-              <option value="__custom__">➕ Other Location (Specify Custom Venue)...</option>
-            </optgroup>
+          <label class="form-label form-label-required">Venue Location (Evacuation Areas)</label>
+          <select name="venue" id="edit_venue_select" class="form-control" required>
+            <option value="" disabled>-- Select Evacuation Area --</option>
+            <?php foreach ($evacuationVenues as $ev): ?>
+              <option value="<?= htmlspecialchars($ev['name']) ?>">
+                <?= htmlspecialchars($ev['name']) ?> (<?= htmlspecialchars($ev['center_type'] ?? 'Evacuation Center') ?>)
+              </option>
+            <?php endforeach; ?>
           </select>
-          <div id="edit_custom_venue_wrap" style="display:none;margin-top:6px;">
-            <input type="text" name="venue_custom" id="edit_custom_venue_input" class="form-control"
-              placeholder="Specify custom venue or exact location address..."
-              oninput="document.getElementById('edit_act_venue').value = this.value.trim();">
-          </div>
-          <input type="hidden" name="venue" id="edit_act_venue">
         </div>
 
         <div class="form-row">
@@ -1751,27 +1945,7 @@ require_once __DIR__ . '/../layouts/header.php';
     container.scrollTop = container.scrollHeight;
   }
 
-  function onVenueSelectChange(sel, wrapId, inputId, finalInputId) {
-    const wrap = document.getElementById(wrapId);
-    const input = document.getElementById(inputId);
-    const finalInput = document.getElementById(finalInputId);
-
-    if (sel.value === '__custom__') {
-      if (wrap) wrap.style.display = 'block';
-      if (input) {
-        input.setAttribute('required', 'required');
-        input.focus();
-        if (finalInput) finalInput.value = input.value.trim();
-      }
-    } else {
-      if (wrap) wrap.style.display = 'none';
-      if (input) {
-        input.removeAttribute('required');
-        input.value = '';
-      }
-      if (finalInput) finalInput.value = sel.value;
-    }
-  }
+  function onVenueSelectChange() {}
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -1790,29 +1964,18 @@ require_once __DIR__ . '/../layouts/header.php';
     const initialCreateType = document.getElementById('create_activity_type')?.value || Object.keys(EXPECTED_ACTIVITIES_BY_TYPE)[0];
     onActivityTypeChange('create', initialCreateType);
 
-    // Sync Venue selection before form submission
+    // Validate Venue selection from evacuation areas before form submission
     ['createActivityForm', 'editActivityForm'].forEach(formId => {
       const form = document.getElementById(formId);
       if (!form) return;
       form.addEventListener('submit', function (e) {
         const isCreate = (formId === 'createActivityForm');
         const sel = document.getElementById(isCreate ? 'create_venue_select' : 'edit_venue_select');
-        const customInput = document.getElementById(isCreate ? 'create_custom_venue_input' : 'edit_custom_venue_input');
-        const finalInput = document.getElementById(isCreate ? 'create_final_venue_input' : 'edit_act_venue');
-
-        if (sel && finalInput) {
-          if (sel.value === '__custom__') {
-            finalInput.value = customInput ? customInput.value.trim() : '';
-          } else {
-            finalInput.value = sel.value;
-          }
-
-          if (!finalInput.value) {
-            e.preventDefault();
-            alert('Please select or specify an event venue.');
-            sel.focus();
-            return false;
-          }
+        if (sel && !sel.value) {
+          e.preventDefault();
+          alert('Please select a venue from the evacuation areas.');
+          sel.focus();
+          return false;
         }
       });
     });
@@ -2864,42 +3027,16 @@ require_once __DIR__ . '/../layouts/header.php';
     document.getElementById('edit_act_target').value = act.target_participants || 50;
     document.getElementById('edit_act_desc').value = act.description || '';
 
-    // Venue handling (select dropdown with custom fallback)
+    // Venue handling (select strictly from evacuation areas)
     const editVenueSelect = document.getElementById('edit_venue_select');
-    const editCustomWrap = document.getElementById('edit_custom_venue_wrap');
-    const editCustomInput = document.getElementById('edit_custom_venue_input');
-    const editFinalVenue = document.getElementById('edit_act_venue');
-
-    if (editFinalVenue) editFinalVenue.value = act.venue || '';
     if (editVenueSelect) {
-      let foundVenue = false;
-      for (let i = 0; i < editVenueSelect.options.length; i++) {
-        if (editVenueSelect.options[i].value === act.venue) {
-          editVenueSelect.selectedIndex = i;
-          foundVenue = true;
-          break;
-        }
-      }
-      if (foundVenue) {
-        if (editCustomWrap) editCustomWrap.style.display = 'none';
-        if (editCustomInput) {
-          editCustomInput.removeAttribute('required');
-          editCustomInput.value = '';
-        }
-      } else if (act.venue) {
-        editVenueSelect.value = '__custom__';
-        if (editCustomWrap) editCustomWrap.style.display = 'block';
-        if (editCustomInput) {
-          editCustomInput.value = act.venue;
-          editCustomInput.setAttribute('required', 'required');
-        }
-      } else {
-        editVenueSelect.selectedIndex = 0;
-        if (editCustomWrap) editCustomWrap.style.display = 'none';
-        if (editCustomInput) {
-          editCustomInput.removeAttribute('required');
-          editCustomInput.value = '';
-        }
+      editVenueSelect.value = act.venue || '';
+      if (act.venue && editVenueSelect.value !== act.venue) {
+        const opt = document.createElement('option');
+        opt.value = act.venue;
+        opt.textContent = act.venue;
+        editVenueSelect.appendChild(opt);
+        editVenueSelect.value = act.venue;
       }
     }
 

@@ -152,6 +152,17 @@ try {
         ]);
     }
 
+    // Sync coordinates if venue is an evacuation area
+    if ($venue !== $act['venue']) {
+        $evacCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM evacuation_areas WHERE (barangay_id = ? OR barangay_id IS NULL) AND name = ? LIMIT 1");
+        $evacCoordStmt->execute([$act['barangay_id'], $venue]);
+        $evacCoord = $evacCoordStmt->fetch(PDO::FETCH_ASSOC);
+        if ($evacCoord && $evacCoord['coordinates_lat'] && $evacCoord['coordinates_lng']) {
+            $coordUpdate = $db->prepare("UPDATE events SET latitude = ?, longitude = ? WHERE id = ?");
+            $coordUpdate->execute([$evacCoord['coordinates_lat'], $evacCoord['coordinates_lng'], $id]);
+        }
+    }
+
     logSystemEvent('UPDATE_ACTIVITY', 'Preparedness', "Updated event #$id: $title ($type)");
 
     if ($isAjax) {

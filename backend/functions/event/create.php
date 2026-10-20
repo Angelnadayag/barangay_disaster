@@ -62,23 +62,31 @@ try {
         $db->exec("ALTER TABLE events ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
     }
 
-    // Look up coordinates from venue match in puroks or barangays
+    // Look up coordinates from evacuation areas, puroks, or barangays
     $eventLat = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
     $eventLng = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
     if (!$eventLat || !$eventLng) {
-        $pCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM puroks WHERE barangay_id = ? AND ? LIKE CONCAT('%', name, '%') LIMIT 1");
-        $pCoordStmt->execute([$barangayId, $venue]);
-        $pCoord = $pCoordStmt->fetch(PDO::FETCH_ASSOC);
-        if ($pCoord) {
-            $eventLat = $pCoord['coordinates_lat'];
-            $eventLng = $pCoord['coordinates_lng'];
+        $evacCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM evacuation_areas WHERE (barangay_id = ? OR barangay_id IS NULL) AND name = ? LIMIT 1");
+        $evacCoordStmt->execute([$barangayId, $venue]);
+        $evacCoord = $evacCoordStmt->fetch(PDO::FETCH_ASSOC);
+        if ($evacCoord && $evacCoord['coordinates_lat'] && $evacCoord['coordinates_lng']) {
+            $eventLat = (float)$evacCoord['coordinates_lat'];
+            $eventLng = (float)$evacCoord['coordinates_lng'];
         } else {
-            $bCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM barangays WHERE id = ?");
-            $bCoordStmt->execute([$barangayId]);
-            $bCoord = $bCoordStmt->fetch(PDO::FETCH_ASSOC);
-            if ($bCoord) {
-                $eventLat = $bCoord['coordinates_lat'];
-                $eventLng = $bCoord['coordinates_lng'];
+            $pCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM puroks WHERE barangay_id = ? AND ? LIKE CONCAT('%', name, '%') LIMIT 1");
+            $pCoordStmt->execute([$barangayId, $venue]);
+            $pCoord = $pCoordStmt->fetch(PDO::FETCH_ASSOC);
+            if ($pCoord) {
+                $eventLat = $pCoord['coordinates_lat'];
+                $eventLng = $pCoord['coordinates_lng'];
+            } else {
+                $bCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM barangays WHERE id = ?");
+                $bCoordStmt->execute([$barangayId]);
+                $bCoord = $bCoordStmt->fetch(PDO::FETCH_ASSOC);
+                if ($bCoord) {
+                    $eventLat = $bCoord['coordinates_lat'];
+                    $eventLng = $bCoord['coordinates_lng'];
+                }
             }
         }
     }

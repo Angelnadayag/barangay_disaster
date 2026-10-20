@@ -17,7 +17,7 @@ if ($check === 0) {
     ");
 
     $stmt->execute([
-        'REQ-2026-001', 12, 'Purok Riverside 1', 8.248100, 124.261200,
+        'REQ-2026-001', 12, 'Purok 1', 8.248100, 124.261200,
         'Along Mandulog River Dike near Footbridge',
         'Flash Flood', 'Critical', 'Immediate',
         45, 180, 45,
@@ -28,8 +28,8 @@ if ($check === 0) {
     ]);
 
     $stmt->execute([
-        'REQ-2026-002', 12, 'Purok San Miguel', 8.244200, 124.257500,
-        'San Miguel Main Access Road, Purok 3',
+        'REQ-2026-002', 12, 'Purok 2', 8.244200, 124.257500,
+        'San Miguel Main Access Road, Purok 2',
         'Flood', 'High', 'High',
         28, 112, 10,
         0, 0, 0,
