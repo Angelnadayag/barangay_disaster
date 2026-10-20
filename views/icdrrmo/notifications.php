@@ -122,8 +122,8 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
                   <a href="<?= BASE_URL ?>/views/icdrrmo/disaster-reports.php" class="btn btn-outline btn-sm">View Disaster Report</a>
                 <?php elseif ($a['related_module'] === 'recommendation' && $a['related_id']): ?>
                   <a href="<?= BASE_URL ?>/views/icdrrmo/recommendations.php?id=<?= $a['related_id'] ?>" class="btn btn-secondary btn-sm">View Recommendation</a>
-                <?php elseif ($a['related_module'] === 'preparedness' && $a['related_id']): ?>
-                  <a href="<?= BASE_URL ?>/views/icdrrmo/preparedness.php" class="btn btn-outline btn-sm">View Activity</a>
+                <?php elseif (in_array($a['related_module'], ['preparedness', 'event', 'events'], true) && $a['related_id']): ?>
+                  <a href="<?= BASE_URL ?>/views/icdrrmo/events.php" class="btn btn-outline btn-sm">View Activity</a>
                 <?php endif; ?>
               </div>
             </div>

@@ -782,7 +782,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <div class="card" style="margin-bottom:0;">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
           <h3 class="card-title">Community Drills & Events</h3>
-          <a href="<?= BASE_URL ?>/views/barangay/preparedness.php" class="btn btn-outline btn-sm">All</a>
+          <a href="<?= BASE_URL ?>/views/barangay/events.php" class="btn btn-outline btn-sm">All</a>
         </div>
         <div class="card-body" style="padding:10px 14px;">
           <?php if (empty($recentActivities)): ?>
