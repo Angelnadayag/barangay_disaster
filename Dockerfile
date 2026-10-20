@@ -28,5 +28,5 @@ RUN chown -R www-data:www-data /var/www/html
 # Expose default port
 EXPOSE 80
 
-# Clean any conflicting MPMs at startup, bind to Railway's dynamic $PORT, and start Apache
-CMD ["sh", "-c", "rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.* && a2enmod mpm_prefork 2>/dev/null || true; sed -i \"s/Listen 80/Listen ${PORT:-80}/\" /etc/apache2/ports.conf; sed -i \"s/<VirtualHost \\*:80>/<VirtualHost *:${PORT:-80}>/\" /etc/apache2/sites-available/000-default.conf; apache2-foreground"]
+# Clean any conflicting MPMs at startup, bind to Railway's dynamic $PORT, auto-run database migration, and start Apache
+CMD ["sh", "-c", "rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.* && a2enmod mpm_prefork 2>/dev/null || true; sed -i \"s/Listen 80/Listen ${PORT:-80}/\" /etc/apache2/ports.conf; sed -i \"s/<VirtualHost \\*:80>/<VirtualHost *:${PORT:-80}>/\" /etc/apache2/sites-available/000-default.conf; php migrate.php || true; apache2-foreground"]

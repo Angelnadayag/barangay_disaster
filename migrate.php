@@ -197,7 +197,7 @@ try {
             }
         }
 
-        // Table: disaster_reports (Geolocation & Street View Pinpoint)
+        // Table: disaster_reports (Geolocation, Street View Pinpoint & Aid Support)
         if (in_array('disaster_reports', $existingTables, true)) {
             if (!$hasColumn($pdo, 'disaster_reports', 'coordinates_lat')) {
                 echo "  [+] Adding column `coordinates_lat` to `disaster_reports`...\n";
@@ -211,6 +211,10 @@ try {
                 echo "  [+] Adding column `incident_location` to `disaster_reports`...\n";
                 $pdo->exec("ALTER TABLE `disaster_reports` ADD COLUMN `incident_location` varchar(255) DEFAULT NULL AFTER `coordinates_lng`;");
             }
+            if (!$hasColumn($pdo, 'disaster_reports', 'aid_support')) {
+                echo "  [+] Adding column `aid_support` to `disaster_reports`...\n";
+                $pdo->exec("ALTER TABLE `disaster_reports` ADD COLUMN `aid_support` enum('resources','financial_aid','both') NOT NULL DEFAULT 'resources' AFTER `urgency`;");
+            }
         }
 
         // Table: recommendations (Support selection between resources, financial_aid, or both & funding sponsor)
@@ -219,13 +223,33 @@ try {
                 echo "  [+] Adding column `modality` to `recommendations`...\n";
                 $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `modality` enum('both','resources','financial_aid') NOT NULL DEFAULT 'both' AFTER `priority`;");
             }
+            if (!$hasColumn($pdo, 'recommendations', 'financial_aid_recommended_budget')) {
+                echo "  [+] Adding column `financial_aid_recommended_budget` to `recommendations`...\n";
+                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_recommended_budget` decimal(12,2) DEFAULT NULL AFTER `recommendation_reason`;");
+            }
+            if (!$hasColumn($pdo, 'recommendations', 'financial_aid_per_family')) {
+                echo "  [+] Adding column `financial_aid_per_family` to `recommendations`...\n";
+                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_per_family` decimal(10,2) DEFAULT NULL AFTER `financial_aid_recommended_budget`;");
+            }
+            if (!$hasColumn($pdo, 'recommendations', 'financial_aid_target_families')) {
+                echo "  [+] Adding column `financial_aid_target_families` to `recommendations`...\n";
+                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_target_families` int(11) DEFAULT NULL AFTER `financial_aid_per_family`;");
+            }
             if (!$hasColumn($pdo, 'recommendations', 'financial_aid_source')) {
                 echo "  [+] Adding column `financial_aid_source` to `recommendations`...\n";
                 $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_source` varchar(150) NOT NULL DEFAULT 'LGU Calamity Fund (QRF)' AFTER `financial_aid_target_families`;");
             }
+            if (!$hasColumn($pdo, 'recommendations', 'financial_aid_approved_budget')) {
+                echo "  [+] Adding column `financial_aid_approved_budget` to `recommendations`...\n";
+                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_approved_budget` decimal(12,2) DEFAULT NULL AFTER `financial_aid_source`;");
+            }
             if (!$hasColumn($pdo, 'recommendations', 'financial_aid_added_type')) {
                 echo "  [+] Adding column `financial_aid_added_type` to `recommendations`...\n";
-                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_added_type` enum('ai_recommended','added_by_admin') NOT NULL DEFAULT 'ai_recommended' AFTER `financial_aid_source`;");
+                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_added_type` enum('ai_recommended','added_by_admin') NOT NULL DEFAULT 'ai_recommended' AFTER `financial_aid_approved_budget`;");
+            }
+            if (!$hasColumn($pdo, 'recommendations', 'financial_aid_allocation_id')) {
+                echo "  [+] Adding column `financial_aid_allocation_id` to `recommendations`...\n";
+                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_allocation_id` int(11) DEFAULT NULL AFTER `financial_aid_added_type`;");
             }
         }
 
@@ -404,8 +428,7 @@ try {
     foreach ($tables as $t) {
         echo "  - " . $t . "\n";
     }
-    echo "========================================================\n";
-    echo "Tip: Run 'railway run php migrate.php --fresh' if you want a complete database reset.\n\n";
+    echo "Tip: Run 'C:\\xampp\\php\\php.exe migrate.php --fresh' (or 'php migrate.php --fresh') if you want a complete database reset.\n\n";
 
 } catch (Throwable $e) {
     echo "\n[ERROR] Migration failed:\n" . $e->getMessage() . "\n\n";
