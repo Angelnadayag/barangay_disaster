@@ -16,7 +16,10 @@ $barangayId = (int) ($user['barangay_id'] ?? 1);
 $userPurok = trim($user['purok'] ?? '');
 $db = getDBConnection();
 
-$filterTab = $_GET['tab'] ?? 'upcoming';
+$filterTab = $_GET['tab'] ?? 'attending';
+if ($filterTab === 'upcoming' || $filterTab === 'my_drills') {
+  $filterTab = 'attending';
+}
 $searchQuery = trim($_GET['q'] ?? '');
 
 // Fetch Resident's Registered Event IDs
@@ -45,19 +48,21 @@ if (!empty($userPurok)) {
   }
 }
 
-// 1. Upcoming Count
-$countUpcomingStmt = $db->prepare("
-    SELECT COUNT(*) FROM events e 
-    LEFT JOIN users u ON e.created_by = u.id 
-    WHERE {$baseWhere}
-      AND e.start_datetime >= CURDATE() 
-      AND e.status != 'Cancelled'
-");
-$countUpcomingStmt->execute($baseParams);
-$countUpcoming = (int) $countUpcomingStmt->fetchColumn();
-
-// 2. My Drills Count
-$countMyDrills = count($myRegisteredEventIds);
+// 1. Attending Count (Upcoming registered events only)
+$countAttending = 0;
+if (!empty($myRegisteredEventIds)) {
+  $inAttending = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+  $countAttStmt = $db->prepare("
+      SELECT COUNT(*) FROM events e 
+      LEFT JOIN users u ON e.created_by = u.id 
+      WHERE {$baseWhere}
+        AND e.id IN ($inAttending)
+        AND e.start_datetime >= CURDATE() 
+        AND e.status != 'Cancelled'
+  ");
+  $countAttStmt->execute(array_merge($baseParams, $myRegisteredEventIds));
+  $countAttending = (int) $countAttStmt->fetchColumn();
+}
 
 // 3. Missed Events Count & Most Recent Missed Event
 $missedWhere = "{$baseWhere} AND (e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled'";
@@ -75,6 +80,25 @@ $countMissedStmt = $db->prepare("
 ");
 $countMissedStmt->execute($missedParams);
 $countMissed = (int) $countMissedStmt->fetchColumn();
+
+// 3. Completed Events Count (Past attended events)
+$countCompleted = 0;
+if (!empty($myRegisteredEventIds)) {
+  $inCompleted = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+  $countCompStmt = $db->prepare("
+      SELECT COUNT(*) FROM events e 
+      LEFT JOIN users u ON e.created_by = u.id 
+      WHERE {$baseWhere}
+        AND e.id IN ($inCompleted)
+        AND (e.status = 'Completed' OR e.start_datetime < CURDATE())
+        AND e.status != 'Cancelled'
+  ");
+  $countCompStmt->execute(array_merge($baseParams, $myRegisteredEventIds));
+  $countCompleted = (int) $countCompStmt->fetchColumn();
+}
+
+// 4. All My Events Count (Attending + Missed + Completed)
+$countAllMy = $countAttending + $countMissed + $countCompleted;
 
 // Fetch most recent missed event for instant top alert banner
 $recentMissedEvent = null;
@@ -102,12 +126,10 @@ $feedSql = "
 ";
 $feedParams = $baseParams;
 
-if ($filterTab === 'upcoming') {
-  $feedSql .= " AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled'";
-} elseif ($filterTab === 'my_drills') {
+if ($filterTab === 'attending') {
   if (!empty($myRegisteredEventIds)) {
     $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
-    $feedSql .= " AND e.id IN ($inPlaceholders)";
+    $feedSql .= " AND e.id IN ($inPlaceholders) AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled' ORDER BY e.start_datetime ASC";
     $feedParams = array_merge($feedParams, $myRegisteredEventIds);
   } else {
     $feedSql .= " AND 1=0";
@@ -119,8 +141,28 @@ if ($filterTab === 'upcoming') {
     $feedSql .= " AND e.id NOT IN ($inPlaceholders)";
     $feedParams = array_merge($feedParams, $myRegisteredEventIds);
   }
+  $feedSql .= " ORDER BY e.start_datetime DESC";
 } elseif ($filterTab === 'completed') {
-  $feedSql .= " AND (e.status = 'Completed' OR e.start_datetime < CURDATE())";
+  if (!empty($myRegisteredEventIds)) {
+    $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+    $feedSql .= " AND e.id IN ($inPlaceholders) AND (e.status = 'Completed' OR e.start_datetime < CURDATE()) AND e.status != 'Cancelled' ORDER BY e.start_datetime DESC";
+    $feedParams = array_merge($feedParams, $myRegisteredEventIds);
+  } else {
+    $feedSql .= " AND 1=0";
+  }
+} elseif ($filterTab === 'all') {
+  // Strictly Attending + Missed + Completed (strictly no unjoined upcoming events!)
+  if (!empty($myRegisteredEventIds)) {
+    $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+    $feedSql .= " AND (
+      (e.id IN ($inPlaceholders) AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled')
+      OR ((e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled')
+    )";
+    $feedParams = array_merge($feedParams, $myRegisteredEventIds);
+  } else {
+    $feedSql .= " AND (e.start_datetime < NOW() OR e.status = 'Completed') AND e.status != 'Cancelled'";
+  }
+  $feedSql .= " ORDER BY (e.start_datetime >= CURDATE()) DESC, e.start_datetime DESC";
 }
 
 if (!empty($searchQuery)) {
@@ -129,13 +171,6 @@ if (!empty($searchQuery)) {
   $feedParams[] = $like;
   $feedParams[] = $like;
   $feedParams[] = $like;
-}
-
-// Order: Upcoming first (ASC), Missed/Past by most recent first (DESC)
-if ($filterTab === 'missed' || $filterTab === 'completed') {
-  $feedSql .= " ORDER BY e.start_datetime DESC";
-} else {
-  $feedSql .= " ORDER BY (e.start_datetime >= NOW()) DESC, e.start_datetime ASC";
 }
 
 $stmt = $db->prepare($feedSql);
@@ -435,6 +470,41 @@ require_once __DIR__ . '/../layouts/header.php';
     border: 1px solid var(--color-success-border, #BCE3C1);
   }
 
+  /* Cancel Join Button - Restrained, clean, accessible */
+  .btn-cancel-join {
+    font-family: var(--font-primary, 'Poppins', sans-serif);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: var(--radius-sm, 6px);
+    padding: 6px 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 34px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    color: #C62828;
+    transition: all 0.15s ease;
+  }
+
+  .btn-cancel-join:hover {
+    background: #FEF2F2;
+    border-color: #F87171;
+    color: #991B1B;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(198, 40, 40, 0.12);
+  }
+
+  .btn-cancel-join:active {
+    transform: translateY(0);
+  }
+
+  .btn-cancel-join:disabled {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
   /* Navigate to Venue Button with Loading State */
   .btn-navigate-venue {
     font-family: var(--font-primary, 'Poppins', sans-serif);
@@ -671,20 +741,17 @@ require_once __DIR__ . '/../layouts/header.php';
     </form>
 
     <div class="event-pills-row">
-      <a href="events.php?tab=upcoming" class="event-pill-link <?= ($filterTab === 'upcoming') ? 'active' : '' ?>">
-        Upcoming Events (<?= $countUpcoming ?>)
-      </a>
-      <a href="events.php?tab=my_drills" class="event-pill-link <?= ($filterTab === 'my_drills') ? 'active' : '' ?>">
-        My Registered Drills (<?= $countMyDrills ?>)
+      <a href="events.php?tab=attending" class="event-pill-link <?= ($filterTab === 'attending') ? 'active' : '' ?>">
+        Attending Events (<?= $countAttending ?>)
       </a>
       <a href="events.php?tab=missed" class="event-pill-link pill-missed <?= ($filterTab === 'missed') ? 'active' : '' ?>">
         Missed Events (<?= $countMissed ?>)
       </a>
-      <a href="events.php?tab=all" class="event-pill-link <?= ($filterTab === 'all') ? 'active' : '' ?>">
-        All Events
-      </a>
       <a href="events.php?tab=completed" class="event-pill-link <?= ($filterTab === 'completed') ? 'active' : '' ?>">
-        Past / Completed
+        Completed Events (<?= $countCompleted ?>)
+      </a>
+      <a href="events.php?tab=all" class="event-pill-link <?= ($filterTab === 'all') ? 'active' : '' ?>">
+        All My Events (<?= $countAllMy ?>)
       </a>
     </div>
   </div>
@@ -695,9 +762,30 @@ require_once __DIR__ . '/../layouts/header.php';
     <!-- Left Column: Events Feed -->
     <div style="display:flex;flex-direction:column;gap:10px;">
       <?php if (empty($eventsList)): ?>
-        <div class="resident-event-card" style="padding:36px;text-align:center;color:var(--color-text-muted);">
-          No preparedness drills or community events match this filter.
-        </div>
+        <?php if ($filterTab === 'attending'): ?>
+          <div class="resident-event-card" style="padding:36px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
+            <div style="font-size:26px;">📅</div>
+            <div style="font-size:14px;font-weight:700;color:var(--color-primary);">No Attending Events</div>
+            <div style="font-size:11.5px;color:var(--color-text-secondary);max-width:440px;line-height:1.5;">
+              You have not joined any upcoming drills or community activities yet. All open disaster drills and aid distributions can be joined from your Home dashboard.
+            </div>
+            <a href="dashboard.php#upcoming-join-events" class="btn btn-primary btn-sm" style="font-size:11px;padding:7px 18px;margin-top:6px;display:inline-flex;align-items:center;gap:6px;">
+              Browse &amp; Join Events on Home &rarr;
+            </a>
+          </div>
+        <?php elseif ($filterTab === 'missed'): ?>
+          <div class="resident-event-card" style="padding:36px;text-align:center;color:var(--color-text-muted);">
+            No missed events recorded. You are all caught up with your barangay drills!
+          </div>
+        <?php elseif ($filterTab === 'completed'): ?>
+          <div class="resident-event-card" style="padding:36px;text-align:center;color:var(--color-text-muted);">
+            No completed past events recorded yet.
+          </div>
+        <?php else: ?>
+          <div class="resident-event-card" style="padding:36px;text-align:center;color:var(--color-text-muted);">
+            No events match your current filter.
+          </div>
+        <?php endif; ?>
       <?php else: ?>
         <?php foreach ($eventsList as $act):
           $eventId = (int) $act['id'];
@@ -826,22 +914,14 @@ require_once __DIR__ . '/../layouts/header.php';
                   <span class="badge badge-neutral" style="font-size:10px;">
                     <?= $isCancelled ? 'Event Cancelled' : 'Completed Activity' ?>
                   </span>
-                <?php else: ?>
-                  <button type="button" id="rsvp-btn-<?= $eventId ?>"
-                    class="rsvp-toggle-btn <?= $isAttending ? 'registered' : 'attend' ?>"
-                    onclick="event.stopPropagation(); toggleRsvp(<?= $eventId ?>)">
-                    <?php if ($isAttending): ?>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      Attending (Registered)
-                    <?php else: ?>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                      Join / Attend Drill
-                    <?php endif; ?>
+                <?php elseif ($isAttending): ?>
+                  <button type="button" class="btn-cancel-join" id="cancel-btn-<?= $eventId ?>"
+                    onclick="event.stopPropagation(); promptCancelJoin(<?= $eventId ?>, '<?= htmlspecialchars(addslashes($act['title']), ENT_QUOTES) ?>')">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    Cancel Join
                   </button>
                 <?php endif; ?>
               </div>
@@ -960,7 +1040,8 @@ require_once __DIR__ . '/../layouts/header.php';
       </div>
 
       <!-- Footer Action -->
-      <div style="display:flex;justify-content:flex-end;padding-top:10px;border-top:1px solid #E7EDF0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid #E7EDF0;flex-wrap:wrap;gap:8px;">
+        <div id="detailsModalActionSlot"></div>
         <button type="button" class="btn btn-outline btn-sm" onclick="closeEventDetailsModal()" style="font-size:11px;padding:6px 16px;">Close</button>
       </div>
     </div>
@@ -998,14 +1079,52 @@ require_once __DIR__ . '/../layouts/header.php';
 </div>
 
 <script>
-  // Dynamic AJAX RSVP Toggle
-  function toggleRsvp(eventId) {
-    const btn = document.getElementById(`rsvp-btn-${eventId}`);
-    if (!btn) return;
+  // Dynamic AJAX Cancel Attendance RSVP Handler
+  let pendingCancelEventId = null;
+  let pendingCancelEventTitle = '';
 
-    btn.disabled = true;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = 'Updating...';
+  function promptCancelJoin(eventId, eventTitle) {
+    pendingCancelEventId = eventId;
+    pendingCancelEventTitle = eventTitle;
+
+    const modalTitle = document.getElementById('confirmModalTitle');
+    const modalMsg = document.getElementById('confirmModalMessage');
+    const submitBtn = document.getElementById('confirmModalSubmitBtn');
+
+    if (modalTitle) modalTitle.textContent = 'Cancel Event Attendance';
+    if (modalMsg) {
+      modalMsg.innerHTML = `Are you sure you want to cancel your attendance for <strong>${escapeHtml(eventTitle)}</strong>?<br><span style="color:var(--color-text-secondary);font-size:11px;margin-top:4px;display:inline-block;">You can rejoin this event anytime from the Home dashboard.</span>`;
+    }
+    if (submitBtn) {
+      submitBtn.className = 'btn btn-danger btn-sm';
+      submitBtn.textContent = 'Yes, Cancel Join';
+      submitBtn.onclick = executeCancelJoin;
+    }
+
+    if (typeof openModal === 'function') {
+      openModal('confirmationModal');
+    } else {
+      const modal = document.getElementById('confirmationModal');
+      if (modal) modal.classList.add('active');
+    }
+  }
+
+  function executeCancelJoin() {
+    if (!pendingCancelEventId) return;
+    const eventId = pendingCancelEventId;
+
+    if (typeof closeModal === 'function') {
+      closeModal('confirmationModal');
+    } else {
+      const modal = document.getElementById('confirmationModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    const cancelBtn = document.getElementById(`cancel-btn-${eventId}`);
+    if (cancelBtn) {
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = 'Cancelling...';
+    }
 
     const formData = new FormData();
     formData.append('event_id', eventId);
@@ -1019,37 +1138,56 @@ require_once __DIR__ . '/../layouts/header.php';
     })
       .then(res => res.json())
       .then(data => {
-        btn.disabled = false;
-        if (data.success) {
-          if (data.is_attending) {
-            btn.className = 'rsvp-toggle-btn registered';
-            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Attending (Registered)';
-          } else {
-            btn.className = 'rsvp-toggle-btn attend';
-            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Join / Attend Drill';
+        if (data.success && !data.is_attending) {
+          // Animate card removal from attending list
+          const card = document.getElementById(`event-card-${eventId}`);
+          if (card) {
+            card.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.96) translateY(-8px)';
+            setTimeout(() => {
+              card.remove();
+              // Check remaining cards in feed
+              const feedCards = document.querySelectorAll('.resident-events-wrap .resident-event-card');
+              if (feedCards.length === 0) {
+                location.reload();
+              }
+            }, 300);
           }
 
-          // Update count display
-          const countEl = document.getElementById(`actual-count-${eventId}`);
-          if (countEl && data.actual_participants !== undefined) {
-            countEl.innerText = `${data.actual_participants} Registered`;
+          // Decrement Attending count pill
+          const attPill = document.querySelector('.event-pills-row a.event-pill-link:first-child');
+          if (attPill) {
+            const m = attPill.textContent.match(/\((\d+)\)/);
+            if (m) {
+              const newCnt = Math.max(0, parseInt(m[1], 10) - 1);
+              attPill.textContent = `Attending Events (${newCnt})`;
+            }
           }
+
+          // Close details modal if open
+          closeEventDetailsModal();
 
           if (typeof showToast === 'function') {
-            showToast(data.message, 'success');
+            showToast(data.message || 'Cancelled attendance successfully.', 'info');
           } else {
-            alert(data.message);
+            alert(data.message || 'Cancelled attendance successfully.');
           }
         } else {
-          btn.innerHTML = originalText;
-          alert(data.message || 'Error updating RSVP.');
+          if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Cancel Join';
+          }
+          alert(data.message || 'Could not cancel attendance.');
         }
       })
       .catch(err => {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+        if (cancelBtn) {
+          cancelBtn.disabled = false;
+          cancelBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Cancel Join';
+        }
         console.error(err);
-        alert('Network error while processing registration.');
+        alert('Network error while processing cancellation.');
       });
   }
 
@@ -1252,6 +1390,21 @@ require_once __DIR__ . '/../layouts/header.php';
     const descEl = document.getElementById('detailsModalDesc');
     if (descEl) descEl.textContent = desc;
 
+    const eventId = cardEl.getAttribute('data-id');
+    const actionSlot = document.getElementById('detailsModalActionSlot');
+    if (actionSlot) {
+      if (attendance.includes('Registered') && !attendance.includes('Not') && !isPast) {
+        actionSlot.innerHTML = `
+          <button type="button" class="btn-cancel-join" onclick="promptCancelJoin(${eventId}, '${escapeHtml(title).replace(/'/g, "\\'")}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            Cancel Join
+          </button>
+        `;
+      } else {
+        actionSlot.innerHTML = '';
+      }
+    }
+
     const modal = document.getElementById('eventDetailsModal');
     if (modal) {
       modal.style.display = 'flex';
@@ -1306,7 +1459,8 @@ require_once __DIR__ . '/../layouts/header.php';
   window.openEventDetailsModalById = openEventDetailsModalById;
   window.closeEventDetailsModal = closeEventDetailsModal;
   window.handleOverlayClick = handleOverlayClick;
-  window.toggleRsvp = toggleRsvp;
+  window.promptCancelJoin = promptCancelJoin;
+  window.executeCancelJoin = executeCancelJoin;
 </script>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

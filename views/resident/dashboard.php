@@ -105,18 +105,30 @@ $notifStmt->execute([$barangayId, $user['id'], $user['id'], $barangayId]);
 $recentAdvisories = $notifStmt->fetchAll();
 
 // Fetch Preparedness Schedule Drills / Events for Resident (created by Barangay Head)
+$userPurok = trim($user['purok'] ?? '');
+$actWhere = "
+    e.barangay_id = ?
+    AND (e.is_archived = 0 OR e.is_archived IS NULL)
+    AND e.status != 'Cancelled'
+    AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+";
+$actParams = [$barangayId, $barangayId];
+if (!empty($userPurok)) {
+    $purokLike = "%{$userPurok}%";
+    $actWhere .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.title NOT LIKE 'Purok %')";
+    $actParams[] = $purokLike;
+    $actParams[] = $purokLike;
+}
+
 $actStmt = $db->prepare("
     SELECT e.*, b.name AS barangay_name, u.full_name AS organizer_name 
     FROM events e
     LEFT JOIN barangays b ON e.barangay_id = b.id
     LEFT JOIN users u ON e.created_by = u.id
-    WHERE e.barangay_id = ?
-      AND (e.is_archived = 0 OR e.is_archived IS NULL)
-      AND e.status != 'Cancelled'
-      AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    WHERE {$actWhere}
     ORDER BY e.start_datetime ASC
 ");
-$actStmt->execute([$barangayId, $barangayId]);
+$actStmt->execute($actParams);
 $scheduleEvents = $actStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // User RSVP status
@@ -126,6 +138,11 @@ if (!empty($scheduleEvents)) {
     $rsvpStmt->execute([(int)$user['id'], $user['phone'] ?? '']);
     $myRsvps = $rsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 }
+
+// All Joinable Upcoming Events for Home display (today onwards)
+$upcomingJoinEvents = array_filter($scheduleEvents, function($ev) {
+    return strtotime($ev['start_datetime']) >= strtotime('today');
+});
 
 // Format events for client-side calendar
 $calendarEventsJson = [];
@@ -154,9 +171,9 @@ $pageTitle = "Community Safety Home";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-<!-- Leaflet GIS Map Dependencies for Evacuation Routing -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Leaflet GIS Map Dependencies for Evacuation Routing (Local Vendor) -->
+<link rel="stylesheet" href="<?= BASE_URL ?>/frontend/vendor/leaflet/leaflet.css" />
+<script src="<?= BASE_URL ?>/frontend/vendor/leaflet/leaflet.js"></script>
 
   <!-- Page Header -->
   <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -231,9 +248,111 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   </div>
 
+  <!-- Upcoming Community Events to Join Section (All join events displayed on Home) -->
+  <section class="home-join-events-section" id="upcoming-join-events" style="margin-top:14px;margin-bottom:14px;">
+    <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-primary, 10px);padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h2 style="font-size:14px;font-weight:700;color:var(--color-primary);margin:0;display:flex;align-items:center;gap:6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-secondary);">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Upcoming Community Events to Join
+          </h2>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">
+            Browse and join community disaster drills, flood simulations, and relief distributions in your barangay.
+          </div>
+        </div>
+        <a href="events.php?tab=attending" class="btn btn-secondary btn-sm" style="font-size:11px;padding:5px 12px;display:inline-flex;align-items:center;gap:4px;">
+          View Attending Events (<?= count($myRsvps) ?>) &rarr;
+        </a>
+      </div>
 
+      <?php if (empty($upcomingJoinEvents)): ?>
+        <div style="padding:24px;text-align:center;color:var(--color-text-muted);font-size:11.5px;background:var(--color-surface-subtle);border-radius:6px;border:1px dashed var(--color-border);">
+          No upcoming community events or drills currently open to join.
+        </div>
+      <?php else: ?>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <?php foreach ($upcomingJoinEvents as $act):
+            $eventId = (int)$act['id'];
+            $isAttending = in_array($eventId, $myRsvps, true);
+            $startDt = strtotime($act['start_datetime']);
+            $endDt = strtotime($act['end_datetime']);
+            $target = max(1, (int)$act['target_participants']);
+            $actual = (int)$act['actual_participants'];
+            $pctAtt = min(100, round(($actual / $target) * 100));
+          ?>
+            <div class="resident-join-card" id="home-event-card-<?= $eventId ?>"
+                 style="border:1px solid var(--color-border-light, #E7EDF0);border-radius:8px;padding:12px 14px;background:#FAFCFD;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:12px;align-items:flex-start;">
+                <!-- Date Box -->
+                <div style="background:#FFFFFF;border:1px solid #D9E0E3;border-radius:6px;padding:5px 9px;text-align:center;min-width:52px;flex-shrink:0;">
+                  <div style="font-size:9.5px;font-weight:700;color:var(--color-primary);text-transform:uppercase;"><?= date('M', $startDt) ?></div>
+                  <div style="font-family:var(--font-secondary);font-size:16px;font-weight:700;color:var(--color-text);line-height:1.1;margin:1px 0;"><?= date('d', $startDt) ?></div>
+                  <div style="font-size:9px;color:var(--color-text-muted);"><?= date('Y', $startDt) ?></div>
+                </div>
 
-  <!-- Evacuation Routing & Safe Shelters (Scroll-Down Section) -->
+                <!-- Event Details -->
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px;">
+                    <h3 style="font-family:var(--font-primary);font-size:13px;font-weight:600;color:var(--color-primary);margin:0;line-height:1.35;">
+                      <?= clean($act['title']) ?>
+                    </h3>
+                    <span class="badge" style="background:#EBF3F5;color:var(--color-secondary);font-size:9.5px;padding:2px 7px;white-space:nowrap;">
+                      <?= clean($act['activity_type']) ?>
+                    </span>
+                  </div>
+
+                  <div style="font-size:10.5px;color:var(--color-text-secondary);margin-bottom:4px;">
+                    🕒 <?= date('h:i A', $startDt) ?> &ndash; <?= date('h:i A', $endDt) ?> &bull; 📍 <?= clean($act['venue']) ?>
+                    <?php if (!empty($act['barangay_name'])): ?>
+                      (Brgy. <?= clean($act['barangay_name']) ?>)
+                    <?php endif; ?>
+                  </div>
+
+                  <?php if (!empty($act['description'])): ?>
+                    <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.4;margin-bottom:6px;">
+                      <?= clean($act['description']) ?>
+                    </div>
+                  <?php endif; ?>
+
+                  <!-- Community Turnout -->
+                  <div style="background:#FFFFFF;border:1px solid #E7EDF0;border-radius:6px;padding:5px 8px;font-size:10px;margin-top:4px;">
+                    <div style="display:flex;justify-content:space-between;">
+                      <span style="font-weight:600;color:var(--color-text-secondary);">Turnout</span>
+                      <span style="font-weight:700;color:var(--color-primary);" id="home-actual-count-<?= $eventId ?>">
+                        <?= number_format($actual) ?> / <?= number_format($target) ?> Registered
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Row -->
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #E7EDF0;padding-top:8px;margin-top:2px;">
+                <a href="events.php?tab=attending" style="font-size:10.5px;color:var(--color-secondary);font-weight:600;text-decoration:none;">
+                  Manage in Events Module &rarr;
+                </a>
+                <div>
+                  <button type="button"
+                          id="home-join-btn-<?= $eventId ?>"
+                          class="btn btn-sm <?= $isAttending ? 'btn-secondary' : 'btn-primary' ?>"
+                          style="font-size:11px;padding:5px 14px;<?= $isAttending ? 'background:#EAF4EB;color:#2E7D32;border:1px solid #BCE3C1;' : '' ?>"
+                          onclick="handleHomeJoin(<?= $eventId ?>, this)">
+                    <?= $isAttending ? '✓ Attending' : '+ Join Event' ?>
+                  </button>
+                </div>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </section>
   <section class="evac-routing-section" id="evacuation-routing">
     <div class="evac-section-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -533,8 +652,9 @@ require_once __DIR__ . '/../layouts/header.php';
       if (paneBadge) paneBadge.textContent = `${dayDrills.length} Scheduled`;
       drillList.innerHTML = dayDrills.map(ev => {
         const isAttending = ev.is_registered;
-        const btnClass = isAttending ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
-        const btnLabel = isAttending ? '✓ Attending' : 'RSVP';
+        const btnClass = isAttending ? 'btn btn-sm' : 'btn btn-primary btn-sm';
+        const btnStyle = isAttending ? 'background:#EAF4EB;color:#2E7D32;border:1px solid #BCE3C1;font-size:10px;padding:5px 10px;' : 'font-size:10px;padding:5px 10px;';
+        const btnLabel = isAttending ? '✓ Attending' : '+ Join Event';
         return `
           <div class="prep-drill-card" data-event-id="${ev.id}">
             <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:180px;">
@@ -552,10 +672,10 @@ require_once __DIR__ . '/../layouts/header.php';
               </div>
             </div>
             <div class="prep-drill-actions">
-              <button type="button" class="${btnClass}" style="font-size:10px;padding:5px 10px;" onclick="handleResidentRsvp(${ev.id}, this)">
+              <button type="button" class="${btnClass}" style="${btnStyle}" onclick="handleResidentRsvp(${ev.id}, this)">
                 ${btnLabel}
               </button>
-              <a href="events.php" class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 8px;">
+              <a href="events.php?tab=attending" class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 8px;">
                 Details
               </a>
             </div>
@@ -611,26 +731,133 @@ require_once __DIR__ . '/../layouts/header.php';
         if (targetEv) targetEv.is_registered = isAttending;
 
         if (isAttending) {
-          btnElem.className = 'btn btn-primary btn-sm';
+          btnElem.className = 'btn btn-sm';
+          btnElem.style.background = '#EAF4EB';
+          btnElem.style.color = '#2E7D32';
+          btnElem.style.border = '1px solid #BCE3C1';
           btnElem.textContent = '✓ Attending';
         } else {
-          btnElem.className = 'btn btn-secondary btn-sm';
-          btnElem.textContent = 'RSVP';
+          btnElem.className = 'btn btn-primary btn-sm';
+          btnElem.style.background = '';
+          btnElem.style.color = '';
+          btnElem.style.border = '';
+          btnElem.textContent = '+ Join Event';
+        }
+
+        // Sync with the Home join card button if present
+        const homeBtn = document.getElementById(`home-join-btn-${eventId}`);
+        if (homeBtn) {
+          if (isAttending) {
+            homeBtn.className = 'btn btn-sm btn-secondary';
+            homeBtn.style.background = '#EAF4EB';
+            homeBtn.style.color = '#2E7D32';
+            homeBtn.style.border = '1px solid #BCE3C1';
+            homeBtn.textContent = '✓ Attending';
+          } else {
+            homeBtn.className = 'btn btn-sm btn-primary';
+            homeBtn.style.background = '';
+            homeBtn.style.color = '';
+            homeBtn.style.border = '';
+            homeBtn.textContent = '+ Join Event';
+          }
+        }
+
+        const countEl = document.getElementById(`home-actual-count-${eventId}`);
+        if (countEl && data.actual_participants !== undefined) {
+          countEl.innerText = `${data.actual_participants} Registered`;
         }
 
         if (typeof showToast === 'function') {
-          showToast(data.message || 'RSVP updated successfully.', 'success');
+          showToast(data.message || 'Event registration updated successfully.', 'success');
+        } else {
+          alert(data.message || 'Event registration updated successfully.');
         }
       } else {
         btnElem.innerHTML = origText;
         if (typeof showToast === 'function') {
           showToast(data.message || 'Could not update RSVP.', 'danger');
+        } else {
+          alert(data.message || 'Could not update RSVP.');
         }
       }
     } catch (err) {
       btnElem.innerHTML = origText;
       if (typeof showToast === 'function') {
         showToast('Network error updating RSVP.', 'danger');
+      } else {
+        alert('Network error updating RSVP.');
+      }
+    } finally {
+      btnElem.disabled = false;
+    }
+  };
+
+  // Home Join Event Deck Handler
+  window.handleHomeJoin = async function(eventId, btnElem) {
+    const origText = btnElem.innerHTML;
+    btnElem.disabled = true;
+    btnElem.textContent = '...';
+
+    try {
+      const fd = new FormData();
+      fd.append('event_id', eventId);
+
+      const res = await fetch(`${BASE_URL}/backend/functions/activities/rsvp.php`, {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        const isAttending = data.is_attending;
+        const targetEv = events.find(e => e.id === eventId);
+        if (targetEv) targetEv.is_registered = isAttending;
+
+        if (isAttending) {
+          btnElem.className = 'btn btn-sm btn-secondary';
+          btnElem.style.background = '#EAF4EB';
+          btnElem.style.color = '#2E7D32';
+          btnElem.style.border = '1px solid #BCE3C1';
+          btnElem.textContent = '✓ Attending';
+        } else {
+          btnElem.className = 'btn btn-sm btn-primary';
+          btnElem.style.background = '';
+          btnElem.style.color = '';
+          btnElem.style.border = '';
+          btnElem.textContent = '+ Join Event';
+        }
+
+        const countEl = document.getElementById(`home-actual-count-${eventId}`);
+        if (countEl && data.actual_participants !== undefined) {
+          countEl.innerText = `${data.actual_participants} Registered`;
+        }
+
+        // Re-render calendar drills if currently open for that date
+        if (selectedDateStr) {
+          renderDrillsForDate(selectedDateStr);
+        }
+
+        if (typeof showToast === 'function') {
+          showToast(data.message || 'Event registration updated successfully.', 'success');
+        } else {
+          alert(data.message || 'Event registration updated successfully.');
+        }
+      } else {
+        btnElem.innerHTML = origText;
+        if (typeof showToast === 'function') {
+          showToast(data.message || 'Could not update registration.', 'danger');
+        } else {
+          alert(data.message || 'Could not update registration.');
+        }
+      }
+    } catch (err) {
+      btnElem.innerHTML = origText;
+      console.error(err);
+      if (typeof showToast === 'function') {
+        showToast('Network error updating registration.', 'danger');
+      } else {
+        alert('Network error updating registration.');
       }
     } finally {
       btnElem.disabled = false;

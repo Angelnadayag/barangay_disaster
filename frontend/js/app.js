@@ -743,3 +743,26 @@ function handleDssModalClose() {
   }
 }
 
+// Global Modal Controls
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('active');
+    el.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.remove('active');
+    el.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+window.openModal = openModal;
+window.closeModal = closeModal;
+
+
