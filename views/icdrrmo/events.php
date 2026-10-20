@@ -20,6 +20,22 @@ $viewMode = $_GET['view'] ?? 'list'; // 'month', 'list'
 $filterType = $_GET['type'] ?? '';
 $filterStatus = $_GET['status'] ?? '';
 
+$activityTypes = [
+  "Health and Medical",
+  "Nutrition and Feeding",
+  "Cleanliness and Environment",
+  "Youth and Children",
+  "Education and Skills Training",
+  "Social Welfare and Assistance",
+  "Livelihood and Employment",
+  "Sports and Recreation",
+  "Disaster Preparedness and Safety",
+  "Animal Welfare",
+  "Community Celebrations and Special Events",
+  "Government and Community Services",
+  "Agricultural Programs"
+];
+
 $sql = "
     SELECT pa.*, b.name AS barangay_name, u.full_name AS creator_name 
     FROM events pa 
@@ -74,13 +90,11 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
       <form method="GET" class="filter-bar" style="margin-bottom:0;">
         <input type="hidden" name="view" value="<?= clean($viewMode) ?>">
         <div class="filter-group">
-          <select name="type" class="form-control" style="width:180px;">
+          <select name="type" class="form-control" style="width:220px;">
             <option value="">All Activity Types</option>
-            <option value="Disaster Drill" <?= $filterType === 'Disaster Drill' ? 'selected' : '' ?>>Disaster Drill</option>
-            <option value="First Aid / Rescuer Training" <?= $filterType === 'First Aid / Rescuer Training' ? 'selected' : '' ?>>First Aid / Rescuer Training</option>
-            <option value="Community Seminar" <?= $filterType === 'Community Seminar' ? 'selected' : '' ?>>Community Seminar</option>
-            <option value="IEC Campaign" <?= $filterType === 'IEC Campaign' ? 'selected' : '' ?>>IEC Campaign</option>
-            <option value="Contingency Planning" <?= $filterType === 'Contingency Planning' ? 'selected' : '' ?>>Contingency Planning</option>
+            <?php foreach ($activityTypes as $t): ?>
+              <option value="<?= clean($t) ?>" <?= $filterType === $t ? 'selected' : '' ?>><?= clean($t) ?></option>
+            <?php endforeach; ?>
           </select>
 
           <select name="status" class="form-control" style="width:130px;">
@@ -232,11 +246,9 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
           <div class="form-group">
             <label class="form-label form-label-required">Activity Type</label>
             <select name="activity_type" class="form-control" required>
-              <option value="Disaster Drill">Disaster Drill</option>
-              <option value="First Aid / Rescuer Training">First Aid / Rescuer Training</option>
-              <option value="Community Seminar">Community Seminar</option>
-              <option value="IEC Campaign">IEC Campaign</option>
-              <option value="Contingency Planning">Contingency Planning</option>
+              <?php foreach ($activityTypes as $t): ?>
+                <option value="<?= clean($t) ?>"><?= clean($t) ?></option>
+              <?php endforeach; ?>
             </select>
           </div>
           <div class="form-group">

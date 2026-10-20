@@ -21,6 +21,7 @@ if (!in_array($user['role'], ['icdrrmo', 'barangay_head'], true)) {
 }
 
 $title = trim($_POST['title'] ?? '');
+$type = trim($_POST['activity_type'] ?? 'Health and Medical');
 $barangayId = !empty($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
 if (empty($barangayId) && !empty($user['barangay_id'])) {
     $barangayId = (int)$user['barangay_id'];

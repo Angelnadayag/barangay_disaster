@@ -111,54 +111,186 @@ $evacStmt->execute([$barangayId, $barangayId]);
 $evacuationVenues = $evacStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $defaultExpectedByType = [
-  "Disaster Drill" => [
-    "Initial Briefing & Safety Guidelines Orientation",
-    "Emergency Evacuation / Primary Drill Scenario Execution",
-    "Household Go-Bag & Emergency Survival Kit Inspection",
-    "Tactical First Aid & Emergency Rescuer Demonstration",
-    "Vulnerable Groups Priority Assistance (PWD, Senior Citizens, Children)",
-    "Early Warning Siren & Megaphone Notification Walk",
-    "Evacuation Route Walking & Designated Evacuation Center Assembly",
-    "Resident Roll Call & Attendance Verification",
-    "Facilitator Post-Drill Debriefing & Community Q&A Open Forum",
-    "Information, Education & Communication (IEC) Distribution"
+  "Health and Medical" => [
+    "Medical Mission",
+    "Free Medical Checkup",
+    "Free Dental Checkup",
+    "Free Tooth Extraction (Ibot ng Ngipin)",
+    "Free Circumcision (Libreng Tuli)",
+    "Free Eye Checkup",
+    "Free Eye Glasses Distribution",
+    "Free Medicine Distribution",
+    "Bloodletting Activity",
+    "Free Blood Pressure Check",
+    "Blood Sugar Screening",
+    "Vaccination Program",
+    "Immunization Program",
+    "Deworming Program",
+    "Family Planning Seminar",
+    "Mental Health Awareness Seminar",
+    "Health Awareness Seminar",
+    "Free Massage",
+    "Free Haircut"
   ],
-  "Community Seminar" => [
-    "Participant Registration & IEC Kit Distribution",
-    "Disaster Preparedness Audio-Visual Presentation",
-    "Hazard Types & Early Warning Signal Discussion",
-    "Family Disaster Preparedness Plan Formulation",
-    "Emergency Hotlines & Evacuation Protocol Orientation",
-    "Open Forum & Resident Question-and-Answer Session"
+  "Nutrition and Feeding" => [
+    "Feeding Program",
+    "Supplemental Feeding Program",
+    "School Feeding Program",
+    "Nutrition Month Celebration",
+    "Operation Timbang",
+    "Vitamin Supplementation",
+    "Food Pack Distribution",
+    "Milk Feeding Program"
   ],
-  "First Aid / Rescuer Training" => [
-    "Basic Life Support (BLS) & CPR Demonstration",
-    "Wound Dressing & Bandaging Practical Exercise",
-    "Fracture Splinting & Spine Board Handling",
-    "Emergency Patient Transport & Carry Drills",
-    "Triage Protocol Orientation & Rapid Assessment",
-    "Hands-On Skills Practical Evaluation"
+  "Cleanliness and Environment" => [
+    "Community Clean-Up Drive",
+    "Coastal Clean-Up Drive",
+    "Tree Planting Activity",
+    "Clean and Green Program",
+    "Waste Segregation Campaign",
+    "Recycling Program",
+    "Community Gardening",
+    "Canal Cleaning",
+    "Anti-Dengue Clean-Up Drive",
+    "Gardening Contest"
   ],
-  "IEC Campaign" => [
-    "House-to-House IEC Pamphlet & Poster Handout",
-    "Emergency Siren Schedule Community Notice",
-    "Barangay Disaster Hotline Directory Handout",
-    "Go-Bag Checklist Verification with Households",
-    "Resident Feedback & Vulnerability Profiling"
+  "Youth and Children" => [
+    "Children's Day Celebration",
+    "Youth Leadership Seminar",
+    "Sports Festival",
+    "Basketball Tournament",
+    "Volleyball Tournament",
+    "SK Youth Assembly",
+    "Youth Leadership Training",
+    "Summer Sports Clinic",
+    "Educational Assistance Distribution",
+    "School Supplies Distribution",
+    "Back-to-School Program",
+    "Art Contest",
+    "Dance Contest",
+    "Singing Contest",
+    "Essay Writing Contest"
   ],
-  "Contingency Planning" => [
-    "BDRRMC Resource Inventory & Readiness Audit",
-    "Purok Hazard Vulnerability Review & Updates",
-    "Emergency Response Protocol Form Review",
-    "Relief Goods Storage & Distribution Planning",
-    "Inter-Agency Dispatch Command Coordination"
+  "Education and Skills Training" => [
+    "Scholarship Program",
+    "Tutorial Program",
+    "Reading Program",
+    "Literacy Program",
+    "Computer Literacy Training",
+    "Livelihood Training",
+    "Job Skills Training",
+    "Financial Literacy Seminar",
+    "Entrepreneurship Seminar",
+    "Career Guidance Seminar",
+    "TESDA Skills Training",
+    "Job Fair"
   ],
-  "Hazard Mapping Workshop" => [
-    "Flood-Prone & Landslide-Risk Zone Identification",
-    "Purok Vulnerable Household Pinpointing",
-    "Critical Infrastructure & Safe Route Demarcation",
-    "Community Evacuation Shelter Distance Mapping",
-    "Final Barangay Hazard Map Verification & Presentation"
+  "Social Welfare and Assistance" => [
+    "Financial Assistance Distribution",
+    "Food Assistance Distribution",
+    "Relief Goods Distribution",
+    "Senior Citizens' Assistance",
+    "PWD Assistance Program",
+    "Solo Parent Assistance",
+    "4Ps Assistance and Orientation",
+    "Women's Welfare Program",
+    "Women's Month Celebration",
+    "Child Protection Seminar",
+    "Gift-Giving Program",
+    "Christmas Gift Distribution",
+    "Birthday Gift Distribution for Senior Citizens"
+  ],
+  "Livelihood and Employment" => [
+    "Livelihood Assistance Program",
+    "Livelihood Training",
+    "Small Business Seminar",
+    "Cooperative Development Seminar",
+    "Vegetable Seed Distribution",
+    "Gardening Livelihood Program",
+    "Employment Assistance Program",
+    "Job Fair",
+    "Free Resume Writing Workshop"
+  ],
+  "Sports and Recreation" => [
+    "Barangay Sportsfest",
+    "Inter-Purok Basketball Tournament",
+    "Inter-Purok Volleyball Tournament",
+    "Badminton Tournament",
+    "Fun Run",
+    "Zumba Session",
+    "Community Aerobics",
+    "Chess Tournament",
+    "Traditional Filipino Games",
+    "Family Day",
+    "Community Picnic"
+  ],
+  "Disaster Preparedness and Safety" => [
+    "Disaster Preparedness Seminar",
+    "Earthquake Drill",
+    "Fire Drill",
+    "Fire Prevention Seminar",
+    "First Aid Training",
+    "Basic Life Support Training",
+    "Flood Preparedness Seminar",
+    "Emergency Evacuation Drill",
+    "Disaster Risk Reduction Seminar",
+    "Relief Operations",
+    "Emergency Response Training"
+  ],
+  "Animal Welfare" => [
+    "Free Anti-Rabies Vaccination",
+    "Free Pet Checkup",
+    "Pet Deworming",
+    "Responsible Pet Ownership Seminar",
+    "Pet Registration",
+    "Animal Bite Prevention Seminar",
+    "Spay and Neuter Program"
+  ],
+  "Community Celebrations and Special Events" => [
+    "Barangay Fiesta",
+    "Barangay Foundation Day",
+    "Barangay Anniversary Celebration",
+    "Independence Day Celebration",
+    "Araw ng Barangay",
+    "Christmas Party",
+    "New Year's Celebration",
+    "Family Day Celebration",
+    "Flores de Mayo",
+    "Buwan ng Wika Celebration",
+    "Nutrition Month Celebration",
+    "Valentine's Day Celebration",
+    "Mother's Day Celebration",
+    "Father's Day Celebration",
+    "Community Concert",
+    "Barangay Pageant",
+    "Street Dance Competition"
+  ],
+  "Government and Community Services" => [
+    "Barangay Assembly",
+    "Purok Assembly",
+    "Community Consultation",
+    "Public Information Campaign",
+    "Voter Education Seminar",
+    "Free Legal Consultation",
+    "Civil Registry Assistance",
+    "PhilHealth Registration Assistance",
+    "National ID Registration Assistance",
+    "Police Clearance Assistance",
+    "Senior Citizen ID Registration",
+    "PWD ID Registration",
+    "Solo Parent ID Registration"
+  ],
+  "Agricultural Programs" => [
+    "Free Seed Distribution",
+    "Seedling Distribution",
+    "Organic Farming Seminar",
+    "Urban Gardening Program",
+    "Backyard Gardening Seminar",
+    "Free Fertilizer Distribution",
+    "Livestock Vaccination",
+    "Animal Deworming",
+    "Farmers' Training",
+    "Agricultural Livelihood Seminar"
   ]
 ];
 
@@ -520,12 +652,9 @@ require_once __DIR__ . '/../layouts/header.php';
           <label class="form-label form-label-required">Activity Type</label>
           <select name="activity_type" id="create_activity_type" class="form-control"
             onchange="onActivityTypeChange('create', this.value)" required>
-            <option value="Disaster Drill" selected>Disaster Drill (Evacuation & Siren Simulation)</option>
-            <option value="Community Seminar">Community Seminar (Preparedness Orientation & Go-Bag)</option>
-            <option value="First Aid / Rescuer Training">First Aid / Rescuer Training (BLS, CPR & Trauma)</option>
-            <option value="IEC Campaign">IEC Campaign (Information, Education & House-to-House)</option>
-            <option value="Contingency Planning">Contingency Planning (BDRRMC Resource & Protocols)</option>
-            <option value="Hazard Mapping Workshop">Hazard Mapping Workshop (Risk & Safe Zone Mapping)</option>
+            <?php foreach (array_keys($defaultExpectedByType) as $idx => $tName): ?>
+              <option value="<?= clean($tName) ?>" <?= $idx === 0 ? 'selected' : '' ?>><?= clean($tName) ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
 
@@ -674,12 +803,9 @@ require_once __DIR__ . '/../layouts/header.php';
           <label class="form-label form-label-required">Activity Type</label>
           <select name="activity_type" id="edit_act_type" class="form-control"
             onchange="onActivityTypeChange('edit', this.value)" required>
-            <option value="Disaster Drill">Disaster Drill</option>
-            <option value="Community Seminar">Community Seminar</option>
-            <option value="First Aid / Rescuer Training">First Aid Training</option>
-            <option value="IEC Campaign">IEC Family Campaign</option>
-            <option value="Contingency Planning">Contingency Planning</option>
-            <option value="Hazard Mapping Workshop">Hazard Mapping Workshop</option>
+            <?php foreach (array_keys($defaultExpectedByType) as $tName): ?>
+              <option value="<?= clean($tName) ?>"><?= clean($tName) ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
 
@@ -687,7 +813,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <div class="form-group" style="margin-top:10px;margin-bottom:14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <label class="form-label" style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);">
-              📋 Expected Event Activities & Milestones
+              Event Activities
             </label>
             <div style="display:flex;gap:6px;">
               <button type="button" class="btn btn-outline btn-xs"
@@ -1567,61 +1693,13 @@ require_once __DIR__ . '/../layouts/header.php';
     }
   }
 
-  const EXPECTED_ACTIVITIES_BY_TYPE = {
-    "Disaster Drill": [
-      "Barangay Early Warning Siren & Alarm Activation",
-      "Purok Evacuation Route Navigation & Assembly Walk",
-      "Designated Evacuation Center Safe Entry & Triage Setup",
-      "Resident Roll Call, Attendance & Family Headcount",
-      "Vulnerable Groups Priority Assistance (PWD, Elderly, Pregnant)",
-      "Duck, Cover & Hold / Earthquake & Flood Response Drill",
-      "Search & Rescue Team Stretcher Extrication Simulation",
-      "Post-Drill Debriefing, Evaluation & Open Forum"
-    ],
-    "Community Seminar": [
-      "Community Disaster Risk & Hazard Profiles Briefing",
-      "Family Emergency Preparedness & Go-Bag Orientation",
-      "Early Warning Signal Interpretation (BDRRMC / PAGASA / PHIVOLCS)",
-      "Community Evacuation Protocols & Designated Shelters Orientation",
-      "Resident Q&A, Feedback & Community Open Forum",
-      "Emergency Hotlines & Preparedness Guide Pamphlet Handout"
-    ],
-    "First Aid / Rescuer Training": [
-      "Basic Life Support (BLS) & CPR Practical Demonstration",
-      "Wound Dressing, Hemorrhage Control & Splinting Practice",
-      "Airway Obstruction & Choking Rescue (Heimlich Maneuver)",
-      "Patient Immobilization, Stretcher Handling & Safe Transport",
-      "Emergency First Aid Kit & Medical Bag Inspection",
-      "Barangay Quick Response Team Hands-on Drill Simulation"
-    ],
-    "IEC Campaign": [
-      "House-to-House Disaster Information Brochure Distribution",
-      "Purok Megaphone & Public Address Flood Warning Broadcast",
-      "Family Emergency Go-Bag & 72-Hour Survival Kit Check",
-      "Evacuation Map & Nearest Safe Refuge Center Orientation",
-      "Household Disaster Vulnerability & Contact Info Survey"
-    ],
-    "Contingency Planning": [
-      "Barangay Disaster Risk Profile & Hazard Assessment Review",
-      "Evacuation Center Capacity & Shelter Logistics Mapping",
-      "Emergency Response Team Roles & Incident Command Protocol",
-      "Relief Goods, Emergency Supplies & Equipment Audit",
-      "Coordination Protocols with CDRRMO & Partner Agencies"
-    ],
-    "Hazard Mapping Workshop": [
-      "Purok-Level Hazard Identification & Ground Truthing",
-      "Flood Inundation & Landslide Vulnerable Zones Tagging",
-      "Critical Infrastructure & Safe Route Demarcation",
-      "Community Evacuation Shelter Distance Mapping",
-      "Final Barangay Hazard Map Verification & Presentation"
-    ]
-  };
+  const EXPECTED_ACTIVITIES_BY_TYPE = <?= json_encode($defaultExpectedByType, JSON_UNESCAPED_UNICODE) ?>;
 
   function onActivityTypeChange(prefix, type) {
     const container = document.getElementById(prefix + '_expected_activities_list');
     if (!container) return;
 
-    const items = EXPECTED_ACTIVITIES_BY_TYPE[type] || EXPECTED_ACTIVITIES_BY_TYPE["Disaster Drill"] || [];
+    const items = EXPECTED_ACTIVITIES_BY_TYPE[type] || Object.values(EXPECTED_ACTIVITIES_BY_TYPE)[0] || [];
     let html = '';
     items.forEach(item => {
       html += `
@@ -1709,7 +1787,8 @@ require_once __DIR__ . '/../layouts/header.php';
     });
 
     // Initialize Create Event expected activities checklist
-    onActivityTypeChange('create', 'Disaster Drill');
+    const initialCreateType = document.getElementById('create_activity_type')?.value || Object.keys(EXPECTED_ACTIVITIES_BY_TYPE)[0];
+    onActivityTypeChange('create', initialCreateType);
 
     // Sync Venue selection before form submission
     ['createActivityForm', 'editActivityForm'].forEach(formId => {
@@ -2835,7 +2914,7 @@ require_once __DIR__ . '/../layouts/header.php';
     }
     if (!Array.isArray(savedExecution)) savedExecution = [];
 
-    const defaultList = EXPECTED_ACTIVITIES_BY_TYPE[act.activity_type] || EXPECTED_ACTIVITIES_BY_TYPE["Disaster Drill"] || [];
+    const defaultList = EXPECTED_ACTIVITIES_BY_TYPE[act.activity_type] || Object.values(EXPECTED_ACTIVITIES_BY_TYPE)[0] || [];
     const combinedItems = Array.from(new Set([...defaultList, ...savedExecution]));
     const editContainer = document.getElementById('edit_expected_activities_list');
     if (editContainer) {
