@@ -399,8 +399,8 @@ try {
         `id`, `title`, `activity_type`, `barangay_id`, `venue`, `start_datetime`, `end_datetime`, 
         `assigned_personnel`, `target_participants`, `actual_participants`, `description`, 
         `status`, `is_archived`, `evaluation_summary`, `content_execution`, `expected_activities`, 
-        `cancellation_reason`, `created_by`, `created_at`
-    ) VALUES (?, ?, ?, 12, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, 2, ?)");
+        `cancellation_reason`, `created_by`, `created_at`, `latitude`, `longitude`
+    ) VALUES (?, ?, ?, 12, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, 2, ?, ?, ?)");
 
     $attStmt = $pdo->prepare("INSERT INTO `event_attendees` (
         `activity_id`, `user_id`, `resident_name`, `attended`, `phone`, `registered_at`, `sms_status`, `sms_message`
@@ -418,6 +418,8 @@ try {
     for ($pId = 1; $pId <= 10; $pId++) {
         $p = $puroks[$pId];
         $pName = $p['name'];
+        $lat = (float) $p['lat'];
+        $lng = (float) $p['lng'];
 
         for ($evIdx = 0; $evIdx < 5; $evIdx++) {
             $theme = $eventThemes[$evIdx];
@@ -425,9 +427,10 @@ try {
             $actType = $theme[1];
             $venue = "{$pName} Community Covered Area & Assembly Grounds";
             
-            $daysOffset = ($eventId % 2 == 0) ? (15 - $eventId) : (-1 * ($eventId % 10));
+            $daysOffset = ($eventId % 2 == 0) ? (15 - $eventId) : (-1 * (($eventId % 8) + 1));
             $isPast = ($daysOffset < 0);
-            $startDate = date('Y-m-d H:i:s', strtotime("2026-10-20 09:00:00 + {$daysOffset} days"));
+            $offsetStr = ($daysOffset >= 0) ? "+{$daysOffset} days" : "{$daysOffset} days";
+            $startDate = date('Y-m-d H:i:s', strtotime("2026-10-20 09:00:00 {$offsetStr}"));
             $endDate = date('Y-m-d H:i:s', strtotime("{$startDate} + 3 hours"));
             $status = $isPast ? 'Completed' : 'Scheduled';
             $targetPart = 60 + ($eventId * 2);
@@ -441,23 +444,68 @@ try {
                 $eventId, $title, $actType, $venue, $startDate, $endDate,
                 $assigned, $targetPart, $actualPart, $desc, $status,
                 $eval, "Lectures, hands-on demonstration, participatory drills",
-                "Simulation, safety briefing, attendance log verification", $createdAt
+                "Simulation, safety briefing, attendance log verification", $createdAt,
+                $lat, $lng
             ]);
 
             // Register the 5 residents of this purok as attendees
             $baseResidentId = (($pId - 1) * 5) + 1;
             for ($rOffset = 0; $rOffset < 5; $rOffset++) {
                 $curResId = $baseResidentId + $rOffset;
+                $curUserId = 52 + $curResId; // maps resident_1 (id 1) to user id 53
                 $rData = $pdo->query("SELECT * FROM residents WHERE id = {$curResId}")->fetch(PDO::FETCH_ASSOC);
                 $msg = "BARANGAY DISASTER ADVISORY\nHi {$rData['first_name']}!\nYou are registered for {$title} at {$venue}.\nDate: {$startDate}.";
                 $attStmt->execute([
-                    $eventId, $curResId, $rData['full_name'], $rData['phone'], $createdAt, $msg
+                    $eventId, $curUserId, $rData['full_name'], $rData['phone'], $createdAt, $msg
                 ]);
             }
 
             $eventId++;
         }
     }
+
+    // Event 51: Financial Aid Distribution (Scheduled / Active)
+    $evStmt->execute([
+        51,
+        'Hinaplanon Emergency Flood Relief Cash Assistance Distribution',
+        'Financial Aid Distribution',
+        'Hinaplanon Covered Court & Gymnasium',
+        '2026-10-24 09:00:00',
+        '2026-10-24 16:00:00',
+        'Hon. Rodrigo Almonte (Barangay Head) & City Social Welfare Officers',
+        300,
+        215,
+        'Official payout and releasing of the Emergency Flood Relief Financial Assistance (₱5,000 per verified household). Beneficiaries must bring a valid government ID and Barangay Certificate upon claiming.',
+        'Scheduled',
+        NULL,
+        'Identification check, verification ledger signing, direct cash assistance disbursal',
+        'Beneficiary verification, payout desk processing, grievance assistance booth',
+        '2026-10-18 08:00:00',
+        8.246596,
+        124.259474
+    ]);
+
+    // Event 52: Missed Concluded Event ("natapos nah")
+    $evStmt->execute([
+        52,
+        'Hinaplanon Riverine Flood Evacuation & Early Warning Drill',
+        'Disaster Drill',
+        'Purok Riverside 1 Multi-Purpose Assembly Area',
+        '2026-10-16 08:30:00',
+        '2026-10-16 11:30:00',
+        'BDRRMC Rescue Alpha Team & Purok Leaders',
+        120,
+        95,
+        'Concluded comprehensive riverine flood response and siren evacuation drill for low-lying riverbank households along the Mandulog River.',
+        'Completed',
+        'Concluded with 95 community participants. Evacuation staging and siren protocols successfully tested.',
+        'Siren alerting, rapid marshaling, staging area headcount, first aid demonstration',
+        'Alarm activation, evacuation walk, muster point accounting, debriefing',
+        '2026-10-10 08:00:00',
+        8.246596,
+        124.259474
+    ]);
+    // NOTE: Resident accounts (user 53..57) are NOT registered in event_attendees for Event 52, marking it as a missed event.
 
     // -------------------------------------------------------------------------
     // 9. CLEAN NOTIFICATIONS (Residents, Responders, ICDRRMO, Barangay Head)

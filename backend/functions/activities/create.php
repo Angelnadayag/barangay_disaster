@@ -60,15 +60,36 @@ try {
         $db->exec("ALTER TABLE events ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
     }
 
+    // Look up coordinates from venue match in puroks or barangays
+    $eventLat = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
+    $eventLng = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
+    if (!$eventLat || !$eventLng) {
+        $pCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM puroks WHERE barangay_id = ? AND ? LIKE CONCAT('%', name, '%') LIMIT 1");
+        $pCoordStmt->execute([$barangayId, $venue]);
+        $pCoord = $pCoordStmt->fetch(PDO::FETCH_ASSOC);
+        if ($pCoord) {
+            $eventLat = $pCoord['coordinates_lat'];
+            $eventLng = $pCoord['coordinates_lng'];
+        } else {
+            $bCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM barangays WHERE id = ?");
+            $bCoordStmt->execute([$barangayId]);
+            $bCoord = $bCoordStmt->fetch(PDO::FETCH_ASSOC);
+            if ($bCoord) {
+                $eventLat = $bCoord['coordinates_lat'];
+                $eventLng = $bCoord['coordinates_lng'];
+            }
+        }
+    }
+
     $stmt = $db->prepare("
         INSERT INTO events (
-            title, activity_type, barangay_id, venue, start_datetime, end_datetime,
+            title, activity_type, barangay_id, venue, latitude, longitude, start_datetime, end_datetime,
             assigned_personnel, target_participants, actual_participants, description,
             status, content_execution, expected_activities, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
     ");
     $stmt->execute([
-        $title, $type, $barangayId, $venue, $startDate, $endDate,
+        $title, $type, $barangayId, $venue, $eventLat, $eventLng, $startDate, $endDate,
         $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $user['id']
     ]);
     $actId = $db->lastInsertId();

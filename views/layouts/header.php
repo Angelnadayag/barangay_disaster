@@ -17,18 +17,35 @@ $currentUser = getCurrentUser();
 $db = getDBConnection();
 
 // Fetch unread notifications count for this user
-if (in_array($currentUser['role'] ?? '', ['resident', 'responder'], true)) {
+if (($currentUser['role'] ?? '') === 'resident') {
     $notifCountStmt = $db->prepare("
         SELECT COUNT(*) FROM notifications n
         LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+        LEFT JOIN users u ON n.created_by = u.id
         WHERE nr.id IS NULL
-          AND n.target_barangay_id = ?
-          AND (n.target_role IN ('all', ?) OR n.target_user_id = ?)
+          AND (n.target_barangay_id = ? OR n.target_user_id = ?)
+          AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
+          AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
     ");
     $notifCountStmt->execute([
         $currentUser['id'],
         (int)($currentUser['barangay_id'] ?? 0),
-        $currentUser['role'],
+        $currentUser['id'],
+        $currentUser['id'],
+        (int)($currentUser['barangay_id'] ?? 0)
+    ]);
+} elseif (($currentUser['role'] ?? '') === 'responder') {
+    $notifCountStmt = $db->prepare("
+        SELECT COUNT(*) FROM notifications n
+        LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+        WHERE nr.id IS NULL
+          AND (n.target_barangay_id = ? OR n.target_user_id = ?)
+          AND (n.target_role IN ('all', 'responder') OR n.target_user_id = ?)
+    ");
+    $notifCountStmt->execute([
+        $currentUser['id'],
+        (int)($currentUser['barangay_id'] ?? 0),
+        $currentUser['id'],
         $currentUser['id']
     ]);
 } else {

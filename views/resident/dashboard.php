@@ -89,51 +89,60 @@ foreach ($allEvacAreas as $ea) {
     }
 }
 
-// Latest Public Advisories
+// Latest Public Advisories (strictly scoped to resident's barangay and created by Barangay Head)
 $notifStmt = $db->prepare("
-    SELECT n.*, b.name AS barangay_name 
+    SELECT n.*, b.name AS barangay_name, u.full_name AS sender_name 
     FROM notifications n
     LEFT JOIN barangays b ON n.target_barangay_id = b.id
-    WHERE n.target_role IN ('all', 'resident')
-       OR n.target_barangay_id = ?
-    ORDER BY n.alert_level = 'Critical' DESC, n.created_at DESC
+    LEFT JOIN users u ON n.created_by = u.id
+    WHERE (n.target_barangay_id = ? OR n.target_user_id = ?)
+      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
+      AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    ORDER BY n.alert_level = 'urgent' DESC, n.alert_level = 'warning' DESC, n.created_at DESC
     LIMIT 4
 ");
-$notifStmt->execute([$barangayId]);
+$notifStmt->execute([$barangayId, $user['id'], $user['id'], $barangayId]);
 $recentAdvisories = $notifStmt->fetchAll();
 
-// Fetch Preparedness Schedule Drills / Events for Resident
+// Fetch Preparedness Schedule Drills / Events for Resident (created by Barangay Head)
+$userPurok = trim($user['purok'] ?? '');
+$actWhere = "
+    e.barangay_id = ?
+    AND (e.is_archived = 0 OR e.is_archived IS NULL)
+    AND e.status != 'Cancelled'
+    AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+";
+$actParams = [$barangayId, $barangayId];
+if (!empty($userPurok)) {
+    $purokLike = "%{$userPurok}%";
+    $actWhere .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.title NOT LIKE 'Purok %')";
+    $actParams[] = $purokLike;
+    $actParams[] = $purokLike;
+}
+
 $actStmt = $db->prepare("
-    SELECT e.*, b.name AS barangay_name 
+    SELECT e.*, b.name AS barangay_name, u.full_name AS organizer_name 
     FROM events e
     LEFT JOIN barangays b ON e.barangay_id = b.id
-    WHERE (e.barangay_id = ? OR e.barangay_id IS NULL)
-      AND (e.is_archived = 0 OR e.is_archived IS NULL)
-      AND e.status != 'Cancelled'
+    LEFT JOIN users u ON e.created_by = u.id
+    WHERE {$actWhere}
     ORDER BY e.start_datetime ASC
 ");
-$actStmt->execute([$barangayId]);
+$actStmt->execute($actParams);
 $scheduleEvents = $actStmt->fetchAll(PDO::FETCH_ASSOC);
-
-if (empty($scheduleEvents)) {
-    $actStmt2 = $db->query("
-        SELECT e.*, b.name AS barangay_name 
-        FROM events e
-        LEFT JOIN barangays b ON e.barangay_id = b.id
-        WHERE (e.is_archived = 0 OR e.is_archived IS NULL)
-          AND e.status != 'Cancelled'
-        ORDER BY e.start_datetime ASC
-    ");
-    $scheduleEvents = $actStmt2->fetchAll(PDO::FETCH_ASSOC);
-}
 
 // User RSVP status
 $myRsvps = [];
 if (!empty($scheduleEvents)) {
     $rsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_id = ? OR (phone != '' AND phone = ?)");
     $rsvpStmt->execute([(int)$user['id'], $user['phone'] ?? '']);
-    $myRsvps = $rsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    $myRsvps = array_map('intval', $rsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 }
+
+// Only upcoming events that the resident has NOT joined yet (apply to join pa)
+$upcomingJoinEvents = array_filter($scheduleEvents, function($ev) use ($myRsvps) {
+    return strtotime($ev['start_datetime']) >= strtotime('today') && !in_array((int)$ev['id'], $myRsvps, true);
+});
 
 // Format events for client-side calendar
 $calendarEventsJson = [];
@@ -162,9 +171,9 @@ $pageTitle = "Community Safety Home";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-<!-- Leaflet GIS Map Dependencies for Evacuation Routing -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Leaflet GIS Map Dependencies for Evacuation Routing (Local Vendor) -->
+<link rel="stylesheet" href="<?= BASE_URL ?>/frontend/vendor/leaflet/leaflet.css" />
+<script src="<?= BASE_URL ?>/frontend/vendor/leaflet/leaflet.js"></script>
 
   <!-- Page Header -->
   <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -239,9 +248,6 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   </div>
 
-
-
-  <!-- Evacuation Routing & Safe Shelters (Scroll-Down Section) -->
   <section class="evac-routing-section" id="evacuation-routing">
     <div class="evac-section-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -510,6 +516,115 @@ require_once __DIR__ . '/../layouts/header.php';
     }
   }
 
+  function renderDrillCard(ev) {
+    return `
+      <div class="prep-drill-card" id="home-drill-card-${ev.id}" data-event-id="${ev.id}">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:180px;">
+          <div class="prep-drill-date-block">
+            <span class="prep-drill-month">${ev.monthShort}</span>
+            <span class="prep-drill-day">${ev.dayNum}</span>
+          </div>
+          <div class="prep-drill-info">
+            <div class="prep-drill-title">${escapeHtml(ev.title)}</div>
+            <div class="prep-drill-meta">
+              <span>🕒 ${escapeHtml(ev.timeStr)}</span>
+              <span>📍 ${escapeHtml(ev.venue)}</span>
+              <span class="badge" style="background:#EBF3F5;color:var(--color-secondary);font-size:9px;padding:2px 6px;">${escapeHtml(ev.type)}</span>
+            </div>
+          </div>
+        </div>
+        <div class="prep-drill-actions" style="display:flex;gap:6px;align-items:center;">
+          <button type="button" class="btn btn-primary btn-sm" style="font-size:10px;padding:5px 12px;" onclick="handleResidentRsvp(${ev.id}, this)">
+            Join Event
+          </button>
+          <a href="#evacuation-routing" class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 8px;display:inline-flex;align-items:center;gap:3px;" title="Route to Area">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            Route
+          </a>
+          <a href="events.php" class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 8px;">
+            Details
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderOpenDrillsList(filterDate = null) {
+    const todayStr = toDateStr(initialYear, initialMonth, initialDay);
+    const unjoinedEvents = events.filter(e => !e.is_registered && e.dateStr >= todayStr && e.status !== 'Cancelled')
+                                 .sort((a,b) => a.dateStr.localeCompare(b.dateStr));
+
+    if (filterDate) {
+      const dateUnjoined = unjoinedEvents.filter(e => e.dateStr === filterDate);
+      const dateRegistered = events.filter(e => e.dateStr === filterDate && e.is_registered);
+
+      if (dateUnjoined.length > 0) {
+        if (paneTitle) paneTitle.textContent = `Drills: ${formatHumanDate(filterDate)}`;
+        if (paneBadge) paneBadge.textContent = `${dateUnjoined.length} Scheduled`;
+        drillList.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:10px;color:var(--color-text-secondary);">${formatHumanDate(filterDate)}</span>
+            ${unjoinedEvents.length > dateUnjoined.length ? `<button type="button" class="btn btn-outline btn-sm" style="font-size:9.5px;padding:2px 7px;" onclick="window.resCalShowAll()">Show All Open (${unjoinedEvents.length})</button>` : ''}
+          </div>
+          ${dateUnjoined.map(ev => renderDrillCard(ev)).join('')}
+        `;
+        return;
+      } else if (dateRegistered.length > 0) {
+        if (paneTitle) paneTitle.textContent = `Drills: ${formatHumanDate(filterDate)}`;
+        if (paneBadge) paneBadge.textContent = `Attending`;
+        drillList.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:10px;color:var(--color-text-secondary);">${formatHumanDate(filterDate)}</span>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:9.5px;padding:2px 7px;" onclick="window.resCalShowAll()">Show All Open (${unjoinedEvents.length})</button>
+          </div>
+          ${dateRegistered.map(ev => `
+            <div style="padding:12px 14px;background:#F0F8F4;border:1px solid #C8E6C9;border-radius:6px;font-size:11px;color:#2E7D32;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <div>
+                <strong style="color:#1B5E20;">✓ Attending: ${escapeHtml(ev.title)}</strong>
+                <div style="font-size:10px;color:var(--color-text-secondary);margin-top:2px;">You already joined this drill. Managed in your Events module.</div>
+              </div>
+              <a href="events.php?tab=attending" class="btn btn-secondary btn-sm" style="font-size:10px;padding:4px 10px;white-space:nowrap;">
+                Manage in Events &rarr;
+              </a>
+            </div>
+          `).join('')}
+        `;
+        return;
+      } else {
+        if (paneTitle) paneTitle.textContent = `Drills: ${formatHumanDate(filterDate)}`;
+        if (paneBadge) paneBadge.textContent = `None Scheduled`;
+        drillList.innerHTML = `
+          <div style="padding:12px;text-align:center;color:var(--color-text-muted);font-size:10.5px;background:var(--color-surface-subtle);border-radius:6px;border:1px dashed var(--color-border);margin-bottom:4px;">
+            <div>No preparedness drills scheduled for ${formatHumanDate(filterDate)}.</div>
+            ${unjoinedEvents.length > 0 ? `<button type="button" class="btn btn-outline btn-sm" style="font-size:9.5px;padding:3px 8px;margin-top:4px;" onclick="window.resCalShowAll()">View All Open Events (${unjoinedEvents.length}) &rarr;</button>` : ''}
+          </div>
+        `;
+        return;
+      }
+    }
+
+    // Default view: list down ALL open events that the resident can join
+    if (paneTitle) paneTitle.textContent = 'Events to Join';
+    if (unjoinedEvents.length > 0) {
+      if (paneBadge) paneBadge.textContent = `${unjoinedEvents.length} Scheduled`;
+      drillList.innerHTML = unjoinedEvents.map(ev => renderDrillCard(ev)).join('');
+    } else {
+      if (paneBadge) paneBadge.textContent = 'All Caught Up';
+      drillList.innerHTML = `
+        <div style="padding:18px;text-align:center;color:var(--color-primary);font-size:11.5px;background:#F8FAFB;border-radius:6px;border:1px dashed #D9E0E3;">
+          <div style="font-size:18px;margin-bottom:4px;">✓</div>
+          <strong>You are attending all open community drills!</strong>
+          <div style="color:var(--color-text-secondary);font-size:10.5px;margin-top:2px;margin-bottom:8px;">
+            All available disaster drills have been joined. You can view and manage your attendance in the Events module.
+          </div>
+          <a href="events.php?tab=attending" class="btn btn-primary btn-sm" style="font-size:10.5px;padding:5px 12px;">
+            View Attending in Events &rarr;
+          </a>
+        </div>
+      `;
+    }
+  }
+
   function selectDate(dStr) {
     selectedDateStr = dStr;
     const parts = dStr.split('-');
@@ -530,77 +645,14 @@ require_once __DIR__ . '/../layouts/header.php';
       });
     }
 
-    renderDrillsForDate(dStr);
-  }
-
-  function renderDrillsForDate(dStr) {
-    if (paneTitle) paneTitle.textContent = `Drills: ${formatHumanDate(dStr)}`;
-    const dayDrills = events.filter(e => e.dateStr === dStr);
-
-    if (dayDrills.length > 0) {
-      if (paneBadge) paneBadge.textContent = `${dayDrills.length} Scheduled`;
-      drillList.innerHTML = dayDrills.map(ev => {
-        const isAttending = ev.is_registered;
-        const btnClass = isAttending ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
-        const btnLabel = isAttending ? '✓ Attending' : 'RSVP';
-        return `
-          <div class="prep-drill-card" data-event-id="${ev.id}">
-            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:180px;">
-              <div class="prep-drill-date-block">
-                <span class="prep-drill-month">${ev.monthShort}</span>
-                <span class="prep-drill-day">${ev.dayNum}</span>
-              </div>
-              <div class="prep-drill-info">
-                <div class="prep-drill-title">${escapeHtml(ev.title)}</div>
-                <div class="prep-drill-meta">
-                  <span>🕒 ${escapeHtml(ev.timeStr)}</span>
-                  <span>📍 ${escapeHtml(ev.venue)}</span>
-                  <span class="badge" style="background:#EBF3F5;color:var(--color-secondary);font-size:9px;padding:2px 6px;">${escapeHtml(ev.type)}</span>
-                </div>
-              </div>
-            </div>
-            <div class="prep-drill-actions">
-              <button type="button" class="${btnClass}" style="font-size:10px;padding:5px 10px;" onclick="handleResidentRsvp(${ev.id}, this)">
-                ${btnLabel}
-              </button>
-              <a href="events.php" class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 8px;">
-                Details
-              </a>
-            </div>
-          </div>
-        `;
-      }).join('');
-    } else {
-      if (paneBadge) paneBadge.textContent = 'None Scheduled';
-      const nextDrill = getNextUpcomingDrill();
-      let nextNotice = '';
-      if (nextDrill && nextDrill.dateStr !== dStr) {
-        nextNotice = `
-          <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--color-border-light);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <div style="font-size:10px;color:var(--color-primary);font-weight:600;">
-              Next: <span>${escapeHtml(nextDrill.title)}</span> (${formatHumanDate(nextDrill.dateStr)})
-            </div>
-            <button type="button" class="btn btn-outline btn-sm" style="font-size:9.5px;padding:3px 8px;" onclick="window.resCalSelect('${nextDrill.dateStr}')">
-              View Drill &rarr;
-            </button>
-          </div>
-        `;
-      }
-
-      drillList.innerHTML = `
-        <div style="padding:14px;text-align:center;color:var(--color-text-muted);font-size:10.5px;background:var(--color-surface-subtle);border-radius:6px;border:1px dashed var(--color-border);">
-          <div>No preparedness drills scheduled for this date.</div>
-          ${nextNotice}
-        </div>
-      `;
-    }
+    renderOpenDrillsList(dStr);
   }
 
   // RSVP AJAX Handler
   window.handleResidentRsvp = async function(eventId, btnElem) {
     const origText = btnElem.innerHTML;
     btnElem.disabled = true;
-    btnElem.innerHTML = '...';
+    btnElem.textContent = 'Joining...';
 
     try {
       const fd = new FormData();
@@ -613,40 +665,58 @@ require_once __DIR__ . '/../layouts/header.php';
       });
 
       const data = await res.json();
-      if (data.success) {
-        const isAttending = data.is_attending;
+      if (data.success && data.is_attending) {
         const targetEv = events.find(e => e.id === eventId);
-        if (targetEv) targetEv.is_registered = isAttending;
+        if (targetEv) targetEv.is_registered = true;
 
-        if (isAttending) {
-          btnElem.className = 'btn btn-primary btn-sm';
-          btnElem.textContent = '✓ Attending';
+        // Animate card removal since it immediately moves to the Events module!
+        const card = document.getElementById(`home-drill-card-${eventId}`) || btnElem.closest('.prep-drill-card');
+        if (card) {
+          card.style.transition = 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(-10px) scale(0.98)';
+          setTimeout(() => {
+            renderOpenDrillsList(selectedDateStr);
+          }, 350);
         } else {
-          btnElem.className = 'btn btn-secondary btn-sm';
-          btnElem.textContent = 'RSVP';
+          renderOpenDrillsList(selectedDateStr);
         }
 
         if (typeof showToast === 'function') {
-          showToast(data.message || 'RSVP updated successfully.', 'success');
+          showToast('Successfully joined! Event displayed now in your Events module under Attending.', 'success');
+        } else {
+          alert('Successfully joined! Event displayed now in your Events module under Attending.');
         }
       } else {
+        btnElem.disabled = false;
         btnElem.innerHTML = origText;
         if (typeof showToast === 'function') {
-          showToast(data.message || 'Could not update RSVP.', 'danger');
+          showToast(data.message || 'Could not join event.', 'danger');
+        } else {
+          alert(data.message || 'Could not join event.');
         }
       }
     } catch (err) {
-      btnElem.innerHTML = origText;
-      if (typeof showToast === 'function') {
-        showToast('Network error updating RSVP.', 'danger');
-      }
-    } finally {
       btnElem.disabled = false;
+      btnElem.innerHTML = origText;
+      console.error(err);
+      if (typeof showToast === 'function') {
+        showToast('Network error joining event.', 'danger');
+      } else {
+        alert('Network error joining event.');
+      }
     }
   };
 
   window.resCalSelect = function(dStr) {
     selectDate(dStr);
+  };
+
+  window.resCalShowAll = function() {
+    selectedDateStr = null;
+    const cells = daysGrid.querySelectorAll('.prep-cal-day');
+    cells.forEach(c => c.classList.remove('is-selected'));
+    renderOpenDrillsList();
   };
 
   // Nav Handlers
@@ -670,18 +740,14 @@ require_once __DIR__ . '/../layouts/header.php';
 
   if (todayBtn) {
     todayBtn.addEventListener('click', function() {
-      const todayStr = toDateStr(initialYear, initialMonth, initialDay);
       renderCalendar(initialYear, initialMonth);
-      selectDate(todayStr);
+      window.resCalShowAll();
     });
   }
 
-  // Initial load: pick next drill or today
-  const nextDrill = getNextUpcomingDrill();
-  const initDateStr = nextDrill ? nextDrill.dateStr : toDateStr(initialYear, initialMonth, initialDay);
-  const selParts = initDateStr.split('-');
-  renderCalendar(parseInt(selParts[0], 10), parseInt(selParts[1], 10) - 1);
-  selectDate(initDateStr);
+  // Initial load: render calendar and list down all events to join
+  renderCalendar(currentYear, currentMonth);
+  renderOpenDrillsList();
 })();
 
 // Evacuation Map & Live Routing Engine (Resident Home)

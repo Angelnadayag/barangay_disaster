@@ -129,7 +129,7 @@ foreach ($scheduleEvents as $ev) {
     ];
 }
 
-$pageTitle = "Responder Field Operations Home";
+$pageTitle = "Responder Dashboard";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
@@ -139,7 +139,7 @@ require_once __DIR__ . '/../layouts/header.php';
 
   <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0;">Tactical Field Operations Home</h1>
+      <h1 style="font-size:16px;font-weight:700;margin:0;">Responder Field Dashboard</h1>
     </div>
     <div class="page-header-actions">
       <a href="active-incidents.php" class="btn btn-secondary btn-sm" style="font-size:11px;padding:6px 12px;">Active Incidents</a>
@@ -169,7 +169,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <span class="prep-cal-month-label" id="respCalMonthLabel">October 2026</span>
         <button type="button" class="prep-cal-btn" id="respCalNextBtn" aria-label="Next Month">&rsaquo;</button>
         <button type="button" class="btn btn-secondary btn-sm" id="respCalTodayBtn" style="font-size:10px;padding:3px 8px;margin-left:4px;">Today</button>
-        <a href="events.php" style="font-size:11px;color:var(--color-secondary);font-weight:600;margin-left:8px;text-decoration:none;">Tactical Drills &rarr;</a>
+        <a href="events.php" style="font-size:11px;color:var(--color-secondary);font-weight:600;margin-left:8px;text-decoration:none;">View All Events &rarr;</a>
       </div>
     </div>
 
@@ -199,49 +199,7 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
   </div>
 
-  <!-- Tactical Identity Banner -->
-  <div style="background:var(--color-primary);color:#FFF;border-radius:var(--radius-primary, 10px);padding:12px 16px;margin-bottom:var(--space-3);box-shadow:var(--shadow-subtle);">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-      <div>
-        <div style="font-size:9px;text-transform:uppercase;color:#B5C6D4;letter-spacing:0.8px;font-weight:700;">Tactical Field Identity</div>
-        <div style="font-size:15px;font-weight:700;margin-top:2px;"><?= clean($user['full_name']) ?></div>
-        <div style="font-size:10px;color:#D9E0E3;">Field Unit: <?= clean(!empty($user['purok']) ? $user['purok'] : 'Rapid Response Team A') ?> • Base: Central Command</div>
-      </div>
-      <div>
-        <span style="font-size:9px;color:#B5C6D4;display:block;margin-bottom:4px;text-align:right;">Current Mission Readiness:</span>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <?php foreach (['Available', 'En Route', 'On Scene', 'Busy', 'Off Duty'] as $st): ?>
-            <?php
-              $isSelected = ($activeStatus === $st);
-              $bgCol = $isSelected ? '#2F6F73' : 'rgba(255,255,255,0.12)';
-              $borderCol = $isSelected ? '#4DD0E1' : 'transparent';
-            ?>
-            <button class="btn btn-sm" style="background:<?= $bgCol ?>;color:#FFF;border:1px solid <?= $borderCol ?>;font-size:9.5px;padding:4px 9px;"
-                    onclick="setQuickStatus('<?= $st ?>')">
-              <?= $st ?>
-            </button>
-          <?php endforeach; ?>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <?php if (!empty($urgentAlerts)): ?>
-    <div style="margin-bottom:var(--space-3);display:flex;flex-direction:column;gap:6px;">
-      <?php foreach ($urgentAlerts as $alert): ?>
-        <div style="background:#FDE8E8;border-left:4px solid var(--color-danger);padding:7px 12px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-size:10px;color:var(--color-danger);font-weight:600;">
-            [<?= strtoupper($alert['alert_level']) ?>] <?= clean($alert['title']) ?>: <span style="font-weight:400;"><?= clean($alert['message']) ?></span>
-          </div>
-          <span style="font-size:8.5px;color:#991B1B;white-space:nowrap;margin-left:8px;"><?= formatDate($alert['created_at'], 'h:i A') ?></span>
-        </div>
-      <?php endforeach; ?>
-    </div>
-  <?php endif; ?>
-
-
-
-  <!-- Tactical Evacuation Routing & Shelter Management (Scroll-Down Section) -->
+  <!-- Evacuation Routing & Safe Shelters Directory (Scroll-Down Section) -->
   <section class="evac-routing-section" id="evacuation-routing">
     <div class="evac-section-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -249,13 +207,13 @@ require_once __DIR__ . '/../layouts/header.php';
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-secondary);">
             <polygon points="3 11 22 2 13 21 11 13 3 11"/>
           </svg>
-          Tactical Evacuation Routing &amp; Camp Management
+          Evacuation Routing &amp; Safe Shelters
         </h2>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
         <button type="button" class="btn btn-secondary btn-sm" id="respGpsLocateBtn" style="font-size:10px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-          Locate Unit
+          My Location
         </button>
       </div>
     </div>
@@ -353,7 +311,7 @@ require_once __DIR__ . '/../layouts/header.php';
               <?php endif; ?>
               <button type="button" class="evac-route-btn" onclick="plotTacticalRoute(<?= (int)$center['id'] ?>)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-                Tactical Route
+                View Route
               </button>
             </div>
           </div>
@@ -363,7 +321,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <!-- Live Tactical Evacuation Map -->
       <div class="evac-map-wrapper">
         <div class="evac-map-header">
-          <span>Tactical Map &amp; Convoy Route Planning</span>
+          <span>Evacuation Map &amp; Route Guide</span>
           <span style="font-size:9.5px;color:var(--color-text-muted);">OpenStreetMap / Leaflet</span>
         </div>
         <div id="respEvacMap" class="evac-live-map-box"></div>
@@ -502,7 +460,7 @@ async function setQuickStatus(status) {
       const hasEv = events.some(e => e.dateStr === dStr);
       if (hasEv) {
         cell.classList.add('has-event');
-        cell.title = 'Tactical Drill Scheduled';
+        cell.title = 'Event / Drill Scheduled';
       }
 
       if (dStr === selectedDateStr) {
@@ -559,7 +517,7 @@ async function setQuickStatus(status) {
       drillList.innerHTML = dayDrills.map(ev => {
         const isAttending = ev.is_registered;
         const btnClass = isAttending ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
-        const btnLabel = isAttending ? '✓ Assigned' : 'Confirm Duty';
+        const btnLabel = isAttending ? 'Attending ✓' : 'Join Event';
         return `
           <div class="prep-drill-card" data-event-id="${ev.id}">
             <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:180px;">
@@ -585,7 +543,7 @@ async function setQuickStatus(status) {
                 Route
               </a>
               <a href="events.php" class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 8px;">
-                Briefing
+                Details
               </a>
             </div>
           </div>
@@ -641,14 +599,14 @@ async function setQuickStatus(status) {
 
         if (isAttending) {
           btnElem.className = 'btn btn-primary btn-sm';
-          btnElem.textContent = '✓ Assigned';
+          btnElem.textContent = 'Attending ✓';
         } else {
           btnElem.className = 'btn btn-secondary btn-sm';
-          btnElem.textContent = 'Confirm Duty';
+          btnElem.textContent = 'Join Event';
         }
 
         if (typeof showToast === 'function') {
-          showToast(data.message || 'Deployment duty roster updated.', 'success');
+          showToast(data.message || 'Event attendance updated.', 'success');
         }
       } else {
         btnElem.innerHTML = origText;
@@ -777,7 +735,7 @@ async function setQuickStatus(status) {
           <strong style="color:#17324D;">${s.name}</strong><br>
           <span style="font-size:9.5px;color:#666;">Brgy. ${s.barangay} &bull; ${s.accessibility}</span><br>
           <div style="margin-top:4px;">
-            <button onclick="plotTacticalRoute(${s.id})" style="background:#17324D;color:#FFF;border:none;border-radius:4px;font-size:9.5px;padding:3px 8px;cursor:pointer;">Plot Tactical Route &rarr;</button>
+            <button onclick="plotTacticalRoute(${s.id})" style="background:#17324D;color:#FFF;border:none;border-radius:4px;font-size:9.5px;padding:3px 8px;cursor:pointer;">View Route &rarr;</button>
           </div>
         </div>
       `);

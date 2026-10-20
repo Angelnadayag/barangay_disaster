@@ -17,17 +17,18 @@ $filterTab = trim($_GET['tab'] ?? 'all');
 $filterUnread = !empty($_GET['unread']);
 $searchQuery = trim($_GET['q'] ?? '');
 
-// Base query strictly scoped to resident's barangay ONLY
+// Base query strictly scoped to resident's barangay and created by their Barangay Head ONLY
 $sql = "
     SELECT n.*, b.name AS barangay_name, u.full_name AS sender_name, nr.id AS is_read
     FROM notifications n
     LEFT JOIN barangays b ON n.target_barangay_id = b.id
     LEFT JOIN users u ON n.created_by = u.id
     LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
-    WHERE n.target_barangay_id = ?
+    WHERE (n.target_barangay_id = ? OR n.target_user_id = ?)
       AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
+      AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
 ";
-$params = [$user['id'], $barangayId, $user['id']];
+$params = [$user['id'], $barangayId, $user['id'], $user['id'], $barangayId];
 
 if ($filterTab === 'financial_aid') {
     $sql .= " AND (n.related_module = 'financial_aid' OR n.title LIKE '%Financial Aid%' OR n.title LIKE '%Ayuda%' OR n.title LIKE '%Cash Assistance%')";
@@ -55,47 +56,55 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Counts per category (strictly scoped to this barangay)
+// Counts per category (strictly scoped to this barangay and created by Barangay Head)
+$brgyHeadSubquery = "AND (n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = {$barangayId}))";
+
 $countAll = (int)$db->query("
     SELECT COUNT(*) FROM notifications n 
-    WHERE n.target_barangay_id = {$barangayId} 
+    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
       AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
+      {$brgyHeadSubquery}
 ")->fetchColumn();
 
 $countAid = (int)$db->query("
     SELECT COUNT(*) FROM notifications n 
-    WHERE n.target_barangay_id = {$barangayId} 
+    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
       AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
       AND (n.related_module = 'financial_aid' OR n.title LIKE '%Financial Aid%' OR n.title LIKE '%Ayuda%' OR n.title LIKE '%Cash Assistance%')
+      {$brgyHeadSubquery}
 ")->fetchColumn();
 
 $countRes = (int)$db->query("
     SELECT COUNT(*) FROM notifications n 
-    WHERE n.target_barangay_id = {$barangayId} 
+    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
       AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
       AND (n.related_module = 'resources' OR n.title LIKE '%Resource%' OR n.title LIKE '%Relief%' OR n.title LIKE '%Supplies%')
+      {$brgyHeadSubquery}
 ")->fetchColumn();
 
 $countEvents = (int)$db->query("
     SELECT COUNT(*) FROM notifications n 
-    WHERE n.target_barangay_id = {$barangayId} 
+    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
       AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
       AND (n.related_module IN ('events', 'preparedness') OR n.title LIKE '%Event%' OR n.title LIKE '%Drill%' OR n.title LIKE '%Seminar%')
+      {$brgyHeadSubquery}
 ")->fetchColumn();
 
 $countCritical = (int)$db->query("
     SELECT COUNT(*) FROM notifications n 
-    WHERE n.target_barangay_id = {$barangayId} 
+    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
       AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
       AND n.alert_level IN ('urgent', 'Critical', 'critical')
+      {$brgyHeadSubquery}
 ")->fetchColumn();
 
 $countUnread = (int)$db->query("
     SELECT COUNT(*) FROM notifications n 
     LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = {$user['id']}
-    WHERE n.target_barangay_id = {$barangayId} 
+    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
       AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
       AND nr.id IS NULL
+      {$brgyHeadSubquery}
 ")->fetchColumn();
 
 $pageTitle = "Notifications & Advisories";
