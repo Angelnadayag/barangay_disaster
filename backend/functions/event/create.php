@@ -13,13 +13,15 @@ requireLogin();
 $user = getCurrentUser();
 $db = getDBConnection();
 
-$returnUrl = $_POST['return_url'] ?? ($_SERVER['HTTP_REFERER'] ?? (BASE_URL . '/views/icdrrmo/preparedness.php'));
+$defaultReturn = ($user['role'] === 'barangay_head') ? (BASE_URL . '/views/barangay/events.php') : (BASE_URL . '/views/icdrrmo/events.php');
+$returnUrl = $_POST['return_url'] ?? ($_SERVER['HTTP_REFERER'] ?? $defaultReturn);
 
 if (!in_array($user['role'], ['icdrrmo', 'barangay_head'], true)) {
     redirectWithFlash($returnUrl, 'error', 'Unauthorized to schedule activities.');
 }
 
 $title = trim($_POST['title'] ?? '');
+$type = trim($_POST['activity_type'] ?? 'Health and Medical');
 $barangayId = !empty($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
 if (empty($barangayId) && !empty($user['barangay_id'])) {
     $barangayId = (int)$user['barangay_id'];

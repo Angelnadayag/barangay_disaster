@@ -201,7 +201,7 @@ async function markNotifRead(notifId, module) {
     // Redirect to user module
     if (module === 'disaster_request') window.location.href = `${BASE_URL}/views/${folder}/disaster-requests.php`;
     else if (module === 'recommendation') window.location.href = `${BASE_URL}/views/${folder}/recommendations.php`;
-    else if (module === 'preparedness') window.location.href = `${BASE_URL}/views/${folder}/preparedness.php`;
+    else if (module === 'preparedness' || module === 'events' || module === 'event') window.location.href = `${BASE_URL}/views/${folder}/events.php`;
     else window.location.href = `${BASE_URL}/views/${folder}/notifications.php`;
   } catch (err) {
     console.error(err);

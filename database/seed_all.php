@@ -235,7 +235,7 @@ try {
         `resolution_notes`, `status`, `submitted_by`, `created_at`, `completed_at`
     ) VALUES (?, ?, 12, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $disasterTypes = ['Flash Flood', 'Flood', 'Storm Surge', 'Urban Fire', 'Landslide', 'Strong Winds'];
+    $disasterTypes = ['Flash Flood', 'Flood', 'Storm Surge', 'Fire', 'Landslide', 'Typhoon'];
     $severities = ['Critical', 'High', 'Moderate'];
     $urgencies = ['Immediate', 'High', 'Medium'];
 
@@ -407,11 +407,71 @@ try {
     ) VALUES (?, ?, ?, 1, ?, ?, 'sent', ?)");
 
     $eventThemes = [
-        ['Flash Flood Evacuation & Early Warning Simulation', 'Disaster Drill'],
-        ['Swift Water Rescue & Flotation Safety Refresher', 'First Aid / Rescuer Training'],
-        ['Family Disaster Go-Bag & 72-Hour Survival Kit Workshop', 'IEC Campaign'],
-        ['Participatory Community Hazard Mapping & Evacuation Walkthrough', 'Hazard Mapping Workshop'],
-        ['Cardiopulmonary Resuscitation (CPR) & Trauma First Aid Seminar', 'First Aid / Rescuer Training']
+        [
+            'suffix' => 'Flood Evacuation & Early Warning Simulation Drill',
+            'type' => 'Disaster Preparedness and Safety',
+            'activities' => ['Emergency Evacuation Drill', 'Disaster Preparedness Seminar', 'Flood Preparedness Seminar', 'Basic Life Support Training']
+        ],
+        [
+            'suffix' => 'Community Medical Mission & Free Health Consultation',
+            'type' => 'Health and Medical',
+            'activities' => ['Medical Mission', 'Free Medical Checkup', 'Free Medicine Distribution', 'Free Blood Pressure Check']
+        ],
+        [
+            'suffix' => 'Community Clean-Up Drive & Drainage Desilting',
+            'type' => 'Cleanliness and Environment',
+            'activities' => ['Community Clean-Up Drive', 'Canal Cleaning', 'Clean and Green Program', 'Anti-Dengue Clean-Up Drive']
+        ],
+        [
+            'suffix' => 'Supplemental Feeding & Child Nutrition Program',
+            'type' => 'Nutrition and Feeding',
+            'activities' => ['Supplemental Feeding Program', 'Feeding Program', 'Food Pack Distribution', 'Operation Timbang']
+        ],
+        [
+            'suffix' => 'Emergency Relief Goods & Family Care Distribution',
+            'type' => 'Social Welfare and Assistance',
+            'activities' => ['Financial Assistance Distribution', 'Food Assistance Distribution', 'Relief Goods Distribution', 'Senior Citizens\' Assistance']
+        ],
+        [
+            'suffix' => 'Basic Life Support & First Aid Skills Training',
+            'type' => 'Education and Skills Training',
+            'activities' => ['First Aid Training', 'Basic Life Support Training', 'Emergency Response Training', 'Job Skills Training']
+        ],
+        [
+            'suffix' => 'Youth Leadership Assembly & Summer Sports Clinic',
+            'type' => 'Youth and Children',
+            'activities' => ['Youth Leadership Seminar', 'Summer Sports Clinic', 'Basketball Tournament', 'SK Youth Assembly']
+        ],
+        [
+            'suffix' => 'Livelihood Assistance & Small Business Seminar',
+            'type' => 'Livelihood and Employment',
+            'activities' => ['Livelihood Assistance Program', 'Livelihood Training', 'Small Business Seminar', 'Free Resume Writing Workshop']
+        ],
+        [
+            'suffix' => 'Free Anti-Rabies Vaccination & Pet Care Program',
+            'type' => 'Animal Welfare',
+            'activities' => ['Free Anti-Rabies Vaccination', 'Free Pet Checkup', 'Pet Deworming', 'Responsible Pet Ownership Seminar']
+        ],
+        [
+            'suffix' => 'Urban Backyard Gardening & Seed Distribution',
+            'type' => 'Agricultural Programs',
+            'activities' => ['Free Seed Distribution', 'Urban Gardening Program', 'Organic Farming Seminar', 'Seedling Distribution']
+        ],
+        [
+            'suffix' => 'Purok Consultation & Barangay Assembly Day',
+            'type' => 'Government and Community Services',
+            'activities' => ['Barangay Assembly', 'Purok Assembly', 'Community Consultation', 'Public Information Campaign']
+        ],
+        [
+            'suffix' => 'Inter-Purok Sportsfest & Community Fitness Zumba',
+            'type' => 'Sports and Recreation',
+            'activities' => ['Barangay Sportsfest', 'Inter-Purok Basketball Tournament', 'Zumba Session', 'Community Aerobics']
+        ],
+        [
+            'suffix' => 'Barangay Community Day & Special Gathering',
+            'type' => 'Community Celebrations and Special Events',
+            'activities' => ['Barangay Fiesta', 'Araw ng Barangay', 'Family Day Celebration', 'Community Concert']
+        ]
     ];
 
     $eventId = 1;
@@ -422,10 +482,11 @@ try {
         $lng = (float) $p['lng'];
 
         for ($evIdx = 0; $evIdx < 5; $evIdx++) {
-            $theme = $eventThemes[$evIdx];
-            $title = "{$pName} {$theme[0]}";
-            $actType = $theme[1];
+            $theme = $eventThemes[($eventId - 1) % count($eventThemes)];
+            $title = "{$pName} {$theme['suffix']}";
+            $actType = $theme['type'];
             $venue = "{$pName} Community Covered Area & Assembly Grounds";
+            $activitiesJson = json_encode($theme['activities'], JSON_UNESCAPED_UNICODE);
             
             $daysOffset = ($eventId % 2 == 0) ? (15 - $eventId) : (-1 * (($eventId % 8) + 1));
             $isPast = ($daysOffset < 0);
@@ -437,14 +498,13 @@ try {
             $actualPart = $isPast ? ($targetPart - 5) : 0;
             $eval = $isPast ? "High community turnout in {$pName}. Evacuation timing benchmarks successfully met." : NULL;
             $assigned = "Responders Team Alpha ({$pName} Unit)";
-            $desc = "Dedicated disaster risk reduction activity for {$pName} residents, emphasizing practical preparedness for {$p['hazard']}.";
+            $desc = "Dedicated community activity for {$pName} residents, emphasizing practical engagement and preparedness for {$p['hazard']}.";
             $createdAt = date('Y-m-d H:i:s', strtotime("2026-10-01 08:00:00 + " . ($eventId * 6) . " hours"));
 
             $evStmt->execute([
                 $eventId, $title, $actType, $venue, $startDate, $endDate,
                 $assigned, $targetPart, $actualPart, $desc, $status,
-                $eval, "Lectures, hands-on demonstration, participatory drills",
-                "Simulation, safety briefing, attendance log verification", $createdAt,
+                $eval, $activitiesJson, $activitiesJson, $createdAt,
                 $lat, $lng
             ]);
 
@@ -465,10 +525,17 @@ try {
     }
 
     // Event 51: Financial Aid Distribution (Scheduled / Active)
+    $ev51Activities = json_encode([
+        'Financial Assistance Distribution',
+        'Food Assistance Distribution',
+        'Relief Goods Distribution',
+        'Senior Citizens\' Assistance'
+    ], JSON_UNESCAPED_UNICODE);
+
     $evStmt->execute([
         51,
         'Hinaplanon Emergency Flood Relief Cash Assistance Distribution',
-        'Financial Aid Distribution',
+        'Social Welfare and Assistance',
         'Hinaplanon Covered Court & Gymnasium',
         '2026-10-24 09:00:00',
         '2026-10-24 16:00:00',
@@ -478,18 +545,25 @@ try {
         'Official payout and releasing of the Emergency Flood Relief Financial Assistance (₱5,000 per verified household). Beneficiaries must bring a valid government ID and Barangay Certificate upon claiming.',
         'Scheduled',
         NULL,
-        'Identification check, verification ledger signing, direct cash assistance disbursal',
-        'Beneficiary verification, payout desk processing, grievance assistance booth',
+        $ev51Activities,
+        $ev51Activities,
         '2026-10-18 08:00:00',
         8.246596,
         124.259474
     ]);
 
     // Event 52: Missed Concluded Event ("natapos nah")
+    $ev52Activities = json_encode([
+        'Emergency Evacuation Drill',
+        'Disaster Preparedness Seminar',
+        'Flood Preparedness Seminar',
+        'Basic Life Support Training'
+    ], JSON_UNESCAPED_UNICODE);
+
     $evStmt->execute([
         52,
         'Hinaplanon Riverine Flood Evacuation & Early Warning Drill',
-        'Disaster Drill',
+        'Disaster Preparedness and Safety',
         'Purok Riverside 1 Multi-Purpose Assembly Area',
         '2026-10-16 08:30:00',
         '2026-10-16 11:30:00',
@@ -499,8 +573,8 @@ try {
         'Concluded comprehensive riverine flood response and siren evacuation drill for low-lying riverbank households along the Mandulog River.',
         'Completed',
         'Concluded with 95 community participants. Evacuation staging and siren protocols successfully tested.',
-        'Siren alerting, rapid marshaling, staging area headcount, first aid demonstration',
-        'Alarm activation, evacuation walk, muster point accounting, debriefing',
+        $ev52Activities,
+        $ev52Activities,
         '2026-10-10 08:00:00',
         8.246596,
         124.259474

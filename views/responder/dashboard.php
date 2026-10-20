@@ -585,7 +585,7 @@ async function setQuickStatus(status) {
       const fd = new FormData();
       fd.append('event_id', eventId);
 
-      const res = await fetch(`${BASE_URL}/backend/functions/activities/rsvp.php`, {
+      const res = await fetch(`${BASE_URL}/backend/functions/event/rsvp.php`, {
         method: 'POST',
         body: fd,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }

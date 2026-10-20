@@ -137,7 +137,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <?php if ($isCitizenOrResponder): ?>
       <nav class="topbar-desktop-nav">
         <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Home</a>
-        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/events.php" class="topbar-nav-pill <?= in_array($currentPage, ['events.php', 'preparedness.php'], true) ? 'active' : '' ?>">Events</a>
+        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/events.php" class="topbar-nav-pill <?= $currentPage === 'events.php' ? 'active' : '' ?>">Events</a>
         <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>" style="display:inline-flex;align-items:center;gap:5px;">
           <span>Notification</span>
           <?php if ($unreadCount > 0): ?>

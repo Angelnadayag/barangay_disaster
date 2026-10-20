@@ -1112,7 +1112,7 @@ require_once __DIR__ . '/../layouts/header.php';
     const formData = new FormData();
     formData.append('event_id', eventId);
 
-    fetch('<?= BASE_URL ?>/backend/functions/activities/rsvp.php', {
+    fetch('<?= BASE_URL ?>/backend/functions/event/rsvp.php', {
       method: 'POST',
       body: formData,
       headers: {

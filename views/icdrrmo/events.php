@@ -12,13 +12,29 @@ $user = getCurrentUser();
 $role = $user['role'];
 $db = getDBConnection();
 
-$pageTitle = "Preparedness Activities & Drills";
+$pageTitle = "Manage Events & Community Drills";
 require_once __DIR__ . '/../layouts/header.php';
 require_once __DIR__ . '/../layouts/sidebar.php';
 
 $viewMode = $_GET['view'] ?? 'list'; // 'month', 'list'
 $filterType = $_GET['type'] ?? '';
 $filterStatus = $_GET['status'] ?? '';
+
+$activityTypes = [
+  "Health and Medical",
+  "Nutrition and Feeding",
+  "Cleanliness and Environment",
+  "Youth and Children",
+  "Education and Skills Training",
+  "Social Welfare and Assistance",
+  "Livelihood and Employment",
+  "Sports and Recreation",
+  "Disaster Preparedness and Safety",
+  "Animal Welfare",
+  "Community Celebrations and Special Events",
+  "Government and Community Services",
+  "Agricultural Programs"
+];
 
 $sql = "
     SELECT pa.*, b.name AS barangay_name, u.full_name AS creator_name 
@@ -57,8 +73,8 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
     </div>
     <div class="page-header-actions">
       <div style="display:flex;background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;padding:2px;gap:2px;">
-        <a href="<?= BASE_URL ?>/views/icdrrmo/preparedness.php?view=list" class="btn btn-sm <?= $viewMode === 'list' ? 'btn-primary' : 'btn-outline' ?>" style="border:none;">List View</a>
-        <a href="<?= BASE_URL ?>/views/icdrrmo/preparedness.php?view=month" class="btn btn-sm <?= $viewMode === 'month' ? 'btn-primary' : 'btn-outline' ?>" style="border:none;">Month View</a>
+        <a href="<?= BASE_URL ?>/views/icdrrmo/events.php?view=list" class="btn btn-sm <?= $viewMode === 'list' ? 'btn-primary' : 'btn-outline' ?>" style="border:none;">List View</a>
+        <a href="<?= BASE_URL ?>/views/icdrrmo/events.php?view=month" class="btn btn-sm <?= $viewMode === 'month' ? 'btn-primary' : 'btn-outline' ?>" style="border:none;">Month View</a>
       </div>
 
       <button class="btn btn-primary" onclick="openModal('createActivityModal')">
@@ -74,13 +90,11 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
       <form method="GET" class="filter-bar" style="margin-bottom:0;">
         <input type="hidden" name="view" value="<?= clean($viewMode) ?>">
         <div class="filter-group">
-          <select name="type" class="form-control" style="width:180px;">
+          <select name="type" class="form-control" style="width:220px;">
             <option value="">All Activity Types</option>
-            <option value="Disaster Drill" <?= $filterType === 'Disaster Drill' ? 'selected' : '' ?>>Disaster Drill</option>
-            <option value="First Aid / Rescuer Training" <?= $filterType === 'First Aid / Rescuer Training' ? 'selected' : '' ?>>First Aid / Rescuer Training</option>
-            <option value="Community Seminar" <?= $filterType === 'Community Seminar' ? 'selected' : '' ?>>Community Seminar</option>
-            <option value="IEC Campaign" <?= $filterType === 'IEC Campaign' ? 'selected' : '' ?>>IEC Campaign</option>
-            <option value="Contingency Planning" <?= $filterType === 'Contingency Planning' ? 'selected' : '' ?>>Contingency Planning</option>
+            <?php foreach ($activityTypes as $t): ?>
+              <option value="<?= clean($t) ?>" <?= $filterType === $t ? 'selected' : '' ?>><?= clean($t) ?></option>
+            <?php endforeach; ?>
           </select>
 
           <select name="status" class="form-control" style="width:130px;">
@@ -93,7 +107,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
 
           <button type="submit" class="btn btn-outline">Filter</button>
           <?php if (!empty($filterType) || !empty($filterStatus)): ?>
-            <a href="<?= BASE_URL ?>/views/icdrrmo/preparedness.php?view=<?= clean($viewMode) ?>" class="btn btn-outline" style="color:var(--color-text-muted);">Reset</a>
+            <a href="<?= BASE_URL ?>/views/icdrrmo/events.php?view=<?= clean($viewMode) ?>" class="btn btn-outline" style="color:var(--color-text-muted);">Reset</a>
           <?php endif; ?>
         </div>
       </form>
@@ -219,7 +233,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
       <h3 class="modal-title">Schedule Preparedness Activity / Drill</h3>
       <button class="modal-close-btn" onclick="closeModal('createActivityModal')">&times;</button>
     </div>
-    <form id="createActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/create.php">
+    <form id="createActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/event/create.php">
       <input type="hidden" name="action" value="create">
       <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body">
@@ -232,11 +246,9 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
           <div class="form-group">
             <label class="form-label form-label-required">Activity Type</label>
             <select name="activity_type" class="form-control" required>
-              <option value="Disaster Drill">Disaster Drill</option>
-              <option value="First Aid / Rescuer Training">First Aid / Rescuer Training</option>
-              <option value="Community Seminar">Community Seminar</option>
-              <option value="IEC Campaign">IEC Campaign</option>
-              <option value="Contingency Planning">Contingency Planning</option>
+              <?php foreach ($activityTypes as $t): ?>
+                <option value="<?= clean($t) ?>"><?= clean($t) ?></option>
+              <?php endforeach; ?>
             </select>
           </div>
           <div class="form-group">
@@ -313,7 +325,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
       <h3 class="modal-title">Activity Accomplishment Evaluation</h3>
       <button class="modal-close-btn" onclick="closeModal('evaluateModal')">&times;</button>
     </div>
-    <form id="evaluateForm" method="POST" action="<?= BASE_URL ?>/backend/functions/activities/evaluate.php">
+    <form id="evaluateForm" method="POST" action="<?= BASE_URL ?>/backend/functions/event/evaluate.php">
       <input type="hidden" name="action" value="evaluate">
       <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <input type="hidden" name="activity_id" id="evalActId">
