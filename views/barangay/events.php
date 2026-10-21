@@ -1507,7 +1507,7 @@ require_once __DIR__ . '/../layouts/header.php';
 <!-- Modal 3A: View Accomplished Event Overview (Archive, Edit, Evaluate)       -->
 <!-- ========================================================================= -->
 <div class="modal-overlay" id="accomplishedEventModal">
-  <div class="modal-dialog" style="max-width:680px;">
+  <div class="modal-dialog" style="max-width:760px;">
     <div class="modal-header">
       <div style="display:flex;align-items:center;gap:8px;">
         <h3 class="modal-title" style="font-size:14px;font-weight:700;color:var(--color-primary);" id="view_acc_title">
@@ -1519,14 +1519,14 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <div class="modal-body" style="padding:16px 20px;">
       <!-- Title & Type Header -->
-      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+      <div style="background:linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);border:1px solid #E2E8F0;border-radius:8px;padding:12px 16px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
           <div>
             <h4 style="font-size:15px;font-weight:700;color:var(--color-primary);margin:0 0 4px 0;"
               id="acc_display_title"></h4>
             <div style="font-size:11px;color:var(--color-text-muted);" id="acc_display_type_wrap"></div>
           </div>
-          <span id="acc_display_type_badge" class="badge badge-info" style="font-size:10.5px;"></span>
+          <span id="acc_display_type_badge" class="badge badge-info" style="font-size:10.5px;padding:4px 10px;"></span>
         </div>
       </div>
 
@@ -1621,7 +1621,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <!-- Description / Objectives -->
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label"
-          style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;">Objectives
+          style="font-size:11px;font-weight:700;color:var(--color-primary);text-transform:uppercase;letter-spacing:0.3px;">Objectives
           & Description</label>
         <div
           style="font-size:11.5px;line-height:1.5;color:var(--color-text);background:#F8FAFC;padding:10px 12px;border-radius:6px;border:1px solid #E2E8F0;"
@@ -1630,41 +1630,52 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <!-- Event Content Execution Checklist Status -->
       <div class="form-group" style="margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <label class="form-label"
-            style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;">
+            style="font-size:11px;font-weight:700;color:var(--color-primary);text-transform:uppercase;margin:0;letter-spacing:0.3px;display:flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"></path>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
             Event Content Execution Milestones
           </label>
-          <span style="font-size:10px;color:var(--color-primary);font-weight:600;" id="acc_content_count_label"></span>
+          <span style="font-size:10.5px;color:var(--color-primary);font-weight:600;" id="acc_content_count_label"></span>
         </div>
         <div id="acc_content_execution_box"
-          style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:10px;max-height:160px;overflow-y:auto;">
+          style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;max-height:190px;overflow-y:auto;">
           <!-- Loaded dynamically -->
         </div>
       </div>
 
-      <!-- Evaluation Remarks & Outcomes -->
-      <div class="form-group" style="margin-bottom:14px;">
+      <!-- Evaluation Remarks & Outcomes (Shown when remarks exist or completed/cancelled) -->
+      <div class="form-group" id="acc_summary_group" style="margin-bottom:14px;display:none;">
         <label class="form-label"
-          style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;">Accomplishment
-          Remarks & Outcomes</label>
+          style="font-size:11px;font-weight:700;color:var(--color-primary);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px;">
+          Accomplishment Remarks & Outcomes
+        </label>
         <div
           style="font-size:11.5px;line-height:1.5;color:var(--color-text);background:#F8FAFC;padding:10px 12px;border-radius:6px;border:1px solid #E2E8F0;white-space:pre-wrap;"
           id="acc_display_summary"></div>
       </div>
 
-      <!-- Participants Attended Summary -->
+      <!-- Participant Attendees Summary -->
       <div class="form-group" style="margin-bottom:0;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <label class="form-label"
-            style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;">
-            Participants Attended
+            style="font-size:11px;font-weight:700;color:var(--color-primary);text-transform:uppercase;margin:0;letter-spacing:0.3px;display:flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Participant Attendees
           </label>
-          <span style="font-size:10.5px;font-weight:600;color:var(--color-success);" id="acc_attendees_pill"></span>
+          <span style="font-size:11px;font-weight:700;color:#0F766E;background:#F0FDFA;border:1px solid #CCFBF1;padding:3px 9px;border-radius:12px;" id="acc_attendees_pill"></span>
         </div>
 
         <div id="acc_attendees_preview_box"
-          style="max-height:160px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:6px;">
+          style="max-height:220px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:8px;background:#FFFFFF;">
           <!-- Loaded dynamically -->
         </div>
       </div>
@@ -2791,27 +2802,169 @@ require_once __DIR__ . '/../layouts/header.php';
     const attBox = document.getElementById('acc_attendees_preview_box');
     const attList = currentAccomplishedAttendees || [];
     const attendedCount = attList.filter(a => a.attended == 1 || a.attended === '1' || a.attended === true).length;
-    document.getElementById('acc_attendees_pill').innerText = `${attendedCount} confirmed attended (${attList.length} registered)`;
+    const pillEl = document.getElementById('acc_attendees_pill');
+    if (pillEl) {
+      pillEl.innerHTML = `<strong>${attendedCount}</strong> Attended • <strong>${attList.length}</strong> Registered`;
+    }
 
     if (!attList || attList.length === 0) {
-      attBox.innerHTML = '<div style="text-align:center;padding:14px;font-size:11.5px;color:var(--color-text-muted);">No participants recorded for this event.</div>';
-    } else {
-      let attHtml = '<table class="data-table" style="font-size:10.5px;width:100%;margin:0;"><thead><tr><th style="padding:6px 8px;">Participant Name</th><th style="padding:6px 8px;">Mobile Phone</th><th style="padding:6px 8px;text-align:center;">Attended Status</th></tr></thead><tbody>';
-      attList.forEach(a => {
-        const isAtt = (a.attended == 1 || a.attended === '1' || a.attended === true);
-        attHtml += `<tr>
-        <td style="padding:6px 8px;font-weight:600;">${a.resident_name}</td>
-        <td style="padding:6px 8px;font-family:monospace;">${a.phone}</td>
-        <td style="padding:6px 8px;text-align:center;">
-          <span class="badge ${isAtt ? 'badge-success' : 'badge-neutral'}" style="font-size:9px;">
-            ${isAtt ? 'Attended ✓' : 'Registered / Absent'}
-          </span>
-        </td>
-      </tr>`;
-      });
-      attHtml += '</tbody></table>';
-      attBox.innerHTML = attHtml;
+      attBox.innerHTML = `
+        <div style="text-align:center;padding:24px 16px;font-size:11.5px;color:var(--color-text-muted);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin-bottom:6px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg><br>
+          No participants or household families registered for this event yet.
+        </div>
+      `;
+      return;
     }
+
+    let attHtml = `
+      <table class="data-table" style="font-size:11px;width:100%;margin:0;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+            <th style="padding:8px 10px;text-align:left;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase;">Participant / Household Family</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase;">Contact Number</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase;">Attendance Status</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:700;color:#475569;font-size:10px;text-transform:uppercase;width:110px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    attList.forEach(a => {
+      const isAtt = (a.attended == 1 || a.attended === '1' || a.attended === true);
+      const rawName = (a.resident_name || 'Participant').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safePhone = (a.phone || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      
+      // Parse family head / member badge if present
+      let displayName = rawName;
+      let familyTag = '';
+      if (rawName.includes('(') && rawName.includes(')')) {
+        const match = rawName.match(/^(.*?)\s*\((.*?)\)$/);
+        if (match) {
+          displayName = match[1];
+          const tagText = match[2];
+          const isHead = tagText.toLowerCase().includes('head');
+          familyTag = `<span style="display:inline-block;margin-left:4px;font-size:9.5px;padding:1px 5px;border-radius:4px;background:${isHead ? '#EFF6FF' : '#F1F5F9'};color:${isHead ? '#1D4ED8' : '#475569'};font-weight:600;">${tagText}</span>`;
+        }
+      }
+
+      attHtml += `
+        <tr id="acc_attendee_row_${a.id}" style="border-bottom:1px solid #F1F5F9;transition:background 0.15s ease;">
+          <td style="padding:8px 10px;">
+            <div style="font-weight:600;color:#1E293B;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+              <span>${displayName}</span>
+              ${familyTag}
+            </div>
+          </td>
+          <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#475569;">
+            ${safePhone}
+          </td>
+          <td style="padding:8px 10px;text-align:center;" id="acc_status_badge_${a.id}">
+            <span class="badge ${isAtt ? 'badge-success' : 'badge-neutral'}" style="font-size:9.5px;padding:2px 7px;font-weight:600;">
+              ${isAtt ? '✓ Attended' : 'Pending / Registered'}
+            </span>
+          </td>
+          <td style="padding:8px 10px;text-align:center;">
+            <button type="button" 
+              id="acc_btn_attend_${a.id}" 
+              onclick="toggleAttendeeAttendance(${a.id}, ${isAtt ? 0 : 1})"
+              class="btn btn-sm"
+              style="${isAtt 
+                ? 'background:#FEF2F2;color:#DC2626;border:1px solid #FCA5A5;font-weight:700;font-size:11px;padding:3px 12px;border-radius:5px;cursor:pointer;transition:all 0.15s ease;' 
+                : 'background:#16A34A;color:#FFFFFF;border:1px solid #16A34A;font-weight:700;font-size:11px;padding:3px 12px;border-radius:5px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.05);transition:all 0.15s ease;'}"
+              title="${isAtt ? 'Click to void attendance' : 'Click to mark as attended'}">
+              ${isAtt ? 'Void' : 'Attended'}
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    attHtml += '</tbody></table>';
+    attBox.innerHTML = attHtml;
+  }
+
+  // Toggle Attendee Attendance (Attended / Void) with live optimistic update and AJAX sync
+  function toggleAttendeeAttendance(attendeeId, targetAttended) {
+    if (!currentAccomplishedAct) return;
+    const actId = currentAccomplishedAct.id;
+    const btn = document.getElementById(`acc_btn_attend_${attendeeId}`);
+    const badgeCell = document.getElementById(`acc_status_badge_${attendeeId}`);
+
+    // Immediate optimistic UI change
+    if (btn) {
+      btn.disabled = true;
+      if (targetAttended === 1) {
+        btn.innerText = 'Void';
+        btn.style.cssText = 'background:#FEF2F2;color:#DC2626;border:1px solid #FCA5A5;font-weight:700;font-size:11px;padding:3px 12px;border-radius:5px;cursor:pointer;';
+        btn.setAttribute('onclick', `toggleAttendeeAttendance(${attendeeId}, 0)`);
+        btn.title = 'Click to void attendance';
+        if (badgeCell) {
+          badgeCell.innerHTML = '<span class="badge badge-success" style="font-size:9.5px;padding:2px 7px;font-weight:600;">✓ Attended</span>';
+        }
+      } else {
+        btn.innerText = 'Attended';
+        btn.style.cssText = 'background:#16A34A;color:#FFFFFF;border:1px solid #16A34A;font-weight:700;font-size:11px;padding:3px 12px;border-radius:5px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.05);';
+        btn.setAttribute('onclick', `toggleAttendeeAttendance(${attendeeId}, 1)`);
+        btn.title = 'Click to mark as attended';
+        if (badgeCell) {
+          badgeCell.innerHTML = '<span class="badge badge-neutral" style="font-size:9.5px;padding:2px 7px;font-weight:600;">Pending / Registered</span>';
+        }
+      }
+    }
+
+    // Update in-memory array and counters
+    if (currentAccomplishedAttendees) {
+      const targetAtt = currentAccomplishedAttendees.find(a => a.id == attendeeId);
+      if (targetAtt) {
+        targetAtt.attended = targetAttended;
+      }
+      const newAttendedCount = currentAccomplishedAttendees.filter(a => a.attended == 1 || a.attended === '1' || a.attended === true).length;
+      const pillEl = document.getElementById('acc_attendees_pill');
+      if (pillEl) {
+        pillEl.innerHTML = `<strong>${newAttendedCount}</strong> Attended • <strong>${currentAccomplishedAttendees.length}</strong> Registered`;
+      }
+      const turnoutEl = document.getElementById('acc_display_attendance');
+      if (turnoutEl) {
+        const targetPart = parseInt(currentAccomplishedAct.target_participants, 10) || 50;
+        turnoutEl.innerText = `${newAttendedCount} attended (${targetPart} targeted)`;
+      }
+      currentAccomplishedAct.actual_participants = newAttendedCount;
+    }
+
+    // Send AJAX request to backend
+    const formData = new FormData();
+    formData.append('action', 'toggle_attendance');
+    formData.append('attendee_id', attendeeId);
+    formData.append('activity_id', actId);
+    formData.append('attended', targetAttended);
+    formData.append('is_ajax', '1');
+
+    fetch('<?= BASE_URL ?>/backend/functions/event/index.php', {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (btn) btn.disabled = false;
+      if (!data.success) {
+        alert(data.message || 'Failed to update attendance status.');
+        renderAccomplishedAttendeesTable();
+      } else {
+        // Sync with global attendees map
+        if (typeof attendeesByActivityMap !== 'undefined' && attendeesByActivityMap[actId]) {
+          const mapped = attendeesByActivityMap[actId].find(a => a.id == attendeeId);
+          if (mapped) mapped.attended = data.attended;
+        }
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      if (btn) btn.disabled = false;
+      alert('Network error while updating attendance.');
+      renderAccomplishedAttendeesTable();
+    });
   }
 
   function renderEditAttendeesTable() {
@@ -2992,10 +3145,18 @@ require_once __DIR__ . '/../layouts/header.php';
 
     document.getElementById('acc_display_description').innerText = act.description || 'No description recorded for this activity.';
 
+    const summaryGroup = document.getElementById('acc_summary_group');
     if (isCancelled && act.cancellation_reason) {
+      if (summaryGroup) summaryGroup.style.display = 'block';
       document.getElementById('acc_display_summary').innerHTML = '<span style="color:#DC2626;font-weight:600;">[Cancellation Reason]</span> ' + act.cancellation_reason;
+    } else if (act.evaluation_summary) {
+      if (summaryGroup) summaryGroup.style.display = 'block';
+      document.getElementById('acc_display_summary').innerText = act.evaluation_summary;
+    } else if (isCompleted) {
+      if (summaryGroup) summaryGroup.style.display = 'block';
+      document.getElementById('acc_display_summary').innerText = 'No evaluation remarks recorded yet.';
     } else {
-      document.getElementById('acc_display_summary').innerText = act.evaluation_summary || (isCompleted ? 'No evaluation remarks recorded yet.' : 'Event remarks will be recorded upon completion or evaluation.');
+      if (summaryGroup) summaryGroup.style.display = 'none';
     }
 
     // Render executed content checklist pills and evaluation percentage
@@ -3022,64 +3183,87 @@ require_once __DIR__ . '/../layouts/header.php';
     }
 
     const contentBox = document.getElementById('acc_content_execution_box');
-    const totalExpected = expectedItems.length;
-    const execCount = executedItems.length;
-    const evalPercent = totalExpected > 0 ? Math.round((execCount / totalExpected) * 100) : 100;
 
     const evalMeta = document.getElementById('acc_display_eval_meta');
     if (isCompleted || act.status === 'Completed') {
+      const totalExpected = expectedItems.length > 0 ? expectedItems.length : (executedItems.length || 1);
+      const execCount = executedItems.length;
+      const evalPercent = totalExpected > 0 ? Math.round((execCount / totalExpected) * 100) : 100;
+
       if (evalMeta) {
         evalMeta.style.display = 'block';
         evalMeta.innerText = `Evaluation: ${evalPercent}% Executed (${execCount}/${totalExpected} milestones)`;
         evalMeta.style.color = evalPercent === 100 ? '#059669' : (evalPercent >= 70 ? '#2563EB' : (evalPercent >= 40 ? '#D97706' : '#DC2626'));
       }
-    } else {
-      if (evalMeta) evalMeta.style.display = 'none';
-    }
 
-    if (isCompleted || act.status === 'Completed') {
       document.getElementById('acc_content_count_label').innerHTML = `
-      <span class="badge ${evalPercent === 100 ? 'badge-success' : (evalPercent >= 70 ? 'badge-primary' : 'badge-warning')}" style="font-size:10.5px;font-weight:700;">
-        ${evalPercent}% Execution Rate (${execCount} of ${totalExpected} completed)
-      </span>
-    `;
+        <span class="badge ${evalPercent === 100 ? 'badge-success' : (evalPercent >= 70 ? 'badge-primary' : 'badge-warning')}" style="font-size:10.5px;font-weight:700;">
+          ${evalPercent}% Execution Rate (${execCount} of ${totalExpected} completed)
+        </span>
+      `;
       let contentHtml = `
-      <div style="margin-bottom:8px;">
-        <div style="height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">
-          <div style="height:100%;width:${evalPercent}%;background:${evalPercent === 100 ? 'linear-gradient(90deg, #10B981, #059669)' : (evalPercent >= 70 ? 'linear-gradient(90deg, #60A5FA, #2563EB)' : 'linear-gradient(90deg, #FBBF24, #D97706)')};border-radius:3px;transition:width 0.3s ease;"></div>
+        <div style="margin-bottom:10px;">
+          <div style="height:7px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:${evalPercent}%;background:${evalPercent === 100 ? 'linear-gradient(90deg, #10B981, #059669)' : (evalPercent >= 70 ? 'linear-gradient(90deg, #60A5FA, #2563EB)' : 'linear-gradient(90deg, #FBBF24, #D97706)')};border-radius:4px;transition:width 0.3s ease;"></div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
       if (executedItems.length > 0) {
-        contentHtml += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+        contentHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:8px;">';
         executedItems.forEach(item => {
           contentHtml += `
-          <span style="display:inline-flex;align-items:center;gap:4px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;padding:4px 9px;border-radius:14px;font-size:11px;font-weight:500;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            ${item}
-          </span>
-        `;
+            <div style="display:flex;align-items:center;gap:8px;background:#FFFFFF;border:1px solid #A7F3D0;padding:8px 10px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+              <div style="width:20px;height:20px;border-radius:50%;background:#ECFDF5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">
+                ✓
+              </div>
+              <span style="font-size:11.5px;font-weight:600;color:#065F46;line-height:1.35;">
+                ${item}
+              </span>
+            </div>
+          `;
         });
         contentHtml += '</div>';
       } else {
-        contentHtml += '<div style="font-size:11px;color:#DC2626;font-style:italic;">0 milestones executed during event.</div>';
+        contentHtml += '<div style="font-size:11.5px;color:#DC2626;font-style:italic;padding:4px 0;">0 milestones executed during event.</div>';
       }
       contentBox.innerHTML = contentHtml;
-    } else if (Array.isArray(executedItems) && executedItems.length > 0) {
-      document.getElementById('acc_content_count_label').innerText = `${executedItems.length} milestone(s) planned`;
-      let contentHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
-      executedItems.forEach(item => {
-        contentHtml += `
-        <span style="display:inline-flex;align-items:center;gap:4px;background:#F1F5F9;border:1px solid #CBD5E1;color:#475569;padding:4px 9px;border-radius:14px;font-size:11px;font-weight:500;">
-          ${item}
+    } else {
+      if (evalMeta) evalMeta.style.display = 'none';
+
+      // Scheduled or Ongoing Event: Show planned execution milestones in a clean grid
+      const plannedList = (expectedItems && expectedItems.length > 0) ? expectedItems : executedItems;
+      const countPlanned = plannedList.length;
+
+      document.getElementById('acc_content_count_label').innerHTML = `
+        <span class="badge badge-info" style="font-size:10.5px;font-weight:700;background:#E0F2FE;color:#0369A1;border:1px solid #BAE6FD;">
+          ${countPlanned} Milestones Scheduled
         </span>
       `;
-      });
-      contentHtml += '</div>';
-      contentBox.innerHTML = contentHtml;
-    } else {
-      document.getElementById('acc_content_count_label').innerText = '0 executed';
-      contentBox.innerHTML = '<div style="font-size:11.5px;color:var(--color-text-muted);font-style:italic;">No event content execution items recorded yet. Execution milestones can be reviewed during evaluation.</div>';
+
+      if (plannedList.length > 0) {
+        let contentHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:8px;">';
+        plannedList.forEach((item, idx) => {
+          contentHtml += `
+            <div style="display:flex;align-items:center;gap:10px;background:#FFFFFF;border:1px solid #E2E8F0;padding:8px 12px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+              <div style="width:22px;height:22px;border-radius:6px;background:#EFF6FF;color:#2563EB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">
+                ${idx + 1}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:11.5px;font-weight:600;color:#1E293B;line-height:1.35;word-break:break-word;">
+                  ${item}
+                </div>
+              </div>
+              <span style="font-size:9.5px;color:#64748B;background:#F1F5F9;padding:2px 6px;border-radius:4px;font-weight:600;white-space:nowrap;">
+                Planned
+              </span>
+            </div>
+          `;
+        });
+        contentHtml += '</div>';
+        contentBox.innerHTML = contentHtml;
+      } else {
+        contentBox.innerHTML = '<div style="font-size:11.5px;color:var(--color-text-muted);font-style:italic;padding:6px 0;">No specific execution milestones configured for this activity type.</div>';
+      }
     }
 
     // Render attendees list preview (read-only view)
