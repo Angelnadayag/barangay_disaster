@@ -397,3 +397,53 @@ function sortPuroksMainFirst(array &$puroksList): void {
 }
 }
 
+/**
+ * Synchronize dynamic households and population count for a purok from purok_households table
+ */
+if (!function_exists('syncPurokDemographics')) {
+function syncPurokDemographics($db, $purokId = 0, $purokName = '', $barangayId = 0) {
+    if (!$db) return ['purok_id' => 0, 'households' => 0, 'population' => 0];
+
+    if (!$purokId && !empty($purokName) && $barangayId > 0) {
+        $pStmt = $db->prepare("SELECT id FROM puroks WHERE name = ? AND barangay_id = ? LIMIT 1");
+        $pStmt->execute([$purokName, $barangayId]);
+        $purokId = (int)$pStmt->fetchColumn();
+    }
+
+    if (!$purokId) return ['purok_id' => 0, 'households' => 0, 'population' => 0];
+
+    $stmt = $db->prepare("
+        SELECT 
+            COUNT(*) as dyn_households,
+            COALESCE(SUM(total_members), 0) as dyn_population
+        FROM purok_households 
+        WHERE (purok_id = ? OR (purok_name = (SELECT name FROM puroks WHERE id = ?) AND barangay_id = (SELECT barangay_id FROM puroks WHERE id = ?)))
+          AND status = 'active'
+    ");
+    $stmt->execute([$purokId, $purokId, $purokId]);
+    $counts = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $hh = (int)($counts['dyn_households'] ?? 0);
+    $pop = (int)($counts['dyn_population'] ?? 0);
+
+    $upd = $db->prepare("UPDATE puroks SET households = ?, population = ? WHERE id = ?");
+    $upd->execute([$hh, $pop, $purokId]);
+
+    $bStmt = $db->prepare("SELECT barangay_id FROM puroks WHERE id = ?");
+    $bStmt->execute([$purokId]);
+    $bId = (int)$bStmt->fetchColumn();
+    if ($bId > 0) {
+        $updB = $db->prepare("
+            UPDATE barangays 
+            SET total_households = (SELECT COUNT(*) FROM purok_households WHERE barangay_id = ? AND status = 'active'),
+                population = (SELECT COALESCE(SUM(total_members), 0) FROM purok_households WHERE barangay_id = ? AND status = 'active')
+            WHERE id = ?
+        ");
+        $updB->execute([$bId, $bId, $bId]);
+    }
+
+    return ['purok_id' => $purokId, 'households' => $hh, 'population' => $pop];
+}
+}
+
+
