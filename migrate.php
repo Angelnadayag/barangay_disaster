@@ -105,6 +105,13 @@ try {
             echo "Step 2: Importing seed data from seeds.sql...\n";
             $executeSqlFile($pdo, $seedsFile, "Seed data");
         }
+
+        // Master PHP Seeder (Puroks, Users, Reports, Aid, Inventory, Households 30-50 & Demographics)
+        $seedAllFile = $rootDir . '/database/seed_all.php';
+        if (file_exists($seedAllFile)) {
+            echo "Step 3: Populating master database records & households (seed_all.php)...\n";
+            require $seedAllFile;
+        }
     } else {
         // --------------------------------------------------------------------
         // SMART INCREMENTAL MIGRATION (Preserves existing data on deployment)
@@ -422,9 +429,16 @@ try {
             }
         }
 
-        if ($seedOnly && file_exists($seedsFile)) {
-            echo "Step 3: Re-seeding database from seeds.sql (--seed)...\n";
-            $executeSqlFile($pdo, $seedsFile, "Seed data");
+        if ($seedOnly) {
+            if (file_exists($seedsFile)) {
+                echo "Step 3: Re-seeding database from seeds.sql (--seed)...\n";
+                $executeSqlFile($pdo, $seedsFile, "Seed data");
+            }
+            $seedAllFile = $rootDir . '/database/seed_all.php';
+            if (file_exists($seedAllFile)) {
+                echo "Step 4: Populating master database records & households (seed_all.php)...\n";
+                require $seedAllFile;
+            }
         }
     }
 

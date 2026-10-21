@@ -777,7 +777,10 @@ CREATE TABLE `financial_aid_audits` (
   KEY `fk_audit_actor` (`actor_id`),
   CONSTRAINT `fk_audit_actor` FOREIGN KEY (`actor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_audit_alloc` FOREIGN KEY (`allocation_id`) REFERENCES `financial_aid_allocations` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_audit_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_audit_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 DROP TABLE IF EXISTS `household_members`;
 DROP TABLE IF EXISTS `purok_households`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
