@@ -44,24 +44,41 @@ $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 // Determine initial selected allocation ID (from query or first available)
 $selectedAllocId = !empty($_GET['selected_id']) ? (int)$_GET['selected_id'] : (!empty($allocations) ? (int)$allocations[0]['id'] : 0);
 
-// Fetch all beneficiary distributions for this barangay
+// Fetch all beneficiary distributions for this barangay (with household details)
 $distStmt = $db->prepare("
-    SELECT d.*, a.allocation_code, a.program_name, a.amount_per_beneficiary, u.full_name AS disbursing_officer
+    SELECT d.*, a.allocation_code, a.program_name, a.amount_per_beneficiary, u.full_name AS disbursing_officer,
+           h.household_code, h.family_name, h.pwd_count, h.seniors_count
     FROM financial_aid_distributions d
     JOIN financial_aid_allocations a ON d.allocation_id = a.id
     LEFT JOIN users u ON d.disbursed_by = u.id
+    LEFT JOIN purok_households h ON d.household_id = h.id
     WHERE d.barangay_id = ?
     ORDER BY d.created_at DESC
 ");
 $distStmt->execute([$barangayId]);
 $allDistributions = $distStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch barangay puroks for beneficiary entry
+// Fetch barangay puroks for beneficiary entry and filtering
 $purokStmt = $db->prepare("SELECT name FROM puroks WHERE barangay_id = ? ORDER BY name ASC");
 $purokStmt->execute([$barangayId]);
 $barangayPuroks = $purokStmt->fetchAll(PDO::FETCH_COLUMN);
 
-// Fetch registered residents for autofill
+// Fetch active household families with 1 authorized representative and PWD / demographic status
+$hhStmt = $db->prepare("
+    SELECT h.id, h.purok_id, h.purok_name, h.household_code, h.family_name, 
+           h.head_full_name, h.head_phone, h.head_relation, h.economic_status,
+           h.evacuation_priority, h.pwd_count, h.seniors_count, h.minors_count,
+           h.total_members, h.authorized_id_type, h.authorized_id_number,
+           r.username AS resident_username
+    FROM purok_households h
+    LEFT JOIN residents r ON h.head_resident_id = r.id
+    WHERE h.barangay_id = ? AND h.status = 'active'
+    ORDER BY h.purok_name ASC, h.family_name ASC
+");
+$hhStmt->execute([$barangayId]);
+$householdFamilies = $hhStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch registered residents for fallback autofill
 $resStmt = $db->prepare("
     SELECT id, full_name, purok, phone 
     FROM residents 
@@ -467,7 +484,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               Loading selected allocation...
             </div>
           </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="btn btn-outline" onclick="openEligibleFamiliesModal()" style="padding: 5px 10px; font-size: 10.5px;">
+              Eligible Families Roster
+            </button>
             <button type="button" class="btn btn-primary" onclick="openDistributeModalForCurrent()" style="padding: 5px 10px; font-size: 10.5px;">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               + Distribute Aid
@@ -496,11 +516,19 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <!-- Filter bar for beneficiaries inside this program -->
-        <div style="padding: 8px 14px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF; display: flex; gap: 8px; align-items: center;">
-          <div style="flex: 1;">
+        <div style="padding: 8px 14px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 170px;">
             <input type="text" id="beneficiarySearchInput" class="form-control" placeholder="Search beneficiary by name, ref no, or phone..." style="font-size: 10.5px; padding: 5px 9px;" oninput="filterBeneficiariesTable()">
           </div>
           <div style="width: 140px;">
+            <select id="beneficiaryPurokFilter" class="form-control" style="font-size: 10.5px; padding: 5px 8px;" onchange="filterBeneficiariesTable()">
+              <option value="">All Puroks</option>
+              <?php foreach ($barangayPuroks as $p): ?>
+                <option value="<?= htmlspecialchars($p) ?>"><?= htmlspecialchars($p) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div style="width: 130px;">
             <select id="beneficiaryStatusFilter" class="form-control" style="font-size: 10.5px; padding: 5px 8px;" onchange="filterBeneficiariesTable()">
               <option value="">All Statuses</option>
               <option value="Claimed">Claimed</option>
@@ -547,6 +575,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/distribute.php" id="distributeForm">
       <input type="hidden" name="action" value="add_beneficiary">
       <input type="hidden" name="resident_id" id="dist_resident_id" value="">
+      <input type="hidden" name="household_id" id="dist_household_id" value="">
       <input type="hidden" name="return_url" id="dist_return_url" value="">
 
       <div class="modal-body">
@@ -565,24 +594,69 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             </select>
           </div>
 
-          <!-- Quick Autofill from Registered Residents -->
-          <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px;">
-            <label class="form-label" style="font-size: 10px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 4px; display: block;">
-              Select From Registered Residents (Optional Autofill)
-            </label>
-            <select id="resident_autofill_select" class="form-control" style="font-size: 11px;" onchange="autofillResident(this)">
-              <option value="">-- Type name below or pick registered resident --</option>
-              <?php foreach ($residentList as $res): ?>
-                <option value="<?= $res['id'] ?>" data-name="<?= htmlspecialchars($res['full_name']) ?>" data-purok="<?= htmlspecialchars($res['purok']) ?>" data-phone="<?= htmlspecialchars($res['phone']) ?>">
-                  <?= htmlspecialchars($res['full_name']) ?> (<?= htmlspecialchars($res['purok']) ?>)
+          <!-- Select Household Family na Pwede Bigyan ng Ayuda -->
+          <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="font-size: 10.5px; font-weight: 600; color: var(--color-primary); margin-bottom: 0;">
+                Select Household Family (Pamilyang Pwede Bigyan ng Ayuda)
+              </label>
+              <span id="modalFamilyCounter" style="font-size: 9.5px; color: var(--color-text-muted);">
+                <?= count($householdFamilies) ?> families
+              </span>
+            </div>
+
+            <!-- Two compact filters: Purok & Priority/PWD -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+              <div>
+                <label style="font-size: 9.5px; font-weight: 600; color: var(--color-text-secondary); display: block; margin-bottom: 2px;">Filter Purok</label>
+                <select id="dist_family_purok_filter" class="form-control" style="font-size: 10px; height: 28px; padding: 3px 6px;" onchange="updateModalFamilyOptions()">
+                  <option value="">All Puroks</option>
+                  <?php foreach ($barangayPuroks as $p): ?>
+                    <option value="<?= htmlspecialchars($p) ?>"><?= htmlspecialchars($p) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 9.5px; font-weight: 600; color: var(--color-text-secondary); display: block; margin-bottom: 2px;">Priority / PWD Filter</label>
+                <select id="dist_family_priority_filter" class="form-control" style="font-size: 10px; height: 28px; padding: 3px 6px;" onchange="updateModalFamilyOptions()">
+                  <option value="">All Families</option>
+                  <option value="pwd">With PWD Members (Priority)</option>
+                  <option value="seniors">With Senior Citizens</option>
+                  <option value="indigent">Indigent / Low Income</option>
+                  <option value="unclaimed">Not Yet Claimed (This Program)</option>
+                </select>
+              </div>
+            </div>
+
+            <select id="dist_family_select" class="form-control" style="font-size: 10.5px;" onchange="onFamilySelected(this)">
+              <option value="">-- Choose Household Family (Auto-fills details) --</option>
+              <?php foreach ($householdFamilies as $fam): 
+                $demoBadges = [];
+                if ($fam['pwd_count'] > 0) $demoBadges[] = "PWD: {$fam['pwd_count']}";
+                if ($fam['seniors_count'] > 0) $demoBadges[] = "Seniors: {$fam['seniors_count']}";
+                $demoStr = !empty($demoBadges) ? ' [' . implode(', ', $demoBadges) . ']' : '';
+              ?>
+                <option value="<?= $fam['id'] ?>" 
+                        data-purok="<?= htmlspecialchars($fam['purok_name']) ?>" 
+                        data-head="<?= htmlspecialchars($fam['head_full_name']) ?>" 
+                        data-phone="<?= htmlspecialchars($fam['head_phone']) ?>" 
+                        data-code="<?= htmlspecialchars($fam['household_code']) ?>"
+                        data-name="<?= htmlspecialchars($fam['family_name']) ?>"
+                        data-pwd="<?= (int)$fam['pwd_count'] ?>"
+                        data-seniors="<?= (int)$fam['seniors_count'] ?>">
+                  <?= htmlspecialchars($fam['family_name']) ?> — Rep: <?= htmlspecialchars($fam['head_full_name']) ?> (<?= htmlspecialchars($fam['purok_name']) ?>)<?= $demoStr ?>
                 </option>
               <?php endforeach; ?>
             </select>
+
+            <div id="familyClaimWarning" style="display:none;margin-top:6px;padding:6px 8px;background:#FEF8E8;border:1px solid #FCE6AA;border-radius:4px;font-size:9.5px;color:#8A6402;">
+              <strong>Notice:</strong> This family already has a recorded disbursement in this program.
+            </div>
           </div>
 
           <!-- Beneficiary Details -->
           <div>
-            <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Beneficiary Full Name</label>
+            <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Beneficiary Full Name (Authorized Representative)</label>
             <input type="text" name="beneficiary_name" id="dist_beneficiary_name" class="form-control" placeholder="e.g. Juan Dela Cruz" required style="font-size: 11px;">
           </div>
 
@@ -636,6 +710,102 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
         <button type="submit" class="btn btn-primary">Process Disbursement</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Modal: Eligible Families (Ayuda Roster) -->
+<div class="modal" id="eligibleFamiliesModal">
+  <div class="modal-dialog modal-lg" style="max-width: 920px;">
+    <div class="modal-header">
+      <div>
+        <h3 style="margin:0;font-size:13px;font-weight:700;color:var(--color-primary);">
+          Eligible Families Roster (Pamilyang Pwede Bigyan ng Ayuda) — <span id="efModalProgramBadge" style="font-weight:600;color:var(--color-text-secondary);"></span>
+        </h3>
+        <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">
+          Master directory of household families with 1 Authorized Representative, PWD count, and payout eligibility.
+        </div>
+      </div>
+      <button type="button" class="modal-close" onclick="closeEligibleFamiliesModal()">&times;</button>
+    </div>
+
+    <!-- Telemetry Sub-bar -->
+    <div class="detail-telemetry-bar" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+      <div class="detail-telemetry-item">
+        <span class="detail-telemetry-label">Total Families</span>
+        <span class="detail-telemetry-val" id="efTotalFamiliesCount">0</span>
+      </div>
+      <div class="detail-telemetry-item">
+        <span class="detail-telemetry-label">Families With PWD</span>
+        <span class="detail-telemetry-val" id="efPwdFamiliesCount" style="color: #8A6402;">0</span>
+      </div>
+      <div class="detail-telemetry-item">
+        <span class="detail-telemetry-label">Senior Families</span>
+        <span class="detail-telemetry-val" id="efSeniorFamiliesCount">0</span>
+      </div>
+      <div class="detail-telemetry-item">
+        <span class="detail-telemetry-label">Claimed This Batch</span>
+        <span class="detail-telemetry-val" id="efClaimedCount" style="color: var(--color-success);">0</span>
+      </div>
+      <div class="detail-telemetry-item">
+        <span class="detail-telemetry-label">Unclaimed (Eligible)</span>
+        <span class="detail-telemetry-val" id="efUnclaimedCount" style="color: var(--color-primary);">0</span>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div style="padding: 10px 16px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 170px;">
+        <input type="text" id="efSearchInput" class="form-control" placeholder="Search family, head, or code..." style="font-size: 10px; height: 28px; padding: 4px 8px;" oninput="renderEligibleFamiliesTable()">
+      </div>
+      <div style="width: 135px;">
+        <select id="efPurokFilter" class="form-control" style="font-size: 10px; height: 28px; padding: 4px 8px;" onchange="renderEligibleFamiliesTable()">
+          <option value="">All Puroks</option>
+          <?php foreach ($barangayPuroks as $p): ?>
+            <option value="<?= htmlspecialchars($p) ?>"><?= htmlspecialchars($p) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div style="width: 145px;">
+        <select id="efPriorityFilter" class="form-control" style="font-size: 10px; height: 28px; padding: 4px 8px;" onchange="renderEligibleFamiliesTable()">
+          <option value="">All Families</option>
+          <option value="pwd">With PWD Members</option>
+          <option value="seniors">With Senior Citizens</option>
+          <option value="indigent">Indigent / Low Income</option>
+        </select>
+      </div>
+      <div style="width: 135px;">
+        <select id="efClaimFilter" class="form-control" style="font-size: 10px; height: 28px; padding: 4px 8px;" onchange="renderEligibleFamiliesTable()">
+          <option value="">All Claim Status</option>
+          <option value="unclaimed" selected>Not Yet Claimed</option>
+          <option value="claimed">Already Claimed</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Table Body -->
+    <div class="modal-body" style="padding: 0; max-height: 480px; overflow-y: auto;">
+      <table class="data-table" style="width: 100%; border-collapse: collapse; margin-bottom: 0;">
+        <thead>
+          <tr style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 2;">
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; width: 90px;">HH Code</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600;">Family Name</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600;">1 Authorized Rep & Contact</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; width: 85px;">Purok</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: center; width: 120px;">Demographics</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: center; width: 110px;">Aid Status</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: right; width: 110px;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="efTableBody">
+          <!-- Dynamically populated via renderEligibleFamiliesTable() -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 10px; color: var(--color-text-muted);" id="efFooterSummary"></span>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeEligibleFamiliesModal()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -708,6 +878,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 // Data payloads for zero-lag instant dynamic switching
 const rawAllocations = <?= json_encode($allocations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 const rawDistributions = <?= json_encode($allDistributions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+const rawHouseholds = <?= json_encode($householdFamilies, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 const baseUrl = '<?= BASE_URL ?>';
 
 let selectedAllocationId = <?= (int)$selectedAllocId ?>;
@@ -771,6 +942,9 @@ function selectAllocation(allocId) {
     onProgramSelected(distSelect);
   }
 
+  // Update modal family options for this allocation
+  updateModalFamilyOptions();
+
   // Render Table 2 Beneficiaries
   renderBeneficiariesTable(allocDistributions);
 }
@@ -779,18 +953,22 @@ function renderBeneficiariesTable(list) {
   const tbody = document.getElementById('beneficiariesTableBody');
   if (!tbody) return;
 
-  const searchVal = (document.getElementById('beneficiarySearchInput').value || '').trim().toLowerCase();
-  const statusFilter = (document.getElementById('beneficiaryStatusFilter').value || '').trim();
+  const searchVal = (document.getElementById('beneficiarySearchInput')?.value || '').trim().toLowerCase();
+  const statusFilter = (document.getElementById('beneficiaryStatusFilter')?.value || '').trim();
+  const purokFilter = (document.getElementById('beneficiaryPurokFilter')?.value || '').trim().toLowerCase();
 
-  // Apply search/status filter
+  // Apply search/status/purok filter
   const filtered = list.filter(item => {
     const matchSearch = !searchVal || 
       (item.beneficiary_name && item.beneficiary_name.toLowerCase().includes(searchVal)) ||
       (item.reference_no && item.reference_no.toLowerCase().includes(searchVal)) ||
       (item.purok && item.purok.toLowerCase().includes(searchVal)) ||
+      (item.family_name && item.family_name.toLowerCase().includes(searchVal)) ||
+      (item.household_code && item.household_code.toLowerCase().includes(searchVal)) ||
       (item.phone && item.phone.toLowerCase().includes(searchVal));
     const matchStatus = !statusFilter || item.claim_status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPurok = !purokFilter || (item.purok && item.purok.toLowerCase() === purokFilter);
+    return matchSearch && matchStatus && matchPurok;
   });
 
   if (filtered.length === 0) {
@@ -816,14 +994,31 @@ function renderBeneficiariesTable(list) {
       ? `<div style="font-family: var(--font-secondary);">${row.claim_date.substring(0, 16)}</div><div style="font-size: 9.5px; color: var(--color-text-muted);">${escapeHtml(row.disbursing_officer || 'Barangay Office')}</div>` 
       : '<span style="color: var(--color-text-muted); font-style: italic;">Unclaimed</span>';
 
+    // Demographic indicators (PWD / Senior)
+    let demoBadges = '';
+    const hasPwd = Number(row.pwd_count) > 0 || (row.remarks && row.remarks.toLowerCase().includes('pwd'));
+    const hasSenior = Number(row.seniors_count) > 0 || (row.remarks && row.remarks.toLowerCase().includes('senior'));
+    if (hasPwd) {
+      demoBadges += '<span class="badge badge-warning" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">PWD</span>';
+    }
+    if (hasSenior) {
+      demoBadges += '<span class="badge badge-neutral" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">Senior</span>';
+    }
+
+    const hhCodeInfo = row.household_code ? `<span style="font-family:var(--font-secondary);color:var(--color-primary);font-weight:600;">[${escapeHtml(row.household_code)}]</span> ` : '';
+
     html += `
       <tr style="border-bottom: 1px solid var(--color-border-light);">
         <td style="padding: 9px 12px; font-family: var(--font-secondary); font-size: 10.5px; font-weight: 600; color: var(--color-primary);">
           ${escapeHtml(row.reference_no || 'PENDING-CLAIM')}
         </td>
         <td style="padding: 9px 12px;">
-          <div style="font-weight: 600; font-size: 11px; color: var(--color-text);">${escapeHtml(row.beneficiary_name)}</div>
-          <div style="font-size: 9.5px; color: var(--color-text-muted);">${escapeHtml(row.purok)} • ${escapeHtml(row.phone)}</div>
+          <div style="font-weight: 600; font-size: 11px; color: var(--color-text);">
+            ${hhCodeInfo}${escapeHtml(row.beneficiary_name)} ${demoBadges}
+          </div>
+          <div style="font-size: 9.5px; color: var(--color-text-muted);">
+            ${escapeHtml(row.purok)} • ${escapeHtml(row.phone)} ${row.family_name ? '• ' + escapeHtml(row.family_name) : ''}
+          </div>
         </td>
         <td style="padding: 9px 12px; text-align: right; font-family: var(--font-secondary); font-weight: 700; font-size: 11px; color: var(--color-text);">
           ${formatMoney(row.amount)}
@@ -874,12 +1069,112 @@ function filterAllocationsTable(term) {
   });
 }
 
+function updateModalFamilyOptions() {
+  const purokFilter = (document.getElementById('dist_family_purok_filter')?.value || '').trim().toLowerCase();
+  const priorityFilter = (document.getElementById('dist_family_priority_filter')?.value || '').trim();
+  const selectElem = document.getElementById('dist_family_select');
+  const counterElem = document.getElementById('modalFamilyCounter');
+  if (!selectElem) return;
+
+  const allocDistributions = rawDistributions.filter(d => Number(d.allocation_id) === selectedAllocationId);
+  const claimedHhIds = new Set(allocDistributions.map(d => Number(d.household_id)).filter(id => id > 0));
+  const claimedNames = new Set(allocDistributions.map(d => (d.beneficiary_name || '').toLowerCase()));
+
+  const filtered = rawHouseholds.filter(fam => {
+    // Match Purok
+    const matchPurok = !purokFilter || (fam.purok_name && fam.purok_name.toLowerCase() === purokFilter);
+    if (!matchPurok) return false;
+
+    // Match Priority / PWD
+    if (priorityFilter === 'pwd') {
+      return Number(fam.pwd_count) > 0;
+    } else if (priorityFilter === 'seniors') {
+      return Number(fam.seniors_count) > 0;
+    } else if (priorityFilter === 'indigent') {
+      return fam.economic_status && fam.economic_status.toLowerCase().includes('indigent');
+    } else if (priorityFilter === 'unclaimed') {
+      return !claimedHhIds.has(Number(fam.id)) && !claimedNames.has((fam.head_full_name || '').toLowerCase());
+    }
+    return true;
+  });
+
+  if (counterElem) {
+    counterElem.textContent = `${filtered.length} families available`;
+  }
+
+  let html = '<option value="">-- Choose Household Family (Auto-fills details) --</option>';
+  filtered.forEach(fam => {
+    const isClaimed = claimedHhIds.has(Number(fam.id)) || claimedNames.has((fam.head_full_name || '').toLowerCase());
+    const demoBadges = [];
+    if (Number(fam.pwd_count) > 0) demoBadges.push(`PWD: ${fam.pwd_count}`);
+    if (Number(fam.seniors_count) > 0) demoBadges.push(`Seniors: ${fam.seniors_count}`);
+    const demoStr = demoBadges.length > 0 ? ' [' + demoBadges.join(', ') + ']' : '';
+    const claimTag = isClaimed ? ' ⚠️ (Already Claimed)' : '';
+
+    html += `<option value="${fam.id}" 
+                     data-purok="${escapeHtml(fam.purok_name)}" 
+                     data-head="${escapeHtml(fam.head_full_name)}" 
+                     data-phone="${escapeHtml(fam.head_phone || '')}" 
+                     data-code="${escapeHtml(fam.household_code)}"
+                     data-name="${escapeHtml(fam.family_name)}"
+                     data-pwd="${fam.pwd_count}"
+                     data-seniors="${fam.seniors_count}">
+              ${escapeHtml(fam.family_name)} — Rep: ${escapeHtml(fam.head_full_name)} (${escapeHtml(fam.purok_name)})${demoStr}${claimTag}
+             </option>`;
+  });
+
+  selectElem.innerHTML = html;
+}
+
+function onFamilySelected(selectElem) {
+  const selectedOption = selectElem.options[selectElem.selectedIndex];
+  const warningElem = document.getElementById('familyClaimWarning');
+  if (warningElem) warningElem.style.display = 'none';
+
+  if (!selectedOption || !selectedOption.value) {
+    return;
+  }
+
+  const hhId = Number(selectedOption.value);
+  const headName = selectedOption.dataset.head || '';
+  const purokName = selectedOption.dataset.purok || '';
+  const phone = selectedOption.dataset.phone || '';
+  const code = selectedOption.dataset.code || '';
+  const famName = selectedOption.dataset.name || '';
+  const pwdCount = Number(selectedOption.dataset.pwd || 0);
+  const seniorsCount = Number(selectedOption.dataset.seniors || 0);
+
+  document.getElementById('dist_household_id').value = hhId;
+  document.getElementById('dist_beneficiary_name').value = headName;
+  document.getElementById('dist_purok').value = purokName;
+  document.getElementById('dist_phone').value = phone;
+
+  const remarksInput = document.querySelector('#distributeForm input[name="remarks"]');
+  if (remarksInput) {
+    let tag = `[${code}] ${famName}`;
+    if (pwdCount > 0) tag += ` • ${pwdCount} PWD`;
+    if (seniorsCount > 0) tag += ` • ${seniorsCount} Senior`;
+    remarksInput.value = tag;
+  }
+
+  // Check if already claimed in this allocation
+  const allocDistributions = rawDistributions.filter(d => Number(d.allocation_id) === selectedAllocationId);
+  const alreadyClaimed = allocDistributions.find(d => 
+    Number(d.household_id) === hhId || (d.beneficiary_name && d.beneficiary_name.toLowerCase() === headName.toLowerCase())
+  );
+  if (alreadyClaimed && warningElem) {
+    warningElem.innerHTML = `<strong>Notice:</strong> This family already has a recorded disbursement (Ref: ${escapeHtml(alreadyClaimed.reference_no || 'Pending')}, Status: ${escapeHtml(alreadyClaimed.claim_status)}).`;
+    warningElem.style.display = 'block';
+  }
+}
+
 function openDistributeModalForCurrent() {
   const distSelect = document.getElementById('dist_alloc_select');
   if (distSelect && selectedAllocationId) {
     distSelect.value = selectedAllocationId;
     onProgramSelected(distSelect);
   }
+  updateModalFamilyOptions();
   openDistributeModal();
 }
 
@@ -888,10 +1183,190 @@ function openDistributeModal() {
   if (returnUrlElem) {
     returnUrlElem.value = window.location.href;
   }
+  updateModalFamilyOptions();
   document.getElementById('distributeModal').classList.add('show');
 }
 function closeDistributeModal() {
   document.getElementById('distributeModal').classList.remove('show');
+}
+
+function openEligibleFamiliesModal() {
+  const alloc = rawAllocations.find(a => Number(a.id) === selectedAllocationId);
+  const badge = document.getElementById('efModalProgramBadge');
+  if (badge && alloc) {
+    badge.textContent = `${alloc.program_name} (${formatMoney(alloc.amount_per_beneficiary)}/family)`;
+  }
+  renderEligibleFamiliesTable();
+  document.getElementById('eligibleFamiliesModal').classList.add('show');
+}
+
+function closeEligibleFamiliesModal() {
+  document.getElementById('eligibleFamiliesModal').classList.remove('show');
+}
+
+function renderEligibleFamiliesTable() {
+  const tbody = document.getElementById('efTableBody');
+  if (!tbody) return;
+
+  const searchVal = (document.getElementById('efSearchInput')?.value || '').trim().toLowerCase();
+  const purokFilter = (document.getElementById('efPurokFilter')?.value || '').trim().toLowerCase();
+  const priorityFilter = (document.getElementById('efPriorityFilter')?.value || '').trim();
+  const claimFilter = (document.getElementById('efClaimFilter')?.value || '').trim();
+
+  const allocDistributions = rawDistributions.filter(d => Number(d.allocation_id) === selectedAllocationId);
+  const distByHhId = {};
+  const distByName = {};
+  allocDistributions.forEach(d => {
+    if (d.household_id) distByHhId[Number(d.household_id)] = d;
+    if (d.beneficiary_name) distByName[d.beneficiary_name.toLowerCase()] = d;
+  });
+
+  // Calculate telemetry counts
+  let totalFamilies = 0;
+  let pwdFamilies = 0;
+  let seniorFamilies = 0;
+  let claimedCount = 0;
+  let unclaimedCount = 0;
+
+  // Pre-scan for current purok filter
+  rawHouseholds.forEach(fam => {
+    const matchPurok = !purokFilter || (fam.purok_name && fam.purok_name.toLowerCase() === purokFilter);
+    if (!matchPurok) return;
+
+    totalFamilies++;
+    if (Number(fam.pwd_count) > 0) pwdFamilies++;
+    if (Number(fam.seniors_count) > 0) seniorFamilies++;
+
+    const isClaimed = !!(distByHhId[Number(fam.id)] || distByName[(fam.head_full_name || '').toLowerCase()]);
+    if (isClaimed) claimedCount++;
+    else unclaimedCount++;
+  });
+
+  document.getElementById('efTotalFamiliesCount').textContent = totalFamilies;
+  document.getElementById('efPwdFamiliesCount').textContent = pwdFamilies;
+  document.getElementById('efSeniorFamiliesCount').textContent = seniorFamilies;
+  document.getElementById('efClaimedCount').textContent = claimedCount;
+  document.getElementById('efUnclaimedCount').textContent = unclaimedCount;
+
+  // Filter list
+  const filtered = rawHouseholds.filter(fam => {
+    // Search
+    const matchSearch = !searchVal ||
+      (fam.family_name && fam.family_name.toLowerCase().includes(searchVal)) ||
+      (fam.head_full_name && fam.head_full_name.toLowerCase().includes(searchVal)) ||
+      (fam.household_code && fam.household_code.toLowerCase().includes(searchVal)) ||
+      (fam.purok_name && fam.purok_name.toLowerCase().includes(searchVal));
+    if (!matchSearch) return false;
+
+    // Purok
+    const matchPurok = !purokFilter || (fam.purok_name && fam.purok_name.toLowerCase() === purokFilter);
+    if (!matchPurok) return false;
+
+    // Priority
+    if (priorityFilter === 'pwd' && Number(fam.pwd_count) <= 0) return false;
+    if (priorityFilter === 'seniors' && Number(fam.seniors_count) <= 0) return false;
+    if (priorityFilter === 'indigent' && (!fam.economic_status || !fam.economic_status.toLowerCase().includes('indigent'))) return false;
+
+    // Claim
+    const dist = distByHhId[Number(fam.id)] || distByName[(fam.head_full_name || '').toLowerCase()];
+    if (claimFilter === 'claimed' && !dist) return false;
+    if (claimFilter === 'unclaimed' && dist) return false;
+
+    return true;
+  });
+
+  const footerSummary = document.getElementById('efFooterSummary');
+  if (footerSummary) {
+    footerSummary.textContent = `Showing ${filtered.length} of ${totalFamilies} household families ${purokFilter ? 'in ' + escapeHtml(document.getElementById('efPurokFilter').value) : 'across Hinaplanon'}`;
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="padding: 30px; text-align: center; color: var(--color-text-muted); font-size: 11px;">
+          No household families match the selected filters.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = '';
+  filtered.forEach(fam => {
+    const dist = distByHhId[Number(fam.id)] || distByName[(fam.head_full_name || '').toLowerCase()];
+    const isClaimed = !!dist;
+
+    let demoBadges = [];
+    if (Number(fam.pwd_count) > 0) {
+      demoBadges.push(`<span class="badge badge-warning" style="font-size:9px;">${fam.pwd_count} PWD</span>`);
+    }
+    if (Number(fam.seniors_count) > 0) {
+      demoBadges.push(`<span class="badge badge-neutral" style="font-size:9px;">${fam.seniors_count} Senior</span>`);
+    }
+    if (demoBadges.length === 0) {
+      demoBadges.push(`<span style="color:var(--color-text-muted);font-size:9.5px;">Standard</span>`);
+    }
+
+    const statusHtml = isClaimed
+      ? `<span class="status-badge claimed">${escapeHtml(dist.claim_status || 'Claimed')}</span><div style="font-size:9px;color:var(--color-text-muted);margin-top:2px;font-family:var(--font-secondary);">${escapeHtml(dist.reference_no || '')}</div>`
+      : `<span class="status-badge active">Eligible</span>`;
+
+    const actionHtml = isClaimed
+      ? `<span style="font-size:9.5px;color:var(--color-text-muted);">Payout Complete</span>`
+      : `<button type="button" class="btn btn-primary btn-sm" style="font-size:9.5px;padding:3px 8px;" onclick="selectFamilyForAyuda(${fam.id})">Give Ayuda</button>`;
+
+    html += `
+      <tr style="border-bottom: 1px solid var(--color-border-light);">
+        <td style="padding: 8px 12px; font-family: var(--font-secondary); font-size: 10px; font-weight: 600; color: var(--color-primary);">
+          ${escapeHtml(fam.household_code)}
+        </td>
+        <td style="padding: 8px 12px;">
+          <div style="font-weight: 600; font-size: 10.5px; color: var(--color-text);">${escapeHtml(fam.family_name)}</div>
+          <div style="font-size: 9px; color: var(--color-text-muted);">${escapeHtml(fam.economic_status || 'Indigent')}</div>
+        </td>
+        <td style="padding: 8px 12px;">
+          <div style="font-weight: 600; font-size: 10.5px; color: var(--color-primary);">${escapeHtml(fam.head_full_name)}</div>
+          <div style="font-size: 9.5px; color: var(--color-text-muted); font-family: var(--font-secondary);">${escapeHtml(fam.head_phone || '—')}</div>
+        </td>
+        <td style="padding: 8px 12px; font-size: 10px; color: var(--color-text);">
+          ${escapeHtml(fam.purok_name)}
+        </td>
+        <td style="padding: 8px 12px; text-align: center;">
+          <div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">
+            ${demoBadges.join(' ')}
+          </div>
+        </td>
+        <td style="padding: 8px 12px; text-align: center;">
+          ${statusHtml}
+        </td>
+        <td style="padding: 8px 12px; text-align: right;">
+          ${actionHtml}
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+function selectFamilyForAyuda(famId) {
+  closeEligibleFamiliesModal();
+  openDistributeModalForCurrent();
+
+  // Pick family in select
+  const fam = rawHouseholds.find(f => Number(f.id) === Number(famId));
+  if (fam) {
+    const purokFilter = document.getElementById('dist_family_purok_filter');
+    if (purokFilter) {
+      purokFilter.value = fam.purok_name;
+      updateModalFamilyOptions();
+    }
+    const selectElem = document.getElementById('dist_family_select');
+    if (selectElem) {
+      selectElem.value = fam.id;
+      onFamilySelected(selectElem);
+    }
+  }
 }
 
 function openAuditRecordsModal() {
@@ -906,6 +1381,7 @@ function onProgramSelected(selectElem) {
   if (selectedOption && selectedOption.dataset.rate) {
     document.getElementById('dist_amount').value = selectedOption.dataset.rate;
   }
+  updateModalFamilyOptions();
 }
 
 function autofillResident(selectElem) {

@@ -34,6 +34,7 @@ try {
     if ($action === 'add_beneficiary') {
         $allocationId = (int)($_POST['allocation_id'] ?? 0);
         $residentId = !empty($_POST['resident_id']) ? (int)$_POST['resident_id'] : null;
+        $householdId = !empty($_POST['household_id']) ? (int)$_POST['household_id'] : null;
         $beneficiaryName = trim($_POST['beneficiary_name'] ?? '');
         $purok = trim($_POST['purok'] ?? '');
         $phone = trim($_POST['phone'] ?? '');
@@ -96,17 +97,17 @@ try {
         // Insert distribution record
         $insStmt = $db->prepare("
             INSERT INTO financial_aid_distributions (
-                allocation_id, barangay_id, resident_id, beneficiary_name,
+                allocation_id, barangay_id, resident_id, household_id, beneficiary_name,
                 purok, phone, amount, claim_status, claim_date,
                 reference_no, sms_status, disbursed_by, remarks
             ) VALUES (
-                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, 'not_sent', ?, ?
             )
         ");
         $insStmt->execute([
-            $allocationId, (int)$alloc['barangay_id'], $residentId, $beneficiaryName,
+            $allocationId, (int)$alloc['barangay_id'], $residentId, $householdId, $beneficiaryName,
             $purok, $phone, $amount, $claimStatus, $claimDate,
             $referenceNo, $disbursedBy, $remarks
         ]);

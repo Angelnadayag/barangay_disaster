@@ -730,6 +730,7 @@ CREATE TABLE `financial_aid_distributions` (
   `allocation_id` int(11) NOT NULL,
   `barangay_id` int(11) NOT NULL,
   `resident_id` int(11) DEFAULT NULL,
+  `household_id` int(11) DEFAULT NULL,
   `beneficiary_name` varchar(150) NOT NULL,
   `purok` varchar(100) NOT NULL,
   `phone` varchar(30) NOT NULL,

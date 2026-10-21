@@ -297,6 +297,15 @@ try {
             }
         }
 
+        // Table: financial_aid_distributions (Link distribution to household families)
+        if (in_array('financial_aid_distributions', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'financial_aid_distributions', 'household_id')) {
+                echo "  [+] Adding column `household_id` to `financial_aid_distributions`...\n";
+                $pdo->exec("ALTER TABLE `financial_aid_distributions` ADD COLUMN `household_id` int(11) DEFAULT NULL AFTER `resident_id`;");
+                $pdo->exec("ALTER TABLE `financial_aid_distributions` ADD KEY `idx_dist_hh` (`household_id`);");
+            }
+        }
+
         // Table: hazard_type_options (Multi-purok hazard scoping)
         if (in_array('hazard_type_options', $existingTables, true)) {
             if (!$hasColumn($pdo, 'hazard_type_options', 'purok_id')) {
