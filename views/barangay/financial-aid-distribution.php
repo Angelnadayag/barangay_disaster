@@ -28,15 +28,21 @@ $pageTitle = "Financial Aid Distribution — Barangay " . clean($barangay['name'
 require_once __DIR__ . '/../layouts/header.php';
 require_once __DIR__ . '/../layouts/sidebar.php';
 
-// Fetch all active/completed allocations received for this barangay
+// Auto-sync any existing or newly scheduled Social Welfare & Financial Aid events for this barangay
+syncEventFinancialAidAllocation($db, null, $barangayId);
+
+// Fetch all active/completed allocations received for this barangay (prioritizing event-linked programs)
 $allocStmt = $db->prepare("
     SELECT a.*,
+           e.title AS event_title, e.activity_type AS event_activity_type, e.status AS event_status,
+           e.target_puroks AS event_target_puroks,
            (SELECT COUNT(*) FROM financial_aid_distributions d WHERE d.allocation_id = a.id) AS total_recipients,
            (SELECT COUNT(*) FROM financial_aid_distributions d WHERE d.allocation_id = a.id AND d.claim_status = 'Claimed') AS claimed_recipients,
            (SELECT COUNT(*) FROM financial_aid_distributions d WHERE d.allocation_id = a.id AND d.claim_status = 'Pending') AS pending_recipients
     FROM financial_aid_allocations a
+    LEFT JOIN events e ON a.event_id = e.id
     WHERE a.barangay_id = ? AND a.status != 'Archived'
-    ORDER BY a.created_at DESC
+    ORDER BY (a.event_id IS NOT NULL) DESC, a.created_at DESC
 ");
 $allocStmt->execute([$barangayId]);
 $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -402,10 +408,19 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   </div>
 
   <?php if (empty($allocations)): ?>
-    <div class="card" style="padding: 18px; margin-bottom: var(--space-4); background: #FEF8E8; border: 1px solid #FCE6AA;">
-      <div style="font-weight: 600; color: #8A6402; font-size: 12px;">No Financial Aid Allocation Received Yet</div>
-      <div style="font-size: 11px; color: #8A6402; margin-top: 2px;">
-        There are currently no financial assistance allocations assigned to Barangay <?= clean($barangay['name']) ?> by ICDRRMO. Once an allocation is issued, it will appear here for beneficiary distribution.
+    <div class="card" style="padding: 32px 24px; text-align: center; background: #FFFFFF; border: 1px solid var(--color-border); border-radius: var(--radius-primary); margin-bottom: var(--space-4);">
+      <div style="width: 52px; height: 52px; border-radius: 50%; background: #F0F4F8; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; color: var(--color-primary);">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+      </div>
+      <h3 style="font-size: 15px; font-weight: 700; color: var(--color-primary); margin-bottom: 8px;">No Financial Aid Program or Event Scheduled Yet</h3>
+      <p style="font-size: 12px; color: var(--color-text-secondary); max-width: 560px; margin: 0 auto 20px; line-height: 1.6;">
+        This module is dynamically linked to your scheduled events. When you schedule an event with Activity Type <strong>"Social Welfare and Assistance"</strong> and <strong>"Financial Aid Distribution"</strong>, its target purok household families will automatically appear here with one-click release and tracking ledger.
+      </p>
+      <div>
+        <a href="<?= BASE_URL ?>/views/barangay/events.php?create=1&type=Social+Welfare+and+Assistance" class="btn btn-primary" style="padding: 9px 20px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          + Schedule Financial Aid Event
+        </a>
       </div>
     </div>
   <?php else: ?>
@@ -417,12 +432,12 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       <div class="table-card">
         <div class="table-card-header">
           <div class="table-card-title">
-            <span>Financial Aid Received</span>
+            <span>Financial Aid Programs</span>
             <span style="font-size: 10px; font-weight: 700; background: #EBF3FC; color: #17324D; padding: 2px 7px; border-radius: 999px;">
               <?= count($allocations) ?>
             </span>
           </div>
-          <span style="font-size: 10px; color: var(--color-text-muted);">Click a row to inspect</span>
+          <span style="font-size: 10px; color: var(--color-text-muted);">Click a program to inspect</span>
         </div>
 
         <div style="padding: 8px 12px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF;">
@@ -433,8 +448,8 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
           <table class="data-table" style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 1;">
-                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">Program & Code</th>
-                <th style="padding: 9px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 110px;">Received Fund</th>
+                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">Program & Scope</th>
+                <th style="padding: 9px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 110px;">Program Fund</th>
                 <th style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 75px;">Status</th>
               </tr>
             </thead>
@@ -444,18 +459,21 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               ?>
                 <tr class="alloc-row <?= $isSelected ? 'active' : '' ?>" id="alloc_row_<?= $row['id'] ?>" onclick="selectAllocation(<?= $row['id'] ?>)">
                   <td style="padding: 10px 12px;">
-                    <div style="font-weight: 600; font-size: 11px; color: var(--color-primary); line-height: 1.3;">
-                      <?= htmlspecialchars($row['program_name']) ?>
+                    <div style="font-weight: 600; font-size: 11px; color: var(--color-primary); line-height: 1.3; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                      <span><?= htmlspecialchars($row['program_name']) ?></span>
+                      <?php if (!empty($row['event_id'])): ?>
+                        <span style="font-size: 8.5px; font-weight: 700; background: #EBF3FC; color: #17324D; padding: 1px 5px; border-radius: 3px;">EVENT</span>
+                      <?php endif; ?>
                     </div>
                     <div style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 2px; font-family: var(--font-secondary);">
-                      <?= htmlspecialchars($row['allocation_code']) ?> &bull; &#8369;<?= number_format($row['amount_per_beneficiary'], 2) ?>/family
+                      <?= htmlspecialchars($row['allocation_code']) ?> &bull; <?= htmlspecialchars($row['target_purok'] ?? 'All Puroks') ?> &bull; &#8369;<?= number_format($row['amount_per_beneficiary'], 2) ?>/family
                     </div>
                   </td>
                   <td style="padding: 10px 12px; text-align: right;">
-                    <div style="font-family: var(--font-secondary); font-weight: 700; font-size: 11.5px; color: var(--color-text);">
+                    <div style="font-family: var(--font-secondary); font-weight: 700; font-size: 11.5px; color: var(--color-text);" id="alloc_fund_<?= $row['id'] ?>">
                       &#8369;<?= number_format($row['total_budget'], 2) ?>
                     </div>
-                    <div style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 2px;">
+                    <div style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 2px;" id="alloc_rem_<?= $row['id'] ?>">
                       Rem: &#8369;<?= number_format($row['remaining_budget'], 2) ?>
                     </div>
                   </td>
@@ -510,7 +528,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <span class="detail-telemetry-val" id="detailRemainingBudget">&#8369;0.00</span>
           </div>
           <div class="detail-telemetry-item">
-            <span class="detail-telemetry-label">Beneficiaries Served</span>
+            <span class="detail-telemetry-label">Beneficiaries Released</span>
             <span class="detail-telemetry-val" id="detailBeneficiariesRatio">0 / 0</span>
           </div>
         </div>
@@ -518,22 +536,26 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
         <!-- Filter bar for beneficiaries inside this program -->
         <div style="padding: 8px 14px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
           <div style="flex: 1; min-width: 170px;">
-            <input type="text" id="beneficiarySearchInput" class="form-control" placeholder="Search beneficiary by name, ref no, or phone..." style="font-size: 10.5px; padding: 5px 9px;" oninput="filterBeneficiariesTable()">
+            <input type="text" id="beneficiarySearchInput" class="form-control" placeholder="Search family, representative, ref no, or phone..." style="font-size: 10.5px; padding: 5px 9px;" oninput="filterBeneficiariesTable()">
           </div>
-          <div style="width: 140px;">
+          <div style="width: 150px;">
             <select id="beneficiaryPurokFilter" class="form-control" style="font-size: 10.5px; padding: 5px 8px;" onchange="filterBeneficiariesTable()">
-              <option value="">All Puroks</option>
-              <?php foreach ($barangayPuroks as $p): ?>
-                <option value="<?= htmlspecialchars($p) ?>"><?= htmlspecialchars($p) ?></option>
-              <?php endforeach; ?>
+              <option value="">Target Scope</option>
             </select>
           </div>
-          <div style="width: 130px;">
+          <div style="width: 125px;">
             <select id="beneficiaryStatusFilter" class="form-control" style="font-size: 10.5px; padding: 5px 8px;" onchange="filterBeneficiariesTable()">
               <option value="">All Statuses</option>
-              <option value="Claimed">Claimed</option>
-              <option value="Pending">Pending</option>
-              <option value="Unclaimed">Unclaimed</option>
+              <option value="Claimed">Released</option>
+              <option value="Unclaimed">Unreleased</option>
+            </select>
+          </div>
+          <div style="width: 135px;">
+            <select id="beneficiaryPriorityFilter" class="form-control" style="font-size: 10.5px; padding: 5px 8px;" onchange="filterBeneficiariesTable()">
+              <option value="">All Families</option>
+              <option value="pwd">With PWD</option>
+              <option value="seniors">With Seniors</option>
+              <option value="indigent">Indigent</option>
             </select>
           </div>
         </div>
@@ -543,17 +565,18 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
           <table class="data-table" style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 1;">
-                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 130px;">Reference No</th>
-                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">Beneficiary & Purok</th>
-                <th style="padding: 9px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 100px;">Amount</th>
+                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 125px;">Reference No</th>
+                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">Household Family / Representative</th>
+                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 85px;">Purok</th>
+                <th style="padding: 9px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 95px;">Aid Amount</th>
                 <th style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 85px;">Status</th>
-                <th style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 65px;">SMS</th>
-                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 120px;">Claim Date</th>
-                <th style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 110px;">Actions</th>
+                <th style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 60px;">SMS</th>
+                <th style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 115px;">Release Date</th>
+                <th style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 125px;">Action</th>
               </tr>
             </thead>
             <tbody id="beneficiariesTableBody">
-              <!-- Dynamically rendered via JavaScript based on selected allocation -->
+              <!-- Dynamically rendered via JavaScript based on selected allocation and households -->
             </tbody>
           </table>
         </div>
@@ -916,24 +939,48 @@ function selectAllocation(allocId) {
 
   // Filter distributions for this allocation
   const allocDistributions = rawDistributions.filter(d => Number(d.allocation_id) === selectedAllocationId);
+  const distByHhId = {};
+  allocDistributions.forEach(d => {
+    if (d.household_id && Number(d.household_id) > 0 && d.claim_status === 'Claimed') {
+      distByHhId[Number(d.household_id)] = d;
+    }
+  });
 
-  // Auto-compute dynamic metrics live
-  const totalBudget = Number(alloc.total_budget || 0);
+  // Calculate target scoped families
+  const targetPurokStr = (alloc.target_purok || 'All Puroks').trim();
+  const isAllPuroksScope = (targetPurokStr === 'All Puroks' || targetPurokStr === 'All' || targetPurokStr === '');
+  const targetPurokSet = isAllPuroksScope ? null : new Set(targetPurokStr.split(',').map(s => s.trim().toLowerCase()));
+
+  const scopedFamilies = rawHouseholds.filter(fam => {
+    if (isAllPuroksScope) return true;
+    return targetPurokSet.has((fam.purok_name || '').toLowerCase());
+  });
+
+  const totalFamilies = scopedFamilies.length;
+  const releasedFamiliesCount = scopedFamilies.filter(f => distByHhId[f.id]).length;
+
+  const totalBudget = Number(alloc.total_budget || (totalFamilies * Number(alloc.amount_per_beneficiary || 5000)));
   const totalDisbursed = allocDistributions
     .filter(d => d.claim_status === 'Claimed')
     .reduce((sum, d) => sum + Number(d.amount || 0), 0);
   const remainingBalance = Math.max(0, totalBudget - totalDisbursed);
-  const claimedCount = allocDistributions.filter(d => d.claim_status === 'Claimed').length;
-  const targetBeneficiaries = Number(alloc.target_beneficiaries || 0);
+
+  // Update Left Table amounts dynamically
+  const allocFundEl = document.getElementById('alloc_fund_' + selectedAllocationId);
+  if (allocFundEl) allocFundEl.textContent = formatMoney(totalBudget);
+  const allocRemEl = document.getElementById('alloc_rem_' + selectedAllocationId);
+  if (allocRemEl) allocRemEl.textContent = 'Rem: ' + formatMoney(remainingBalance);
 
   // Update Table 2 Header & Telemetry
   document.getElementById('detailProgramTitle').textContent = alloc.program_name;
-  document.getElementById('detailProgramCode').textContent = alloc.allocation_code + ' • Rate: ' + formatMoney(alloc.amount_per_beneficiary) + '/family • Funding: ' + (alloc.funding_source || 'LGU');
-  
+  const scopeBadge = isAllPuroksScope ? 'Barangay-wide (All Puroks)' : 'Scope: ' + alloc.target_purok;
+  document.getElementById('detailProgramCode').textContent = `${alloc.allocation_code} • ${formatMoney(alloc.amount_per_beneficiary)}/family • ${scopeBadge} (${totalFamilies} families in scope)`;
+
   document.getElementById('detailTotalBudget').textContent = formatMoney(totalBudget);
   document.getElementById('detailDisbursedBudget').textContent = formatMoney(totalDisbursed);
   document.getElementById('detailRemainingBudget').textContent = formatMoney(remainingBalance);
-  document.getElementById('detailBeneficiariesRatio').textContent = claimedCount + ' of ' + targetBeneficiaries + ' served';
+  const percentReleased = totalFamilies > 0 ? Math.round((releasedFamiliesCount / totalFamilies) * 100) : 0;
+  document.getElementById('detailBeneficiariesRatio').textContent = `${releasedFamiliesCount} of ${totalFamilies} families (${percentReleased}%)`;
 
   // Synchronize modal dropdown
   const distSelect = document.getElementById('dist_alloc_select');
@@ -942,40 +989,125 @@ function selectAllocation(allocId) {
     onProgramSelected(distSelect);
   }
 
+  // Populate Scope / Purok filter options for Table 2
+  populatePurokFilter(alloc);
+
   // Update modal family options for this allocation
   updateModalFamilyOptions();
 
   // Render Table 2 Beneficiaries
-  renderBeneficiariesTable(allocDistributions);
+  renderBeneficiariesTable();
 }
 
-function renderBeneficiariesTable(list) {
+function populatePurokFilter(alloc) {
+  const purokSelect = document.getElementById('beneficiaryPurokFilter');
+  if (!purokSelect) return;
+
+  const currentVal = purokSelect.value;
+  const targetPurokStr = (alloc.target_purok || 'All Puroks').trim();
+  const isAllPuroksScope = (targetPurokStr === 'All Puroks' || targetPurokStr === 'All' || targetPurokStr === '');
+
+  let optionsHtml = '';
+  if (isAllPuroksScope) {
+    optionsHtml += '<option value="">All Puroks (Barangay-wide)</option>';
+    const uniquePuroks = [...new Set(rawHouseholds.map(h => h.purok_name).filter(Boolean))].sort();
+    uniquePuroks.forEach(p => {
+      optionsHtml += `<option value="${escapeHtml(p.toLowerCase())}">${escapeHtml(p)}</option>`;
+    });
+  } else {
+    const targetList = targetPurokStr.split(',').map(s => s.trim()).filter(Boolean);
+    optionsHtml += `<option value="">Target Scope (${targetList.length} Puroks)</option>`;
+    targetList.forEach(p => {
+      optionsHtml += `<option value="${escapeHtml(p.toLowerCase())}">${escapeHtml(p)}</option>`;
+    });
+    optionsHtml += '<option value="__all__">(Show All Hinaplanon Puroks)</option>';
+  }
+
+  purokSelect.innerHTML = optionsHtml;
+  if (currentVal) {
+    purokSelect.value = currentVal;
+  }
+}
+
+function renderBeneficiariesTable() {
   const tbody = document.getElementById('beneficiariesTableBody');
   if (!tbody) return;
+
+  const alloc = rawAllocations.find(a => Number(a.id) === selectedAllocationId);
+  if (!alloc) {
+    tbody.innerHTML = `<tr><td colspan="8" style="padding: 24px; text-align: center; color: var(--color-text-muted);">Please select a Financial Aid Program on the left.</td></tr>`;
+    return;
+  }
+
+  const allocDistributions = rawDistributions.filter(d => Number(d.allocation_id) === selectedAllocationId);
+  const distByHhId = {};
+  const distByName = {};
+  allocDistributions.forEach(d => {
+    if (d.household_id && Number(d.household_id) > 0) {
+      distByHhId[Number(d.household_id)] = d;
+    }
+    if (d.beneficiary_name) {
+      distByName[d.beneficiary_name.toLowerCase()] = d;
+    }
+  });
 
   const searchVal = (document.getElementById('beneficiarySearchInput')?.value || '').trim().toLowerCase();
   const statusFilter = (document.getElementById('beneficiaryStatusFilter')?.value || '').trim();
   const purokFilter = (document.getElementById('beneficiaryPurokFilter')?.value || '').trim().toLowerCase();
+  const priorityFilter = (document.getElementById('beneficiaryPriorityFilter')?.value || '').trim();
 
-  // Apply search/status/purok filter
-  const filtered = list.filter(item => {
-    const matchSearch = !searchVal || 
-      (item.beneficiary_name && item.beneficiary_name.toLowerCase().includes(searchVal)) ||
-      (item.reference_no && item.reference_no.toLowerCase().includes(searchVal)) ||
-      (item.purok && item.purok.toLowerCase().includes(searchVal)) ||
-      (item.family_name && item.family_name.toLowerCase().includes(searchVal)) ||
-      (item.household_code && item.household_code.toLowerCase().includes(searchVal)) ||
-      (item.phone && item.phone.toLowerCase().includes(searchVal));
-    const matchStatus = !statusFilter || item.claim_status === statusFilter;
-    const matchPurok = !purokFilter || (item.purok && item.purok.toLowerCase() === purokFilter);
-    return matchSearch && matchStatus && matchPurok;
+  // Target Purok Scope of the program
+  const targetPurokStr = (alloc.target_purok || 'All Puroks').trim();
+  const isAllPuroksScope = (targetPurokStr === 'All Puroks' || targetPurokStr === 'All' || targetPurokStr === '');
+  const targetPurokSet = isAllPuroksScope ? null : new Set(targetPurokStr.split(',').map(s => s.trim().toLowerCase()));
+
+  // Filter household families
+  const filtered = rawHouseholds.filter(fam => {
+    const famPurok = (fam.purok_name || '').toLowerCase();
+
+    // Scope & Purok filter
+    if (purokFilter === '__all__') {
+      // User requested all barangay puroks
+    } else if (purokFilter) {
+      if (famPurok !== purokFilter) return false;
+    } else if (!isAllPuroksScope) {
+      // Default to program's target purok scope
+      if (!targetPurokSet.has(famPurok)) return false;
+    }
+
+    const dist = distByHhId[Number(fam.id)] || distByName[(fam.head_full_name || '').toLowerCase()];
+    const refNo = dist ? (dist.reference_no || '') : '';
+
+    // Search filter
+    if (searchVal) {
+      const matchSearch =
+        (fam.family_name && fam.family_name.toLowerCase().includes(searchVal)) ||
+        (fam.head_full_name && fam.head_full_name.toLowerCase().includes(searchVal)) ||
+        (fam.household_code && fam.household_code.toLowerCase().includes(searchVal)) ||
+        (fam.purok_name && fam.purok_name.toLowerCase().includes(searchVal)) ||
+        (fam.head_phone && fam.head_phone.toLowerCase().includes(searchVal)) ||
+        refNo.toLowerCase().includes(searchVal);
+      if (!matchSearch) return false;
+    }
+
+    // Status filter
+    const isClaimed = (dist && dist.claim_status === 'Claimed');
+    if (statusFilter === 'Claimed' && !isClaimed) return false;
+    if (statusFilter === 'Unclaimed' && isClaimed) return false;
+
+    // Priority filter
+    if (priorityFilter === 'pwd' && Number(fam.pwd_count || 0) <= 0) return false;
+    if (priorityFilter === 'seniors' && Number(fam.seniors_count || 0) <= 0) return false;
+    if (priorityFilter === 'indigent' && (!fam.economic_status || !fam.economic_status.toLowerCase().includes('indigent'))) return false;
+
+    return true;
   });
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="padding: 30px; text-align: center; color: var(--color-text-muted); font-size: 11px;">
-          ${list.length === 0 ? 'No resident beneficiaries recorded yet for this financial aid batch. Click <strong>+ Distribute Aid</strong> to release funds.' : 'No beneficiaries match the current filter criteria.'}
+        <td colspan="8" style="padding: 30px; text-align: center; color: var(--color-text-muted); font-size: 11px;">
+          No household families found matching the selected filters.
         </td>
       </tr>
     `;
@@ -983,48 +1115,74 @@ function renderBeneficiariesTable(list) {
   }
 
   let html = '';
-  filtered.forEach(row => {
-    const isClaimed = (row.claim_status === 'Claimed');
-    const isPending = (row.claim_status === 'Pending');
-    const statusClass = (row.claim_status || 'unclaimed').toLowerCase();
-    const smsClass = 'sms-' + (row.sms_status || 'not_sent');
-    const smsLabel = row.sms_status === 'sent' ? 'Sent' : (row.sms_status === 'failed' ? 'Failed' : 'None');
+  filtered.forEach(fam => {
+    const dist = distByHhId[Number(fam.id)] || distByName[(fam.head_full_name || '').toLowerCase()];
+    const isClaimed = (dist && dist.claim_status === 'Claimed');
+    const rateAmount = Number(alloc.amount_per_beneficiary || 5000);
+    const amount = dist ? Number(dist.amount || rateAmount) : rateAmount;
+    const refNo = (dist && dist.reference_no) ? dist.reference_no : null;
 
-    const claimDateStr = row.claim_date 
-      ? `<div style="font-family: var(--font-secondary);">${row.claim_date.substring(0, 16)}</div><div style="font-size: 9.5px; color: var(--color-text-muted);">${escapeHtml(row.disbursing_officer || 'Barangay Office')}</div>` 
-      : '<span style="color: var(--color-text-muted); font-style: italic;">Unclaimed</span>';
-
-    // Demographic indicators (PWD / Senior)
     let demoBadges = '';
-    const hasPwd = Number(row.pwd_count) > 0 || (row.remarks && row.remarks.toLowerCase().includes('pwd'));
-    const hasSenior = Number(row.seniors_count) > 0 || (row.remarks && row.remarks.toLowerCase().includes('senior'));
-    if (hasPwd) {
-      demoBadges += '<span class="badge badge-warning" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">PWD</span>';
+    if (Number(fam.pwd_count) > 0) {
+      demoBadges += `<span class="badge badge-warning" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">${fam.pwd_count} PWD</span>`;
     }
-    if (hasSenior) {
-      demoBadges += '<span class="badge badge-neutral" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">Senior</span>';
+    if (Number(fam.seniors_count) > 0) {
+      demoBadges += `<span class="badge badge-neutral" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">${fam.seniors_count} Senior</span>`;
     }
 
-    const hhCodeInfo = row.household_code ? `<span style="font-family:var(--font-secondary);color:var(--color-primary);font-weight:600;">[${escapeHtml(row.household_code)}]</span> ` : '';
+    const claimDateStr = isClaimed && dist.claim_date
+      ? `<div style="font-family: var(--font-secondary);">${dist.claim_date.substring(0, 16)}</div><div style="font-size: 9.5px; color: var(--color-text-muted);">${escapeHtml(dist.disbursing_officer || 'Barangay Office')}</div>`
+      : '<span style="color: var(--color-text-muted); font-style: italic;">Pending</span>';
+
+    const smsClass = isClaimed ? ('sms-' + (dist.sms_status || 'not_sent')) : 'sms-not_sent';
+    const smsLabel = isClaimed ? (dist.sms_status === 'sent' ? 'Sent' : (dist.sms_status === 'failed' ? 'Failed' : 'None')) : '—';
+
+    const statusBadge = isClaimed
+      ? `<span class="status-badge claimed">Released</span>`
+      : `<span class="status-badge unclaimed">Unreleased</span>`;
+
+    const refNoHtml = isClaimed
+      ? `<span style="font-family: var(--font-secondary); font-size: 10.5px; font-weight: 700; color: var(--color-primary);">${escapeHtml(refNo)}</span>`
+      : `<span style="color: var(--color-text-muted); font-size: 11px;">—</span>`;
+
+    const actionHtml = isClaimed
+      ? `
+        <div style="display: inline-flex; gap: 4px; align-items: center; justify-content: center;">
+          <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 9.5px; color: var(--color-danger); border-color: #F8D7DA;" onclick="voidHouseholdAid(${fam.id}, ${dist.id}, '${escapeJs(fam.family_name)}')" title="Void Release & Revert Funds">
+            Void
+          </button>
+          <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 9.5px;" onclick="resendSms(${dist.id})" title="Send SMS Confirmation">
+            SMS
+          </button>
+        </div>
+      `
+      : `
+        <button type="button" class="btn btn-primary" id="btn_release_${fam.id}" style="padding: 3px 9px; font-size: 10px; font-weight: 600;" onclick="releaseAidToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.purok_name)}', '${escapeJs(fam.head_phone || '')}', ${rateAmount})" title="Release ₱5,000 Aid to this Family">
+          Release Aid
+        </button>
+      `;
 
     html += `
       <tr style="border-bottom: 1px solid var(--color-border-light);">
-        <td style="padding: 9px 12px; font-family: var(--font-secondary); font-size: 10.5px; font-weight: 600; color: var(--color-primary);">
-          ${escapeHtml(row.reference_no || 'PENDING-CLAIM')}
+        <td style="padding: 9px 12px;">
+          ${refNoHtml}
         </td>
         <td style="padding: 9px 12px;">
-          <div style="font-weight: 600; font-size: 11px; color: var(--color-text);">
-            ${hhCodeInfo}${escapeHtml(row.beneficiary_name)} ${demoBadges}
+          <div style="font-weight: 700; font-size: 11px; color: var(--color-primary); line-height: 1.3;">
+            [${escapeHtml(fam.household_code)}] ${escapeHtml(fam.family_name)} ${demoBadges}
           </div>
-          <div style="font-size: 9.5px; color: var(--color-text-muted);">
-            ${escapeHtml(row.purok)} • ${escapeHtml(row.phone)} ${row.family_name ? '• ' + escapeHtml(row.family_name) : ''}
+          <div style="font-size: 9.5px; color: var(--color-text-secondary); margin-top: 2px;">
+            Rep: <strong>${escapeHtml(fam.head_full_name)}</strong> &bull; ${escapeHtml(fam.head_phone || 'No Contact')}
           </div>
+        </td>
+        <td style="padding: 9px 12px; font-size: 10.5px; color: var(--color-text);">
+          ${escapeHtml(fam.purok_name)}
         </td>
         <td style="padding: 9px 12px; text-align: right; font-family: var(--font-secondary); font-weight: 700; font-size: 11px; color: var(--color-text);">
-          ${formatMoney(row.amount)}
+          ${formatMoney(amount)}
         </td>
         <td style="padding: 9px 12px; text-align: center;">
-          <span class="status-badge ${statusClass}">${escapeHtml(row.claim_status)}</span>
+          ${statusBadge}
         </td>
         <td style="padding: 9px 12px; text-align: center;">
           <span class="sms-badge ${smsClass}">${smsLabel}</span>
@@ -1033,21 +1191,7 @@ function renderBeneficiariesTable(list) {
           ${claimDateStr}
         </td>
         <td style="padding: 9px 12px; text-align: center;">
-          <div style="display: inline-flex; gap: 4px;">
-            ${isPending ? `
-              <button type="button" class="btn btn-primary" style="padding: 2px 7px; font-size: 9.5px;" onclick="claimPayout(${row.id}, '${escapeJs(row.beneficiary_name)}', ${row.amount})" title="Release Cash Aid">
-                Release
-              </button>
-            ` : ''}
-            <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 9.5px;" onclick="resendSms(${row.id})" title="Send SMS Notice">
-              SMS
-            </button>
-            ${isClaimed ? `
-              <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 9.5px; color: var(--color-danger);" onclick="voidPayout(${row.id}, '${escapeJs(row.beneficiary_name)}')" title="Void Disbursement">
-                Void
-              </button>
-            ` : ''}
-          </div>
+          ${actionHtml}
         </td>
       </tr>
     `;
@@ -1057,8 +1201,130 @@ function renderBeneficiariesTable(list) {
 }
 
 function filterBeneficiariesTable() {
-  const allocDistributions = rawDistributions.filter(d => Number(d.allocation_id) === selectedAllocationId);
-  renderBeneficiariesTable(allocDistributions);
+  renderBeneficiariesTable();
+}
+
+async function releaseAidToHousehold(famId, famName, headName, purokName, phone, amount) {
+  const btn = document.getElementById('btn_release_' + famId);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Releasing...';
+  }
+
+  const formData = new FormData();
+  formData.append('action', 'add_beneficiary');
+  formData.append('allocation_id', selectedAllocationId);
+  formData.append('household_id', famId);
+  formData.append('beneficiary_name', headName || (famName + ' Head'));
+  formData.append('purok', purokName || 'Purok');
+  formData.append('phone', phone || '09000000000');
+  formData.append('amount', amount || 5000);
+  formData.append('claim_status', 'Claimed');
+  formData.append('send_sms', '1');
+  formData.append('remarks', '[' + famId + '] ' + famName);
+
+  try {
+    const resp = await fetch(baseUrl + '/backend/functions/financial_aid/distribute.php', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      },
+      body: formData
+    });
+    const res = await resp.json();
+    if (!res.success) {
+      throw new Error(res.message || 'Failed to release aid.');
+    }
+
+    // Update or insert into rawDistributions in memory
+    const existingIdx = rawDistributions.findIndex(d => 
+      Number(d.allocation_id) === Number(selectedAllocationId) && Number(d.household_id) === Number(famId)
+    );
+
+    const updatedDist = {
+      id: res.distribution_id,
+      allocation_id: Number(selectedAllocationId),
+      household_id: Number(famId),
+      beneficiary_name: headName || famName,
+      purok: purokName,
+      phone: phone,
+      amount: amount || 5000,
+      claim_status: 'Claimed',
+      claim_date: res.claim_date || new Date().toISOString().replace('T', ' ').substring(0, 19),
+      reference_no: res.reference_no,
+      sms_status: res.sms_status || 'sent',
+      disbursing_officer: 'Barangay Office'
+    };
+
+    if (existingIdx >= 0) {
+      rawDistributions[existingIdx] = Object.assign({}, rawDistributions[existingIdx], updatedDist);
+    } else {
+      rawDistributions.unshift(updatedDist);
+    }
+
+    // Update allocation in rawAllocations
+    const alloc = rawAllocations.find(a => Number(a.id) === Number(selectedAllocationId));
+    if (alloc) {
+      alloc.disbursed_budget = Number(alloc.disbursed_budget || 0) + Number(amount || 5000);
+      alloc.remaining_budget = Math.max(0, Number(alloc.total_budget || 0) - Number(alloc.disbursed_budget));
+      alloc.claimed_recipients = Number(alloc.claimed_recipients || 0) + 1;
+    }
+
+    // Refresh UI
+    selectAllocation(selectedAllocationId);
+  } catch (err) {
+    alert('Error releasing aid: ' + err.message);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Release Aid';
+    }
+  }
+}
+
+async function voidHouseholdAid(famId, distId, famName) {
+  if (!confirm('Are you sure you want to void disbursement for ' + famName + '? The aid funds will be returned to the remaining allocation budget.')) {
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('action', 'void');
+  formData.append('distribution_id', distId);
+
+  try {
+    const resp = await fetch(baseUrl + '/backend/functions/financial_aid/distribute.php', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      },
+      body: formData
+    });
+    const res = await resp.json();
+    if (!res.success) {
+      throw new Error(res.message || 'Failed to void aid.');
+    }
+
+    // Update distribution in rawDistributions
+    const dist = rawDistributions.find(d => Number(d.id) === Number(distId));
+    const voidedAmount = dist ? Number(dist.amount || 5000) : 5000;
+    if (dist) {
+      dist.claim_status = 'Unclaimed';
+    }
+
+    // Update allocation in rawAllocations
+    const alloc = rawAllocations.find(a => Number(a.id) === Number(selectedAllocationId));
+    if (alloc) {
+      alloc.disbursed_budget = Math.max(0, Number(alloc.disbursed_budget || 0) - voidedAmount);
+      alloc.remaining_budget = Number(alloc.remaining_budget || 0) + voidedAmount;
+      alloc.claimed_recipients = Math.max(0, Number(alloc.claimed_recipients || 0) - 1);
+    }
+
+    // Refresh UI
+    selectAllocation(selectedAllocationId);
+  } catch (err) {
+    alert('Error voiding disbursement: ' + err.message);
+  }
 }
 
 function filterAllocationsTable(term) {
@@ -1431,35 +1697,36 @@ function claimPayout(distributionId, beneficiaryName, amount) {
   form.submit();
 }
 
-function resendSms(distributionId) {
+async function resendSms(distributionId) {
   if (!confirm('Dispatch SMS notification to this beneficiary?')) {
     return;
   }
 
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = baseUrl + '/backend/functions/financial_aid/distribute.php';
+  const formData = new FormData();
+  formData.append('action', 'send_sms');
+  formData.append('distribution_id', distributionId);
 
-  const actionInput = document.createElement('input');
-  actionInput.type = 'hidden';
-  actionInput.name = 'action';
-  actionInput.value = 'send_sms';
-  form.appendChild(actionInput);
-
-  const idInput = document.createElement('input');
-  idInput.type = 'hidden';
-  idInput.name = 'distribution_id';
-  idInput.value = distributionId;
-  form.appendChild(idInput);
-
-  const retInput = document.createElement('input');
-  retInput.type = 'hidden';
-  retInput.name = 'return_url';
-  retInput.value = window.location.href;
-  form.appendChild(retInput);
-
-  document.body.appendChild(form);
-  form.submit();
+  try {
+    const resp = await fetch(baseUrl + '/backend/functions/financial_aid/distribute.php', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      },
+      body: formData
+    });
+    const res = await resp.json();
+    if (res.success) {
+      const dist = rawDistributions.find(d => Number(d.id) === Number(distributionId));
+      if (dist) dist.sms_status = 'sent';
+      selectAllocation(selectedAllocationId);
+      alert(res.message);
+    } else {
+      alert(res.message || 'Failed to dispatch SMS.');
+    }
+  } catch (err) {
+    alert('Error sending SMS: ' + err.message);
+  }
 }
 
 function voidPayout(distributionId, beneficiaryName) {

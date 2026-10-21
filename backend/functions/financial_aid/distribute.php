@@ -94,34 +94,92 @@ try {
             $disbursedBy = $user['id'];
         }
 
-        // Insert distribution record
-        $insStmt = $db->prepare("
-            INSERT INTO financial_aid_distributions (
-                allocation_id, barangay_id, resident_id, household_id, beneficiary_name,
-                purok, phone, amount, claim_status, claim_date,
-                reference_no, sms_status, disbursed_by, remarks
-            ) VALUES (
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                ?, 'not_sent', ?, ?
-            )
-        ");
-        $insStmt->execute([
-            $allocationId, (int)$alloc['barangay_id'], $residentId, $householdId, $beneficiaryName,
-            $purok, $phone, $amount, $claimStatus, $claimDate,
-            $referenceNo, $disbursedBy, $remarks
-        ]);
-        $distId = (int)$db->lastInsertId();
+        // Check if a distribution record already exists for this household in this allocation
+        $existingDist = null;
+        if ($householdId > 0) {
+            $findStmt = $db->prepare("SELECT * FROM financial_aid_distributions WHERE allocation_id = ? AND household_id = ? ORDER BY id DESC LIMIT 1");
+            $findStmt->execute([$allocationId, $householdId]);
+            $existingDist = $findStmt->fetch(PDO::FETCH_ASSOC);
+        }
 
-        // If Claimed, update allocation budget
-        if ($claimStatus === 'Claimed') {
-            $upAlloc = $db->prepare("
-                UPDATE financial_aid_allocations 
-                SET disbursed_budget = disbursed_budget + ?,
-                    remaining_budget = remaining_budget - ?
+        if ($existingDist) {
+            $distId = (int)$existingDist['id'];
+            if ($existingDist['claim_status'] === 'Claimed' && $claimStatus === 'Claimed') {
+                if ($isAjax) {
+                    jsonResponse([
+                        'success' => true,
+                        'message' => "Aid already disbursed for {$beneficiaryName}.",
+                        'reference_no' => $existingDist['reference_no'],
+                        'distribution_id' => $distId,
+                        'claim_date' => $existingDist['claim_date'],
+                        'sms_status' => $existingDist['sms_status']
+                    ]);
+                }
+                redirectWithFlash($returnUrl, 'info', "Beneficiary already claimed.");
+            }
+
+            // Re-activate or update existing record
+            $wasClaimed = ($existingDist['claim_status'] === 'Claimed');
+            $upStmt = $db->prepare("
+                UPDATE financial_aid_distributions
+                SET claim_status = ?,
+                    claim_date = ?,
+                    reference_no = COALESCE(?, reference_no),
+                    disbursed_by = ?,
+                    amount = ?,
+                    beneficiary_name = ?,
+                    purok = ?,
+                    phone = ?,
+                    remarks = CONCAT(COALESCE(remarks, ''), ' [Re-issued]')
                 WHERE id = ?
             ");
-            $upAlloc->execute([$amount, $amount, $allocationId]);
+            $upStmt->execute([
+                $claimStatus, $claimDate, $referenceNo, $disbursedBy,
+                $amount, $beneficiaryName, $purok, $phone, $distId
+            ]);
+
+            // Update budget if newly claimed
+            if (!$wasClaimed && $claimStatus === 'Claimed') {
+                $upAlloc = $db->prepare("
+                    UPDATE financial_aid_allocations 
+                    SET disbursed_budget = disbursed_budget + ?,
+                        remaining_budget = GREATEST(0, remaining_budget - ?)
+                    WHERE id = ?
+                ");
+                $upAlloc->execute([$amount, $amount, $allocationId]);
+            }
+            $referenceNo = $referenceNo ?: $existingDist['reference_no'];
+        } else {
+            // Insert distribution record
+            $eventId = !empty($alloc['event_id']) ? (int)$alloc['event_id'] : null;
+            $insStmt = $db->prepare("
+                INSERT INTO financial_aid_distributions (
+                    allocation_id, event_id, barangay_id, resident_id, household_id, beneficiary_name,
+                    purok, phone, amount, claim_status, claim_date,
+                    reference_no, sms_status, disbursed_by, remarks
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, 'not_sent', ?, ?
+                )
+            ");
+            $insStmt->execute([
+                $allocationId, $eventId, (int)$alloc['barangay_id'], $residentId, $householdId, $beneficiaryName,
+                $purok, $phone, $amount, $claimStatus, $claimDate,
+                $referenceNo, $disbursedBy, $remarks
+            ]);
+            $distId = (int)$db->lastInsertId();
+
+            // If Claimed, update allocation budget
+            if ($claimStatus === 'Claimed') {
+                $upAlloc = $db->prepare("
+                    UPDATE financial_aid_allocations 
+                    SET disbursed_budget = disbursed_budget + ?,
+                        remaining_budget = GREATEST(0, remaining_budget - ?)
+                    WHERE id = ?
+                ");
+                $upAlloc->execute([$amount, $amount, $allocationId]);
+            }
         }
 
         // Audit Trail Entry
@@ -166,6 +224,7 @@ try {
 
         // SMS Notification dispatch if requested
         $smsResultText = "";
+        $smsStatus = 'not_sent';
         if ($sendSms && !empty($phone)) {
             $smsMsg = ($claimStatus === 'Claimed')
                 ? "Good day {$beneficiaryName}, you have received PHP " . number_format($amount, 2) . " Financial Assistance under {$alloc['program_name']} ({$alloc['barangay_name']}). Ref No: {$referenceNo}."
@@ -187,7 +246,14 @@ try {
             : "Beneficiary {$beneficiaryName} registered as Pending.{$smsResultText}";
 
         if ($isAjax) {
-            jsonResponse(['success' => true, 'message' => $succMsg, 'reference_no' => $referenceNo]);
+            jsonResponse([
+                'success' => true,
+                'message' => $succMsg,
+                'reference_no' => $referenceNo,
+                'distribution_id' => $distId,
+                'claim_date' => $claimDate,
+                'sms_status' => $smsStatus
+            ]);
         }
         redirectWithFlash($returnUrl, 'success', $succMsg);
 
@@ -386,7 +452,12 @@ try {
         logSystemEvent('VOID_FINANCIAL_AID', 'Financial Aid', $auditText);
 
         if ($isAjax) {
-            jsonResponse(['success' => true, 'message' => "Distribution for {$dist['beneficiary_name']} voided. Allocation funds restored."]);
+            jsonResponse([
+                'success' => true,
+                'message' => "Distribution for {$dist['beneficiary_name']} voided. Allocation funds restored.",
+                'distribution_id' => $distId,
+                'amount' => $amount
+            ]);
         }
         redirectWithFlash($returnUrl, 'success', "Distribution for {$dist['beneficiary_name']} voided. Allocation funds restored.");
 

@@ -134,6 +134,9 @@ try {
     ]);
     $actId = $db->lastInsertId();
 
+    // Auto-sync into financial_aid_allocations if it's a Social Welfare / Financial Aid event
+    syncEventFinancialAidAllocation($db, $actId, $barangayId);
+
     // Broadcast in-app notification for this activity to barangay residents and responders
     $notif = $db->prepare("
         INSERT INTO notifications (target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at)

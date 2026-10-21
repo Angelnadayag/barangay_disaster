@@ -4657,6 +4657,26 @@ require_once __DIR__ . '/../layouts/header.php';
       }
     }
   }
+
+  // Auto-open Schedule Event modal if requested via URL
+  document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('create') === '1' || urlParams.get('open_create') === '1') {
+      const actType = urlParams.get('type') || urlParams.get('activity_type');
+      if (typeof openModal === 'function') {
+        openModal('createActivityModal');
+        if (actType) {
+          const typeSelect = document.getElementById('create_activity_type');
+          if (typeSelect) {
+            typeSelect.value = actType;
+            if (typeof onActivityTypeChange === 'function') {
+              onActivityTypeChange('create', actType);
+            }
+          }
+        }
+      }
+    }
+  });
 </script>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

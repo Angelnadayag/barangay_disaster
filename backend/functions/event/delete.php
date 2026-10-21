@@ -61,7 +61,19 @@ try {
     $delNotif = $db->prepare("DELETE FROM notifications WHERE related_module = 'events' AND related_id = ?");
     $delNotif->execute([$id]);
 
-    // 4. Permanently delete the event record
+    // 4. Clean up any linked financial aid allocations, distributions, and audits
+    $allocsStmt = $db->prepare("SELECT id FROM financial_aid_allocations WHERE event_id = ?");
+    $allocsStmt->execute([$id]);
+    $linkedAllocIds = $allocsStmt->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($linkedAllocIds)) {
+        $inAllocs = implode(',', array_fill(0, count($linkedAllocIds), '?'));
+        $db->prepare("DELETE FROM financial_aid_audits WHERE allocation_id IN ($inAllocs)")->execute($linkedAllocIds);
+        $db->prepare("DELETE FROM financial_aid_distributions WHERE allocation_id IN ($inAllocs)")->execute($linkedAllocIds);
+        $db->prepare("DELETE FROM financial_aid_allocations WHERE id IN ($inAllocs)")->execute($linkedAllocIds);
+    }
+    $db->prepare("DELETE FROM financial_aid_distributions WHERE event_id = ?")->execute([$id]);
+
+    // 5. Permanently delete the event record
     $delAct = $db->prepare("DELETE FROM events WHERE id = ?");
     $delAct->execute([$id]);
 

@@ -199,6 +199,9 @@ try {
         }
     }
 
+    // Sync financial aid allocation if this event is Social Welfare / Financial Aid
+    syncEventFinancialAidAllocation($db, $id, $act['barangay_id']);
+
     logSystemEvent('UPDATE_ACTIVITY', 'Preparedness', "Updated event #$id: $title ($type)");
 
     if ($isAjax) {

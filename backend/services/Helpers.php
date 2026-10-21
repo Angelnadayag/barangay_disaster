@@ -446,4 +446,158 @@ function syncPurokDemographics($db, $purokId = 0, $purokName = '', $barangayId =
 }
 }
 
+/**
+ * Synchronize event(s) with financial_aid_allocations
+ * If an event has activity_type = 'Social Welfare and Assistance' or content/activities containing 'Financial Aid Distribution',
+ * ensure an active allocation exists in financial_aid_allocations and budget is scoped to target puroks/families.
+ */
+if (!function_exists('syncEventFinancialAidAllocation')) {
+function syncEventFinancialAidAllocation($db, $eventId = null, $barangayId = null) {
+    if (!$db) return;
+
+    // Self-heal event_id, household_id columns if missing
+    try {
+        $cols = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'event_id'")->fetchAll();
+        if (empty($cols)) {
+            $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN event_id INT(11) NULL DEFAULT NULL AFTER id");
+            $db->exec("ALTER TABLE financial_aid_allocations ADD KEY idx_alloc_event (event_id)");
+        }
+        $colsDist = $db->query("SHOW COLUMNS FROM financial_aid_distributions LIKE 'event_id'")->fetchAll();
+        if (empty($colsDist)) {
+            $db->exec("ALTER TABLE financial_aid_distributions ADD COLUMN event_id INT(11) NULL DEFAULT NULL AFTER allocation_id");
+            $db->exec("ALTER TABLE financial_aid_distributions ADD KEY idx_dist_event (event_id)");
+        }
+        $colsHh = $db->query("SHOW COLUMNS FROM financial_aid_distributions LIKE 'household_id'")->fetchAll();
+        if (empty($colsHh)) {
+            $db->exec("ALTER TABLE financial_aid_distributions ADD COLUMN household_id INT(11) NULL DEFAULT NULL AFTER resident_id");
+            $db->exec("ALTER TABLE financial_aid_distributions ADD KEY idx_dist_hh (household_id)");
+        }
+    } catch (Throwable $e) {}
+
+    // Find candidate events
+    $sql = "SELECT * FROM events WHERE status != 'Cancelled' AND (is_archived IS NULL OR is_archived = 0)";
+    $params = [];
+    if ($eventId) {
+        $sql .= " AND id = ?";
+        $params[] = (int)$eventId;
+    } elseif ($barangayId) {
+        $sql .= " AND barangay_id = ?";
+        $params[] = (int)$barangayId;
+    }
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($events as $evt) {
+        $actType = trim($evt['activity_type'] ?? '');
+        $title = trim($evt['title'] ?? '');
+        $expAct = (string)($evt['expected_activities'] ?? '') . ' ' . (string)($evt['content_execution'] ?? '');
+
+        $isFinancialAid = (
+            strcasecmp($actType, 'Social Welfare and Assistance') === 0 ||
+            stripos($title, 'Financial Aid') !== false ||
+            stripos($title, 'Financial Assistance') !== false ||
+            stripos($title, 'Ayuda') !== false ||
+            stripos($expAct, 'Financial Aid Distribution') !== false ||
+            stripos($expAct, 'Financial Assistance Distribution') !== false
+        );
+
+        // Check if an allocation already exists for this event
+        $checkStmt = $db->prepare("SELECT * FROM financial_aid_allocations WHERE event_id = ? LIMIT 1");
+        $checkStmt->execute([$evt['id']]);
+        $existingAlloc = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$isFinancialAid) {
+            if ($existingAlloc) {
+                $distCount = (int)$db->query("SELECT COUNT(*) FROM financial_aid_distributions WHERE allocation_id = {$existingAlloc['id']}")->fetchColumn();
+                if ($distCount === 0) {
+                    $db->exec("DELETE FROM financial_aid_allocations WHERE id = {$existingAlloc['id']}");
+                }
+            }
+            continue;
+        }
+
+        // Calculate target households
+        $targetPuroks = trim($evt['target_puroks'] ?? 'All Puroks');
+        $bId = (int)$evt['barangay_id'];
+
+        $hhCountSql = "SELECT COUNT(*) FROM purok_households WHERE barangay_id = ? AND status = 'active'";
+        $hhParams = [$bId];
+        if (!empty($targetPuroks) && strcasecmp($targetPuroks, 'All Puroks') !== 0 && strcasecmp($targetPuroks, 'All') !== 0) {
+            $purokList = array_values(array_filter(array_map('trim', explode(',', $targetPuroks))));
+            if (!empty($purokList)) {
+                $inClause = implode(',', array_fill(0, count($purokList), '?'));
+                $hhCountSql .= " AND purok_name IN ($inClause)";
+                $hhParams = array_merge($hhParams, $purokList);
+            }
+        }
+        $hhStmt = $db->prepare($hhCountSql);
+        $hhStmt->execute($hhParams);
+        $targetBeneficiaries = (int)$hhStmt->fetchColumn();
+        if ($targetBeneficiaries <= 0) {
+            $targetBeneficiaries = max(1, (int)($evt['target_participants'] ?? 50));
+        }
+
+        $amountPerBeneficiary = 5000.00;
+        $totalBudget = $targetBeneficiaries * $amountPerBeneficiary;
+        $status = ($evt['status'] === 'Completed') ? 'Completed' : 'Active';
+
+        if ($existingAlloc) {
+            // Update allocation metadata
+            $upStmt = $db->prepare("
+                UPDATE financial_aid_allocations
+                SET program_name = ?,
+                    target_purok = ?,
+                    target_beneficiaries = ?,
+                    total_budget = ?,
+                    amount_per_beneficiary = ?,
+                    remaining_budget = GREATEST(0, ? - disbursed_budget),
+                    status = ?
+                WHERE id = ?
+            ");
+            $upStmt->execute([
+                $evt['title'],
+                $targetPuroks,
+                $targetBeneficiaries,
+                $totalBudget,
+                $amountPerBeneficiary,
+                $totalBudget,
+                $status,
+                $existingAlloc['id']
+            ]);
+        } else {
+            // Create allocation code
+            $allocCode = 'AID-EVT-' . str_pad($evt['id'], 4, '0', STR_PAD_LEFT);
+            $cStmt = $db->prepare("SELECT id FROM financial_aid_allocations WHERE allocation_code = ?");
+            $cStmt->execute([$allocCode]);
+            if ($cStmt->fetch()) {
+                $allocCode .= '-' . substr(md5(uniqid()), 0, 4);
+            }
+
+            $insStmt = $db->prepare("
+                INSERT INTO financial_aid_allocations (
+                    event_id, allocation_code, program_name, disaster_type,
+                    barangay_id, target_purok, total_budget, amount_per_beneficiary,
+                    disbursed_budget, remaining_budget, funding_source,
+                    target_beneficiaries, status, added_type, notes, allocated_by, created_at
+                ) VALUES (
+                    ?, ?, ?, 'Disaster Relief & Social Welfare',
+                    ?, ?, ?, ?,
+                    0.00, ?, 'LGU Calamity Fund',
+                    ?, ?, 'added_by_admin', ?, ?, NOW()
+                )
+            ");
+            $notes = 'Auto-synced from Scheduled Event: ' . $evt['title'];
+            $insStmt->execute([
+                $evt['id'], $allocCode, $evt['title'],
+                $bId, $targetPuroks, $totalBudget, $amountPerBeneficiary,
+                $totalBudget,
+                $targetBeneficiaries, $status, $notes, $evt['created_by']
+            ]);
+        }
+    }
+}
+}
+
 
