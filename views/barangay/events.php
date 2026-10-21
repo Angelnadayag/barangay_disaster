@@ -1081,7 +1081,7 @@ require_once __DIR__ . '/../layouts/header.php';
               <input type="checkbox" id="create_count_by_families"
                 onchange="onCountingUnitCheckboxChange('create', this.checked)"
                 style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
-              <span>Count by <strong>House Families</strong> (1 per Household Head) <span
+              <span>Count by <strong>House Families</strong> (1 per Household Representative) <span
                   style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
             </label>
             <span id="create_counting_unit_badge" class="badge"
@@ -1323,7 +1323,7 @@ require_once __DIR__ . '/../layouts/header.php';
               <input type="checkbox" id="edit_count_by_families"
                 onchange="onCountingUnitCheckboxChange('edit', this.checked)"
                 style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
-              <span>Count by <strong>House Families</strong> (1 per Household Head) <span
+              <span>Count by <strong>House Families</strong> (1 per Household Representative) <span
                   style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
             </label>
             <span id="edit_counting_unit_badge" class="badge"
@@ -1633,6 +1633,54 @@ require_once __DIR__ . '/../layouts/header.php';
     <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
       <div id="acc_footer_left"></div>
       <div style="display:flex;gap:6px;" id="acc_footer_right"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Modal 3A-2: View Household Family Members                                  -->
+<!-- ========================================================================= -->
+<div class="modal-overlay" id="householdMembersModal" style="z-index: 1250 !important;">
+  <div class="modal-dialog" style="max-width:620px;">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h3 class="modal-title" style="font-size:14px;font-weight:700;color:var(--color-primary);" id="hh_members_modal_title">
+          Family Members
+        </h3>
+        <span class="badge badge-neutral" style="font-size:10px;font-weight:600;" id="hh_members_badge"></span>
+      </div>
+      <button class="modal-close-btn" onclick="closeModal('householdMembersModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;">
+      <!-- Household Summary Card -->
+      <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--color-primary);" id="hh_members_family_name">—</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;" id="hh_members_rep_info">—</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:9.5px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.3px;font-weight:600;">Purok & Code</div>
+          <div style="font-size:11px;font-weight:600;color:var(--color-text);" id="hh_members_purok_code">—</div>
+        </div>
+      </div>
+
+      <!-- Members Table Container -->
+      <div class="form-group" style="margin-bottom:0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label class="form-label" style="font-size:10px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;letter-spacing:0.3px;">
+            Registered Family Members
+          </label>
+          <span style="font-size:10px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);padding:1px 6px;border-radius:4px;border:1px solid var(--color-border);" id="hh_members_count_pill">
+            0 Members
+          </span>
+        </div>
+        <div id="hh_members_table_box" style="max-height:260px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);background:#FFFFFF;">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;align-items:center;">
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('householdMembersModal')">Close</button>
     </div>
   </div>
 </div>
@@ -2278,7 +2326,7 @@ require_once __DIR__ . '/../layouts/header.php';
 
     if (calcSubtext) {
       calcSubtext.innerText = isFamilies
-        ? 'Auto-calculated from selected purok household records (1 per household head)'
+        ? 'Auto-calculated from selected purok household records (1 per household representative)'
         : 'Auto-calculated from selected purok population records (all individuals)';
     }
 
@@ -2835,7 +2883,7 @@ require_once __DIR__ . '/../layouts/header.php';
         household_id: hh.id,
         household_code: hh.household_code || '—',
         family_name: hh.family_name || 'Family',
-        head_name: hh.head_full_name || 'Household Head',
+        head_name: hh.head_full_name || 'Family Representative',
         purok_name: hh.purok_name || '—',
         phone: (matchedAtt && matchedAtt.phone) ? matchedAtt.phone : (hh.head_phone || '—'),
         attended: isAttended
@@ -2905,11 +2953,11 @@ require_once __DIR__ . '/../layouts/header.php';
       <table class="data-table" style="font-size:11px;width:100%;margin:0;border-collapse:collapse;">
         <thead>
           <tr style="position:sticky;top:0;background:var(--color-surface-subtle);z-index:2;border-bottom:1px solid var(--color-border);">
-            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Household Family / Head</th>
-            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:100px;">Purok</th>
+            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Household Family / Representative</th>
+            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:95px;">Purok</th>
             <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:115px;">Contact</th>
-            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:90px;">Status</th>
-            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:85px;">Action</th>
+            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:85px;">Status</th>
+            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:145px;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -2926,7 +2974,7 @@ require_once __DIR__ . '/../layouts/header.php';
               ${escapeHtml(item.family_name)}
             </div>
             <div style="font-size:10px;color:var(--color-text-secondary);margin-top:1px;">
-              Head: ${escapeHtml(item.head_name)} ${item.household_code && item.household_code !== '—' ? '• ' + escapeHtml(item.household_code) : ''}
+              Representative: ${escapeHtml(item.head_name)} ${item.household_code && item.household_code !== '—' ? '• ' + escapeHtml(item.household_code) : ''}
             </div>
           </td>
           <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
@@ -2941,16 +2989,27 @@ require_once __DIR__ . '/../layouts/header.php';
             </span>
           </td>
           <td style="padding:6px 10px;text-align:center;">
-            <button type="button" 
-              id="acc_btn_attend_${rowId}" 
-              onclick="toggleRosterItemAttendance(${rowId}, ${isAttended ? 0 : 1})"
-              class="btn btn-sm"
-              style="${isAttended 
-                ? 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 10px;border-radius:4px;cursor:pointer;' 
-                : 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 10px;border-radius:4px;cursor:pointer;'}"
-              title="${isAttended ? 'Click to void attendance' : 'Click to mark as attended'}">
-              ${isAttended ? 'Void' : 'Attended'}
-            </button>
+            <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+              <button type="button" 
+                id="acc_btn_attend_${rowId}" 
+                onclick="toggleRosterItemAttendance(${rowId}, ${isAttended ? 0 : 1})"
+                class="btn btn-sm"
+                style="${isAttended 
+                  ? 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;' 
+                  : 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;'}"
+                title="${isAttended ? 'Click to void attendance' : 'Click to mark as attended'}">
+                ${isAttended ? 'Void' : 'Attended'}
+              </button>
+              ${item.household_id ? `
+                <button type="button" 
+                  onclick="openHouseholdMembersModal(${item.household_id})" 
+                  class="btn btn-sm"
+                  style="background:var(--color-surface-subtle);color:var(--color-text);border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;"
+                  title="View family members of this household">
+                  Members
+                </button>
+              ` : ''}
+            </div>
           </td>
         </tr>
       `;
@@ -2980,12 +3039,12 @@ require_once __DIR__ . '/../layouts/header.php';
       btn.disabled = true;
       if (targetAttended === 1) {
         btn.innerText = 'Void';
-        btn.style.cssText = 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 10px;border-radius:4px;cursor:pointer;';
+        btn.style.cssText = 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;';
         btn.setAttribute('onclick', `toggleRosterItemAttendance(${rosterIdx}, 0)`);
         btn.title = 'Click to void attendance';
       } else {
         btn.innerText = 'Attended';
-        btn.style.cssText = 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 10px;border-radius:4px;cursor:pointer;';
+        btn.style.cssText = 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;';
         btn.setAttribute('onclick', `toggleRosterItemAttendance(${rosterIdx}, 1)`);
         btn.title = 'Click to mark as attended';
       }
@@ -3017,7 +3076,7 @@ require_once __DIR__ . '/../layouts/header.php';
     if (item.attendee_id) {
       formData.append('attendee_id', item.attendee_id);
     }
-    const residentName = `${item.family_name} (Head: ${item.head_name}) [${item.household_code}]`;
+    const residentName = `${item.family_name} (Representative: ${item.head_name}) [${item.household_code}]`;
     formData.append('resident_name', residentName);
     formData.append('phone', item.phone !== '—' ? item.phone : '');
     formData.append('attended', targetAttended);
@@ -3075,6 +3134,112 @@ require_once __DIR__ . '/../layouts/header.php';
       alert('Network error while updating attendance.');
       item.attended = (targetAttended !== 1);
       renderAccomplishedAttendeesTable();
+    });
+  }
+
+  // Open Family Members Modal for a Household
+  function openHouseholdMembersModal(householdId) {
+    if (!householdId) return;
+
+    document.getElementById('hh_members_modal_title').innerText = 'Family Members';
+    document.getElementById('hh_members_badge').innerText = 'Loading...';
+    document.getElementById('hh_members_family_name').innerText = 'Loading family details...';
+    document.getElementById('hh_members_rep_info').innerText = 'Please wait...';
+    document.getElementById('hh_members_purok_code').innerText = '—';
+    document.getElementById('hh_members_count_pill').innerText = '0 Members';
+    document.getElementById('hh_members_table_box').innerHTML = `
+      <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-text-muted);">
+        Loading family members...
+      </div>
+    `;
+
+    openModal('householdMembersModal');
+
+    fetch(`<?= BASE_URL ?>/backend/functions/purok_households/get.php?id=${encodeURIComponent(householdId)}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success || !data.household) {
+        document.getElementById('hh_members_table_box').innerHTML = `
+          <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-danger);">
+            ${escapeHtml(data.message || 'Unable to load household details.')}
+          </div>
+        `;
+        return;
+      }
+
+      const hh = data.household;
+      const members = hh.members || [];
+
+      document.getElementById('hh_members_badge').innerText = hh.household_code || 'HH';
+      document.getElementById('hh_members_family_name').innerText = hh.family_name || 'Family';
+      document.getElementById('hh_members_rep_info').innerHTML = `Representative: <strong>${escapeHtml(hh.head_full_name || '—')}</strong> ${hh.head_phone ? '• ' + escapeHtml(hh.head_phone) : ''}`;
+      document.getElementById('hh_members_purok_code').innerText = `${hh.purok_name || '—'} (${hh.household_code || '—'})`;
+      document.getElementById('hh_members_count_pill').innerText = `${members.length} Members`;
+
+      if (members.length === 0) {
+        document.getElementById('hh_members_table_box').innerHTML = `
+          <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-text-muted);">
+            No individual family members recorded for this household.
+          </div>
+        `;
+        return;
+      }
+
+      let mHtml = `
+        <table class="data-table" style="font-size:11px;width:100%;margin:0;border-collapse:collapse;">
+          <thead>
+            <tr style="position:sticky;top:0;background:var(--color-surface-subtle);z-index:2;border-bottom:1px solid var(--color-border);">
+              <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:35px;">#</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Member Name</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:95px;">Relationship</th>
+              <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:65px;">Gender</th>
+              <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:55px;">Age</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:110px;">Classification</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      members.forEach((m, idx) => {
+        const isRep = (m.is_authorized_rep == 1 || m.is_authorized_rep === '1' || m.is_authorized_rep === true);
+        const tags = [];
+        if (m.is_senior == 1 || m.is_senior === '1') tags.push('Senior');
+        if (m.is_minor == 1 || m.is_minor === '1') tags.push('Minor');
+        if (m.is_pwd == 1 || m.is_pwd === '1') tags.push('PWD');
+
+        const tagsHtml = tags.length > 0 
+          ? tags.map(t => `<span style="display:inline-block;padding:1px 5px;font-size:9.5px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);border:1px solid var(--color-border);border-radius:3px;margin-right:3px;">${t}</span>`).join('')
+          : '<span style="font-size:10px;color:var(--color-text-muted);">Regular</span>';
+
+        mHtml += `
+          <tr style="border-bottom:1px solid var(--color-border);">
+            <td style="padding:6px 10px;text-align:center;font-size:10.5px;color:var(--color-text-secondary);">${idx + 1}</td>
+            <td style="padding:6px 10px;">
+              <div style="font-weight:600;color:var(--color-text);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span>${escapeHtml(m.full_name || '—')}</span>
+                ${isRep ? '<span style="font-size:9px;color:var(--color-primary);background:var(--color-surface-subtle);border:1px solid var(--color-border);padding:1px 5px;border-radius:3px;font-weight:600;">Representative</span>' : ''}
+              </div>
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">${escapeHtml(m.relationship || 'Member')}</td>
+            <td style="padding:6px 10px;text-align:center;font-size:10.5px;color:var(--color-text-secondary);">${escapeHtml(m.gender || '—')}</td>
+            <td style="padding:6px 10px;text-align:center;font-size:10.5px;color:var(--color-text);">${m.age !== null && m.age !== undefined ? m.age : '—'}</td>
+            <td style="padding:6px 10px;">${tagsHtml}</td>
+          </tr>
+        `;
+      });
+
+      mHtml += '</tbody></table>';
+      document.getElementById('hh_members_table_box').innerHTML = mHtml;
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById('hh_members_table_box').innerHTML = `
+        <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-danger);">
+          Failed to load family members due to network error.
+        </div>
+      `;
     });
   }
 
