@@ -1,6 +1,7 @@
 <?php
 // ============================================================================
 // Function: Preparedness Activities - Toggle Attendee Attendance (Attended / Void)
+// Supports both existing attendee IDs and unlisted household families (inserts on mark)
 // ============================================================================
 
 require_once __DIR__ . '/../../config/config.php';
@@ -27,25 +28,52 @@ if (!in_array($role, ['icdrrmo', 'barangay_head'], true)) {
 
 $attendeeId = (int)($_POST['attendee_id'] ?? ($_POST['id'] ?? ($_GET['attendee_id'] ?? ($_GET['id'] ?? 0))));
 $actId = (int)($_POST['activity_id'] ?? ($_GET['activity_id'] ?? 0));
+$residentName = trim($_POST['resident_name'] ?? '');
+$phone = trim($_POST['phone'] ?? '');
 
-if (!$attendeeId) {
-    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Attendee ID is required.'], 400);
-    redirectWithFlash($returnUrl, 'error', 'Attendee ID is required.');
+// Ensure 'attended' and 'is_archived' columns exist in event_attendees
+$colsAtt = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'attended'")->fetchAll();
+if (empty($colsAtt)) {
+    $db->exec("ALTER TABLE event_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
+}
+$colsArch = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'is_archived'")->fetchAll();
+if (empty($colsArch)) {
+    $db->exec("ALTER TABLE event_attendees ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER phone");
 }
 
-// Fetch attendee record
-$stmt = $db->prepare("SELECT * FROM event_attendees WHERE id = ?");
-$stmt->execute([$attendeeId]);
-$attendee = $stmt->fetch(PDO::FETCH_ASSOC);
+// Case 1: Attendee ID provided
+if ($attendeeId > 0) {
+    $stmt = $db->prepare("SELECT * FROM event_attendees WHERE id = ?");
+    $stmt->execute([$attendeeId]);
+    $attendee = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$attendee) {
-    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Participant record not found.'], 404);
-    redirectWithFlash($returnUrl, 'error', 'Participant record not found.');
+    if (!$attendee) {
+        if ($isAjax) jsonResponse(['success' => false, 'message' => 'Participant record not found.'], 404);
+        redirectWithFlash($returnUrl, 'error', 'Participant record not found.');
+    }
+
+    $resolvedActId = $actId ?: (int)$attendee['activity_id'];
+} else {
+    // Case 2: Household family not yet in event_attendees table
+    if (!$actId || empty($residentName)) {
+        if ($isAjax) jsonResponse(['success' => false, 'message' => 'Valid activity ID and participant name are required.'], 400);
+        redirectWithFlash($returnUrl, 'error', 'Valid activity ID and participant name are required.');
+    }
+
+    $resolvedActId = $actId;
+
+    // Check if an attendee record already exists for this event matching the resident name or phone
+    $checkSql = "SELECT * FROM event_attendees WHERE activity_id = ? AND (resident_name = ? OR (phone != '' AND phone = ?)) LIMIT 1";
+    $chkStmt = $db->prepare($checkSql);
+    $chkStmt->execute([$resolvedActId, $residentName, $phone]);
+    $attendee = $chkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($attendee) {
+        $attendeeId = (int)$attendee['id'];
+    }
 }
 
-$resolvedActId = $actId ?: (int)$attendee['activity_id'];
-
-// Fetch activity to check jurisdiction
+// Fetch event to verify permissions
 $actStmt = $db->prepare("SELECT * FROM events WHERE id = ?");
 $actStmt->execute([$resolvedActId]);
 $act = $actStmt->fetch(PDO::FETCH_ASSOC);
@@ -60,23 +88,27 @@ if ($role === 'barangay_head' && (int)$act['barangay_id'] !== (int)$user['barang
     redirectWithFlash($returnUrl, 'error', 'Unauthorized.');
 }
 
-// Ensure 'attended' column exists
-$colsAtt = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'attended'")->fetchAll();
-if (empty($colsAtt)) {
-    $db->exec("ALTER TABLE event_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
-}
-
-// Determine target attendance state:
+// Determine target attendance state (1 = Attended, 0 = Void)
 if (isset($_POST['attended']) && $_POST['attended'] !== '') {
     $targetAttended = (int)$_POST['attended'] === 1 ? 1 : 0;
 } else {
-    $currentAtt = (int)($attendee['attended'] ?? 0);
+    $currentAtt = $attendee ? (int)($attendee['attended'] ?? 0) : 0;
     $targetAttended = $currentAtt === 1 ? 0 : 1;
 }
 
-// Update attendee record
-$updStmt = $db->prepare("UPDATE event_attendees SET attended = ? WHERE id = ?");
-$updStmt->execute([$targetAttended, $attendeeId]);
+if ($attendeeId > 0) {
+    // Update existing attendee record
+    $updStmt = $db->prepare("UPDATE event_attendees SET attended = ? WHERE id = ?");
+    $updStmt->execute([$targetAttended, $attendeeId]);
+} else {
+    // Insert new attendee record for this household family
+    $insStmt = $db->prepare("
+        INSERT INTO event_attendees (activity_id, resident_name, phone, attended, registered_at, is_archived)
+        VALUES (?, ?, ?, ?, NOW(), 0)
+    ");
+    $insStmt->execute([$resolvedActId, $residentName, $phone, $targetAttended]);
+    $attendeeId = (int)$db->lastInsertId();
+}
 
 // Recalculate remaining attendees and attendance count
 $cntStmt = $db->prepare("SELECT COUNT(*) AS total_reg, COALESCE(SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END), 0) AS total_att FROM event_attendees WHERE activity_id = ?");
