@@ -306,6 +306,69 @@ try {
             }
         }
 
+        // Table: evacuation_family_checkins (Household & Family Tracking in Evacuation Centers)
+        if (!in_array('evacuation_family_checkins', $existingTables, true)) {
+            echo "  [+] Creating table `evacuation_family_checkins`...\n";
+            $pdo->exec("
+                CREATE TABLE `evacuation_family_checkins` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `evacuation_area_id` int(11) NOT NULL,
+                  `household_id` int(11) NOT NULL,
+                  `family_name` varchar(150) NOT NULL,
+                  `household_code` varchar(50) NOT NULL,
+                  `head_full_name` varchar(150) NOT NULL,
+                  `head_phone` varchar(30) DEFAULT NULL,
+                  `purok_name` varchar(100) NOT NULL,
+                  `room_tent_number` varchar(100) DEFAULT NULL,
+                  `members_count` int(11) NOT NULL DEFAULT 1,
+                  `seniors_count` int(11) NOT NULL DEFAULT 0,
+                  `minors_count` int(11) NOT NULL DEFAULT 0,
+                  `pwd_count` int(11) NOT NULL DEFAULT 0,
+                  `special_medical_needs` varchar(255) DEFAULT NULL,
+                  `relief_packs_given` int(11) NOT NULL DEFAULT 0,
+                  `hot_meals_claimed` int(11) NOT NULL DEFAULT 0,
+                  `status` enum('Sheltered','Transferred','Decamped / Returned Home') NOT NULL DEFAULT 'Sheltered',
+                  `checkin_time` datetime DEFAULT current_timestamp(),
+                  `checkout_time` datetime DEFAULT NULL,
+                  `checked_in_by` varchar(100) DEFAULT NULL,
+                  `notes` text DEFAULT NULL,
+                  `created_at` datetime DEFAULT current_timestamp(),
+                  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+                  PRIMARY KEY (`id`),
+                  KEY `idx_evac_area` (`evacuation_area_id`),
+                  KEY `idx_hh_id` (`household_id`),
+                  KEY `idx_status` (`status`),
+                  CONSTRAINT `fk_evac_checkins_area` FOREIGN KEY (`evacuation_area_id`) REFERENCES `evacuation_areas` (`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+            $existingTables[] = 'evacuation_family_checkins';
+        }
+
+        // Table: evacuation_relief_logs (Relief Packs & Hot Meals Given to Evacuee Families)
+        if (!in_array('evacuation_relief_logs', $existingTables, true)) {
+            echo "  [+] Creating table `evacuation_relief_logs`...\n";
+            $pdo->exec("
+                CREATE TABLE `evacuation_relief_logs` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `checkin_id` int(11) NOT NULL,
+                  `evacuation_area_id` int(11) NOT NULL,
+                  `household_id` int(11) NOT NULL,
+                  `family_name` varchar(150) NOT NULL,
+                  `item_type` varchar(100) NOT NULL DEFAULT 'Family Food Pack',
+                  `quantity` int(11) NOT NULL DEFAULT 1,
+                  `unit` varchar(50) NOT NULL DEFAULT 'packs',
+                  `distributed_by` varchar(100) DEFAULT NULL,
+                  `notes` varchar(255) DEFAULT NULL,
+                  `created_at` datetime DEFAULT current_timestamp(),
+                  PRIMARY KEY (`id`),
+                  KEY `idx_erl_checkin` (`checkin_id`),
+                  KEY `idx_erl_area` (`evacuation_area_id`),
+                  CONSTRAINT `fk_erl_checkin` FOREIGN KEY (`checkin_id`) REFERENCES `evacuation_family_checkins` (`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+            $existingTables[] = 'evacuation_relief_logs';
+        }
+
         // Table: hazard_type_options (Multi-purok hazard scoping)
         if (in_array('hazard_type_options', $existingTables, true)) {
             if (!$hasColumn($pdo, 'hazard_type_options', 'purok_id')) {

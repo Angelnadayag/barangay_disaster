@@ -75,6 +75,74 @@ foreach ($allCenters as $c) {
 
 $occupancyRate = ($totalCapacityInd > 0) ? round(($totalSheltered / $totalCapacityInd) * 100, 1) : 0;
 
+// Evacuee Family Check-In Telemetry & Roster Queries
+$checkinStmt = $db->prepare("
+    SELECT c.*, ea.name AS center_name, ph.housing_type, ph.economic_status, ph.evacuation_priority
+    FROM evacuation_family_checkins c
+    JOIN evacuation_areas ea ON c.evacuation_area_id = ea.id
+    LEFT JOIN purok_households ph ON c.household_id = ph.id
+    WHERE ea.barangay_id = ?
+    ORDER BY c.checkin_time DESC
+");
+$checkinStmt->execute([$barangayId]);
+$allCheckins = $checkinStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$centerCheckinStats = [];
+$totalShelteredFamilies = 0;
+$totalShelteredPwd = 0;
+$totalShelteredSeniors = 0;
+$totalReliefGiven = 0;
+$totalHotMealsClaimed = 0;
+
+foreach ($allCheckins as $ck) {
+    $cid = (int)$ck['evacuation_area_id'];
+    if (!isset($centerCheckinStats[$cid])) {
+        $centerCheckinStats[$cid] = [
+            'active_families' => 0,
+            'active_individuals' => 0,
+            'pwd_count' => 0,
+            'seniors_count' => 0,
+            'minors_count' => 0,
+            'relief_packs' => 0,
+            'hot_meals' => 0,
+            'decamped_families' => 0
+        ];
+    }
+    if ($ck['status'] === 'Sheltered') {
+        $centerCheckinStats[$cid]['active_families']++;
+        $centerCheckinStats[$cid]['active_individuals'] += (int)$ck['members_count'];
+        $centerCheckinStats[$cid]['pwd_count'] += (int)$ck['pwd_count'];
+        $centerCheckinStats[$cid]['seniors_count'] += (int)$ck['seniors_count'];
+        $centerCheckinStats[$cid]['minors_count'] += (int)$ck['minors_count'];
+        $totalShelteredFamilies++;
+        $totalShelteredPwd += (int)$ck['pwd_count'];
+        $totalShelteredSeniors += (int)$ck['seniors_count'];
+    } else {
+        $centerCheckinStats[$cid]['decamped_families']++;
+    }
+    $centerCheckinStats[$cid]['relief_packs'] += (int)$ck['relief_packs_given'];
+    $centerCheckinStats[$cid]['hot_meals'] += (int)$ck['hot_meals_claimed'];
+    $totalReliefGiven += (int)$ck['relief_packs_given'];
+    $totalHotMealsClaimed += (int)$ck['hot_meals_claimed'];
+}
+
+// Fetch all registered households in this barangay for check-in picker
+$hhStmt = $db->prepare("
+    SELECT id, household_code, family_name, head_full_name, head_phone, purok_name,
+           total_members, seniors_count, minors_count, pwd_count,
+           housing_type, economic_status, evacuation_priority, emergency_notes
+    FROM purok_households
+    WHERE barangay_id = ? AND status = 'active'
+    ORDER BY purok_name ASC, family_name ASC
+");
+$hhStmt->execute([$barangayId]);
+$allHouseholds = $hhStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch Hinaplanon Puroks
+$purokStmt = $db->prepare("SELECT id, name FROM puroks WHERE barangay_id = ? ORDER BY name ASC");
+$purokStmt->execute([$barangayId]);
+$allPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
+
 $pageTitle = "Manage Evacuation Areas — Barangay " . $brgyName;
 require_once __DIR__ . '/../layouts/header.php';
 ?>
@@ -174,7 +242,7 @@ require_once __DIR__ . '/../layouts/header.php';
 </div>
 
 <!-- Key Performance Metrics Grid -->
-<div class="metrics-grid" style="margin-bottom:var(--space-4);">
+<div class="metrics-grid" style="grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:12px;margin-bottom:var(--space-4);">
   <div class="metric-card">
     <div class="metric-header">
       <span class="metric-label">Registered Shelters</span>
@@ -186,7 +254,7 @@ require_once __DIR__ . '/../layouts/header.php';
 
   <div class="metric-card">
     <div class="metric-header">
-      <span class="metric-label">Currently Sheltering</span>
+      <span class="metric-label">Open Safe Camps</span>
       <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
     </div>
     <div class="metric-value" style="color:<?= $activeCenters > 0 ? 'var(--color-danger)' : 'var(--color-success)' ?>;">
@@ -197,20 +265,38 @@ require_once __DIR__ . '/../layouts/header.php';
 
   <div class="metric-card">
     <div class="metric-header">
-      <span class="metric-label">Sheltered Evacuees</span>
-      <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+      <span class="metric-label">Sheltered Families</span>
+      <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
     </div>
-    <div class="metric-value"><?= number_format($totalSheltered) ?></div>
-    <div class="metric-meta">Of <?= number_format($totalCapacityInd) ?> Individual Capacity</div>
+    <div class="metric-value" style="color:var(--color-primary);"><?= number_format($totalShelteredFamilies) ?></div>
+    <div class="metric-meta">Of ~<?= number_format($totalCapacityFam) ?> Total Family Capacity</div>
   </div>
 
   <div class="metric-card">
     <div class="metric-header">
-      <span class="metric-label">Occupancy Load</span>
-      <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+      <span class="metric-label">Sheltered Individuals</span>
+      <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
     </div>
-    <div class="metric-value" style="color:var(--color-primary);"><?= $occupancyRate ?>%</div>
-    <div class="metric-meta">~<?= number_format($totalCapacityFam) ?> Total Family Capacity</div>
+    <div class="metric-value"><?= number_format($totalSheltered) ?></div>
+    <div class="metric-meta"><?= $occupancyRate ?>% of <?= number_format($totalCapacityInd) ?> Ind. Cap</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-header">
+      <span class="metric-label">Vulnerable Sheltered</span>
+      <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+    </div>
+    <div class="metric-value" style="color:#E65100;"><?= number_format($totalShelteredPwd) ?> PWD</div>
+    <div class="metric-meta"><?= number_format($totalShelteredSeniors) ?> Seniors in Camps</div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-header">
+      <span class="metric-label">Relief Distributed</span>
+      <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <div class="metric-value" style="color:var(--color-secondary);"><?= number_format($totalReliefGiven) ?> Packs</div>
+    <div class="metric-meta"><?= number_format($totalHotMealsClaimed) ?> Hot Meals Claimed</div>
   </div>
 </div>
 
@@ -293,6 +379,18 @@ require_once __DIR__ . '/../layouts/header.php';
       <?php
         $pct = $center['capacity_individuals'] > 0 ? min(100, round(($center['current_evacuees_count'] / $center['capacity_individuals']) * 100, 1)) : 0;
         $barColor = $pct >= 90 ? 'var(--color-danger)' : ($pct >= 60 ? 'var(--color-warning)' : 'var(--color-secondary)');
+
+        $cStats = $centerCheckinStats[$center['id']] ?? [
+            'active_families' => 0,
+            'active_individuals' => 0,
+            'pwd_count' => 0,
+            'seniors_count' => 0,
+            'relief_packs' => 0,
+            'hot_meals' => 0
+        ];
+        $famCap = max(1, (int)$center['capacity_families']);
+        $famPct = min(100, round(($cStats['active_families'] / $famCap) * 100, 1));
+        $famBarColor = $famPct >= 90 ? 'var(--color-danger)' : ($famPct >= 60 ? 'var(--color-warning)' : 'var(--color-secondary)');
       ?>
       <div class="evac-card" id="center-card-<?= (int)$center['id'] ?>">
         <div>
@@ -321,20 +419,45 @@ require_once __DIR__ . '/../layouts/header.php';
             </button>
           </div>
 
-          <!-- Occupancy Bar -->
-          <div style="margin-bottom:12px;background:var(--color-surface-subtle);padding:8px 10px;border-radius:8px;border:1px solid var(--color-border-light);">
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-bottom:4px;">
-              <span style="font-weight:600;color:var(--color-primary);">Current Occupancy</span>
-              <span style="font-family:var(--font-secondary);font-weight:700;color:<?= $barColor ?>;">
-                <?= number_format($center['current_evacuees_count']) ?> / <?= number_format($center['capacity_individuals']) ?> (<?= $pct ?>%)
-              </span>
+          <!-- Dual Occupancy Bars: Individuals & Household Families -->
+          <div style="margin-bottom:12px;background:var(--color-surface-subtle);padding:8px 10px;border-radius:8px;border:1px solid var(--color-border-light);display:flex;flex-direction:column;gap:8px;">
+            <!-- Individual Occupancy -->
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-bottom:3px;">
+                <span style="font-weight:600;color:var(--color-primary);">Individual Occupancy</span>
+                <span style="font-family:var(--font-secondary);font-weight:700;color:<?= $barColor ?>;">
+                  <?= number_format($center['current_evacuees_count']) ?> / <?= number_format($center['capacity_individuals']) ?> (<?= $pct ?>%)
+                </span>
+              </div>
+              <div style="width:100%;height:5px;background:#D9E0E3;border-radius:3px;overflow:hidden;">
+                <div style="width:<?= $pct ?>%;height:100%;background:<?= $barColor ?>;transition:width 0.3s ease;"></div>
+              </div>
             </div>
-            <div style="width:100%;height:6px;background:#D9E0E3;border-radius:3px;overflow:hidden;">
-              <div style="width:<?= $pct ?>%;height:100%;background:<?= $barColor ?>;transition:width 0.3s ease;"></div>
+
+            <!-- Family Occupancy -->
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-bottom:3px;">
+                <span style="font-weight:600;color:var(--color-secondary);">Household Families</span>
+                <span style="font-family:var(--font-secondary);font-weight:700;color:<?= $famBarColor ?>;">
+                  <?= number_format($cStats['active_families']) ?> / <?= number_format($center['capacity_families']) ?> (<?= $famPct ?>%)
+                </span>
+              </div>
+              <div style="width:100%;height:5px;background:#D9E0E3;border-radius:3px;overflow:hidden;">
+                <div style="width:<?= $famPct ?>%;height:100%;background:<?= $famBarColor ?>;transition:width 0.3s ease;"></div>
+              </div>
             </div>
-            <div style="font-size:8px;color:var(--color-text-muted);margin-top:4px;">
-              Family Capacity: ~<?= number_format($center['capacity_families']) ?> Families (NDRRMC shelter standard)
-            </div>
+          </div>
+
+          <!-- Demographics & Relief Provision Strip -->
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;font-size:9.5px;">
+            <span class="badge badge-primary" style="font-size:9.5px;">🏠 <?= $cStats['active_families'] ?> Families</span>
+            <?php if ($cStats['pwd_count'] > 0): ?>
+              <span class="badge badge-warning" style="font-size:9.5px;"><?= $cStats['pwd_count'] ?> PWD</span>
+            <?php endif; ?>
+            <?php if ($cStats['seniors_count'] > 0): ?>
+              <span class="badge badge-neutral" style="font-size:9.5px;"><?= $cStats['seniors_count'] ?> Seniors</span>
+            <?php endif; ?>
+            <span class="badge badge-neutral" style="font-size:9.5px;">📦 <?= $cStats['relief_packs'] ?> Food Packs</span>
           </div>
 
           <!-- Road Accessibility -->
@@ -363,17 +486,23 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
         </div>
 
-        <!-- Card Action Toolbar (Full CRUD) -->
-        <div style="display:flex;gap:6px;border-top:1px solid var(--color-border-light);padding-top:10px;justify-content:flex-end;">
-          <button type="button" class="btn btn-outline btn-sm" onclick="openUpdateOccupancyModal(<?= htmlspecialchars(json_encode($center), ENT_QUOTES, 'UTF-8') ?>)" title="Update sheltered evacuees and status">
-            📊 Headcount
+        <!-- Card Action Toolbar (Full CRUD + Manage Families CTA) -->
+        <div style="display:flex;gap:6px;border-top:1px solid var(--color-border-light);padding-top:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="btn btn-primary btn-sm" onclick="openEvacueeFamiliesModal(<?= (int)$center['id'] ?>)" style="font-size:10.5px;font-weight:600;display:flex;align-items:center;gap:4px;" title="Admit, track, and manage sheltered household families">
+            <span>🏠</span>
+            <span>Manage Families (<?= $cStats['active_families'] ?>)</span>
           </button>
-          <button type="button" class="btn btn-outline btn-sm" onclick="openEditEvacModal(<?= htmlspecialchars(json_encode($center), ENT_QUOTES, 'UTF-8') ?>)" title="Edit center details and GPS pinpoint">
-            ✏️ Edit
-          </button>
-          <button type="button" class="btn btn-outline btn-sm" style="color:var(--color-danger);border-color:#F8B4B4;" onclick="openDeleteEvacModal(<?= (int)$center['id'] ?>, '<?= clean(addslashes($center['name'])) ?>')" title="Delete center">
-            🗑️ Delete
-          </button>
+          <div style="display:flex;gap:4px;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="openUpdateOccupancyModal(<?= htmlspecialchars(json_encode($center), ENT_QUOTES, 'UTF-8') ?>)" title="Update sheltered evacuees headcount">
+              📊 Headcount
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="openEditEvacModal(<?= htmlspecialchars(json_encode($center), ENT_QUOTES, 'UTF-8') ?>)" title="Edit center details and GPS pinpoint">
+              ✏️ Edit
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" style="color:var(--color-danger);border-color:#F8B4B4;" onclick="openDeleteEvacModal(<?= (int)$center['id'] ?>, '<?= clean(addslashes($center['name'])) ?>')" title="Delete center">
+              🗑️
+            </button>
+          </div>
         </div>
       </div>
     <?php endforeach; ?>
@@ -1137,5 +1266,8 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 </script>
+
+<!-- Evacuee Families Directory & Management Modals Component -->
+<?php require_once __DIR__ . '/components/evacuation_families_modal.php'; ?>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>
