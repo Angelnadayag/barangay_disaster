@@ -23,7 +23,7 @@ if (!in_array($filterTab, ['attending', 'missed', 'completed'], true)) {
 $searchQuery = trim($_GET['q'] ?? '');
 
 // Fetch Resident's Registered Event IDs
-$myRsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_id = ? OR (phone != '' AND phone = ?)");
+$myRsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE (is_archived = 0 OR is_archived IS NULL) AND (user_id = ? OR (phone != '' AND phone = ?))");
 $myRsvpStmt->execute([$userId, $user['phone'] ?? '']);
 $myRegisteredEventIds = array_map('intval', $myRsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 

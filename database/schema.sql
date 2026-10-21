@@ -19,6 +19,7 @@ CREATE TABLE `event_attendees` (
   `resident_name` varchar(150) NOT NULL,
   `attended` tinyint(1) NOT NULL DEFAULT 1,
   `phone` varchar(30) NOT NULL,
+  `is_archived` tinyint(1) NOT NULL DEFAULT 0,
   `registered_at` datetime DEFAULT current_timestamp(),
   `sms_status` enum('sent','failed','pending') DEFAULT 'sent',
   `sms_message` text DEFAULT NULL,

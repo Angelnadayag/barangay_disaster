@@ -47,17 +47,22 @@ try {
     $upd = $db->prepare("UPDATE events SET is_archived = 0 WHERE id = ?");
     $upd->execute([$id]);
 
-    logSystemEvent('RESTORE_ACTIVITY', 'Preparedness', "Restored event #$id: {$act['title']}");
+    // Also restore all attendees / participant families/members
+    $updAtt = $db->prepare("UPDATE event_attendees SET is_archived = 0 WHERE activity_id = ?");
+    $updAtt->execute([$id]);
 
+    logSystemEvent('RESTORE_ACTIVITY', 'Preparedness', "Restored event #$id: {$act['title']} and its registered participant(s)");
+
+    $msg = "Event '{$act['title']}' and its registered participant families/members restored to Active.";
     if ($isAjax) {
         jsonResponse([
             'success' => true,
-            'message' => "Event '{$act['title']}' restored successfully.",
+            'message' => $msg,
             'id' => $id
         ]);
     }
 
-    redirectWithFlash($returnUrl, 'success', "Event '{$act['title']}' restored successfully.");
+    redirectWithFlash($returnUrl, 'success', $msg);
 } catch (Exception $e) {
     if ($isAjax) jsonResponse(['success' => false, 'message' => 'Database Error: ' . $e->getMessage()], 500);
     redirectWithFlash($returnUrl, 'error', 'Failed to restore event: ' . $e->getMessage());

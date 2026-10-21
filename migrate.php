@@ -505,6 +505,14 @@ try {
             }
         }
 
+        // Table: event_attendees (Support attendee archive status)
+        if (in_array('event_attendees', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'event_attendees', 'is_archived')) {
+                echo "  [+] Adding column `is_archived` to `event_attendees`...\n";
+                $pdo->exec("ALTER TABLE `event_attendees` ADD COLUMN `is_archived` TINYINT(1) NOT NULL DEFAULT 0 AFTER `phone`;");
+            }
+        }
+
         if ($seedOnly) {
             if (file_exists($seedsFile)) {
                 echo "Step 3: Re-seeding database from seeds.sql (--seed)...\n";

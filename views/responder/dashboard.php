@@ -101,7 +101,7 @@ $scheduleEvents = $drillStmt->fetchAll(PDO::FETCH_ASSOC);
 // Responder RSVP / Attendance
 $myRsvps = [];
 if (!empty($scheduleEvents)) {
-    $rsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_id = ? OR (phone != '' AND phone = ?)");
+    $rsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE (is_archived = 0 OR is_archived IS NULL) AND (user_id = ? OR (phone != '' AND phone = ?))");
     $rsvpStmt->execute([(int)$user['id'], $user['phone'] ?? '']);
     $myRsvps = $rsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 }

@@ -134,7 +134,7 @@ $scheduleEvents = $actStmt->fetchAll(PDO::FETCH_ASSOC);
 // User RSVP status
 $myRsvps = [];
 if (!empty($scheduleEvents)) {
-    $rsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_id = ? OR (phone != '' AND phone = ?)");
+    $rsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE (is_archived = 0 OR is_archived IS NULL) AND (user_id = ? OR (phone != '' AND phone = ?))");
     $rsvpStmt->execute([(int)$user['id'], $user['phone'] ?? '']);
     $myRsvps = array_map('intval', $rsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 }

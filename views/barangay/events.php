@@ -943,6 +943,18 @@ require_once __DIR__ . '/../layouts/header.php';
                   </svg>
                   View
                 </button>
+                <?php if ($isArchived): ?>
+                  <button type="button" class="btn btn-outline btn-sm"
+                    onclick='confirmDeleteActivity(<?= json_encode($act) ?>, <?= count($actAttendees) ?>)'
+                    style="font-size:11px;padding:4px 8px;color:#DC2626;border-color:#FCA5A5;display:inline-flex;align-items:center;gap:3px;"
+                    title="Permanently Delete Event and Registered Attendees">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Delete
+                  </button>
+                <?php endif; ?>
               </div>
             </td>
           </tr>
@@ -1046,7 +1058,8 @@ require_once __DIR__ . '/../layouts/header.php';
                 style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
               <span>All Puroks (Barangay-Wide)</span>
             </label>
-            <span class="badge badge-info" id="create_all_puroks_badge" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
+            <span class="badge badge-info" id="create_all_puroks_badge"
+              style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
               (<?= number_format($totalPurokPopulation) ?> Residents)</span>
           </div>
 
@@ -1058,11 +1071,12 @@ require_once __DIR__ . '/../layouts/header.php';
               <input type="checkbox" id="create_count_by_families"
                 onchange="onCountingUnitCheckboxChange('create', this.checked)"
                 style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
-              <span>Count by <strong>House Families</strong> (1 per Household Head) <span style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
+              <span>Count by <strong>House Families</strong> (1 per Household Head) <span
+                  style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
             </label>
             <span id="create_counting_unit_badge" class="badge"
               style="font-size:9.5px;padding:2px 7px;background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">
-              👥 All Members
+              All Members
             </span>
           </div>
 
@@ -1083,15 +1097,17 @@ require_once __DIR__ . '/../layouts/header.php';
           <div id="create_purok_checkbox_list"
             style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
             <?php foreach ($barangayPuroks as $p): ?>
-              <?php 
-                $pPop = (int) ($p['population'] ?? 0); 
-                $pHouseholds = (int) ($p['households'] ?? 0);
+              <?php
+              $pPop = (int) ($p['population'] ?? 0);
+              $pHouseholds = (int) ($p['households'] ?? 0);
               ?>
-              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>"
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+                data-households="<?= $pHouseholds ?>"
                 style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
                 <div style="display:flex;align-items:center;gap:6px;min-width:0;">
                   <input type="checkbox" class="create-purok-cb" value="<?= clean($p['name']) ?>"
-                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked onchange="onSinglePurokChange('create')"
+                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked
+                    onchange="onSinglePurokChange('create')"
                     style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
                   <span
                     style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
@@ -1099,7 +1115,7 @@ require_once __DIR__ . '/../layouts/header.php';
                 <span class="create-purok-pill" data-pop="<?= $pPop ?>" data-hh="<?= $pHouseholds ?>"
                   style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;"
                   title="Recorded Population">
-                  👥 <?= number_format($pPop) ?>
+                  <?= number_format($pPop) ?>
                 </span>
               </label>
             <?php endforeach; ?>
@@ -1151,7 +1167,8 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
           <div class="form-group">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <label class="form-label form-label-required" id="create_target_label" style="margin:0;">Target Residents</label>
+              <label class="form-label form-label-required" id="create_target_label" style="margin:0;">Target
+                Residents</label>
               <span id="create_target_pop_hint"
                 style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
                 Recorded Pop: <?= number_format($totalPurokPopulation) ?>
@@ -1283,7 +1300,8 @@ require_once __DIR__ . '/../layouts/header.php';
                 style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
               <span>All Puroks (Barangay-Wide)</span>
             </label>
-            <span class="badge badge-info" id="edit_all_puroks_badge" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
+            <span class="badge badge-info" id="edit_all_puroks_badge"
+              style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
               (<?= number_format($totalPurokPopulation) ?> Residents)</span>
           </div>
 
@@ -1295,11 +1313,12 @@ require_once __DIR__ . '/../layouts/header.php';
               <input type="checkbox" id="edit_count_by_families"
                 onchange="onCountingUnitCheckboxChange('edit', this.checked)"
                 style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
-              <span>Count by <strong>House Families</strong> (1 per Household Head) <span style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
+              <span>Count by <strong>House Families</strong> (1 per Household Head) <span
+                  style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
             </label>
             <span id="edit_counting_unit_badge" class="badge"
               style="font-size:9.5px;padding:2px 7px;background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">
-              👥 All Members
+              All Members
             </span>
           </div>
 
@@ -1320,15 +1339,17 @@ require_once __DIR__ . '/../layouts/header.php';
           <div id="edit_purok_checkbox_list"
             style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
             <?php foreach ($barangayPuroks as $p): ?>
-              <?php 
-                $pPop = (int) ($p['population'] ?? 0); 
-                $pHouseholds = (int) ($p['households'] ?? 0);
+              <?php
+              $pPop = (int) ($p['population'] ?? 0);
+              $pHouseholds = (int) ($p['households'] ?? 0);
               ?>
-              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>"
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+                data-households="<?= $pHouseholds ?>"
                 style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
                 <div style="display:flex;align-items:center;gap:6px;min-width:0;">
                   <input type="checkbox" class="edit-purok-cb" value="<?= clean($p['name']) ?>"
-                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked onchange="onSinglePurokChange('edit')"
+                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked
+                    onchange="onSinglePurokChange('edit')"
                     style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
                   <span
                     style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
@@ -1336,7 +1357,7 @@ require_once __DIR__ . '/../layouts/header.php';
                 <span class="edit-purok-pill" data-pop="<?= $pPop ?>" data-hh="<?= $pHouseholds ?>"
                   style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;"
                   title="Recorded Population">
-                  👥 <?= number_format($pPop) ?>
+                  <?= number_format($pPop) ?>
                 </span>
               </label>
             <?php endforeach; ?>
@@ -1384,7 +1405,8 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
           <div class="form-group">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <label class="form-label form-label-required" id="edit_target_label" style="margin:0;">Target Residents</label>
+              <label class="form-label form-label-required" id="edit_target_label" style="margin:0;">Target
+                Residents</label>
               <span id="edit_target_pop_hint"
                 style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
                 Recorded Pop: 0
@@ -1673,8 +1695,9 @@ require_once __DIR__ . '/../layouts/header.php';
           Are you sure you want to move the event <strong id="archive_act_name"></strong> to the Archives?
         </p>
         <div
-          style="font-size:11px;color:var(--color-text-muted);background:#FFFBEB;border:1px solid #FCD34D;border-radius:6px;padding:8px 10px;margin-top:10px;">
-          Archived events are kept for historical records and can be reviewed or restored anytime from the
+          style="font-size:11px;color:var(--color-text-muted);background:#FFFBEB;border:1px solid #FCD34D;border-radius:6px;padding:8px 10px;margin-top:10px;line-height:1.45;">
+          All registered participant families and household members for this event will also be archived with it.<br><br>
+          Archived events and participant records are kept for historical records and can be reviewed or restored anytime from the
           <strong>Archived Events</strong> tab.
         </div>
       </div>
@@ -1683,6 +1706,36 @@ require_once __DIR__ . '/../layouts/header.php';
           onclick="closeModal('archiveActivityModal')">Cancel</button>
         <button type="submit" class="btn btn-warning btn-sm"
           style="background:#D97706;border-color:#D97706;color:#fff;">Yes, Move to Archives</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Modal 3B-2: Confirm Delete Event & Attendees Permanently                  -->
+<!-- ========================================================================= -->
+<div class="modal-overlay" id="deleteActivityModal">
+  <div class="modal-dialog" style="max-width:460px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="font-size:14px;font-weight:700;color:#DC2626;">Permanently Delete Event</h3>
+      <button class="modal-close-btn" onclick="closeModal('deleteActivityModal')">&times;</button>
+    </div>
+    <form id="deleteActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/event/index.php">
+      <input type="hidden" name="action" value="delete">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
+      <input type="hidden" name="activity_id" id="delete_act_id">
+      <div class="modal-body">
+        <p style="font-size:12.5px;color:var(--color-text);line-height:1.5;">
+          Are you sure you want to permanently delete <strong id="delete_act_name"></strong>?
+        </p>
+        <div style="font-size:11px;color:#991B1B;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:6px;padding:9px 12px;margin-top:10px;line-height:1.45;">
+          <strong>Warning: This action cannot be undone.</strong><br>
+          This event and all its registered participant families, household members, and attendance records (<span id="delete_attendees_info">0 registered</span>) will be permanently deleted. (Barangay master household records will remain safe.)
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('deleteActivityModal')">Cancel</button>
+        <button type="submit" class="btn btn-sm" style="background:#DC2626;border-color:#DC2626;color:#fff;font-weight:600;">Yes, Delete Permanently</button>
       </div>
     </form>
   </div>
@@ -2245,12 +2298,12 @@ require_once __DIR__ . '/../layouts/header.php';
 
     if (badge) {
       if (isFamilies) {
-        badge.innerHTML = '🏠 House Families';
+        badge.innerHTML = ' House Families';
         badge.style.background = '#CCFBF1';
         badge.style.color = '#0F766E';
         badge.style.borderColor = '#5EEAD4';
       } else {
-        badge.innerHTML = '👥 All Members';
+        badge.innerHTML = ' All Members';
         badge.style.background = '#F1F5F9';
         badge.style.color = '#475569';
         badge.style.borderColor = '#CBD5E1';
@@ -2272,11 +2325,11 @@ require_once __DIR__ . '/../layouts/header.php';
     pillEls.forEach(pill => {
       if (isFamilies) {
         const hh = parseInt(pill.getAttribute('data-hh') || '0', 10);
-        pill.innerHTML = `🏠 ${hh.toLocaleString()} fam`;
+        pill.innerHTML = ` ${hh.toLocaleString()} fam`;
         pill.title = 'Recorded Household Families';
       } else {
         const pop = parseInt(pill.getAttribute('data-pop') || '0', 10);
-        pill.innerHTML = `👥 ${pop.toLocaleString()}`;
+        pill.innerHTML = ` ${pop.toLocaleString()}`;
         pill.title = 'Recorded Population';
       }
     });
@@ -3039,29 +3092,47 @@ require_once __DIR__ . '/../layouts/header.php';
     let leftHtml = '';
     if (isArchived) {
       leftHtml = `
-      <form method="POST" action="<?= BASE_URL ?>/backend/functions/event/index.php" style="margin:0;" onsubmit="return confirm('Restore this event back to active events?');">
-        <input type="hidden" name="action" value="restore">
-        <input type="hidden" name="activity_id" value="${act.id}">
-        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
-        <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 9px;color:var(--color-success);border-color:var(--color-success);" title="Restore Event to Active List">
-          Restore to Active
+      <div style="display:flex;gap:6px;align-items:center;">
+        <form method="POST" action="<?= BASE_URL ?>/backend/functions/event/index.php" style="margin:0;" onsubmit="return confirm('Restore this event back to active events?');">
+          <input type="hidden" name="action" value="restore">
+          <input type="hidden" name="activity_id" value="${act.id}">
+          <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
+          <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 9px;color:var(--color-success);border-color:var(--color-success);" title="Restore Event to Active List">
+            Restore to Active
+          </button>
+        </form>
+        <button type="button" class="btn btn-outline btn-sm" onclick="deleteCurrentEventFromOverview()" style="font-size:11px;padding:4px 9px;color:#DC2626;border-color:#FCA5A5;display:inline-flex;align-items:center;gap:3px;" title="Permanently Delete Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete Permanently
         </button>
-      </form>
+      </div>
     `;
     } else if (isCancelled || isCompleted) {
       leftHtml = `
-      <button type="button" class="btn btn-outline btn-sm" onclick="archiveCurrentAccomplishedEvent()" style="color:#D97706;border-color:#FCD34D;" title="Move Event to Archives">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-        Archive
-      </button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="archiveCurrentAccomplishedEvent()" style="color:#D97706;border-color:#FCD34D;" title="Move Event to Archives">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+          Archive
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="deleteCurrentEventFromOverview()" style="color:#DC2626;border-color:#FCA5A5;" title="Permanently Delete Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete
+        </button>
+      </div>
     `;
     } else {
-      // Scheduled or Ongoing: Cancel button on left
+      // Scheduled or Ongoing: Cancel button on left, plus Delete option
       leftHtml = `
-      <button type="button" class="btn btn-outline btn-sm" onclick="cancelCurrentEventFromOverview()" style="color:var(--color-danger);border-color:var(--color-danger);" title="Cancel Event">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-        Cancel Event
-      </button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="cancelCurrentEventFromOverview()" style="color:var(--color-danger);border-color:var(--color-danger);" title="Cancel Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+          Cancel Event
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="deleteCurrentEventFromOverview()" style="color:#DC2626;border-color:#FCA5A5;" title="Permanently Delete Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete
+        </button>
+      </div>
     `;
     }
     if (footerLeft) footerLeft.innerHTML = leftHtml;
@@ -3131,6 +3202,25 @@ require_once __DIR__ . '/../layouts/header.php';
     document.getElementById('archive_act_id').value = act.id;
     document.getElementById('archive_act_name').innerText = act.title;
     openModal('archiveActivityModal');
+  }
+
+  // 1B. Delete Button action from Event Modal
+  function deleteCurrentEventFromOverview() {
+    if (!currentAccomplishedAct) return;
+    const attendeesCount = currentAccomplishedAttendees ? currentAccomplishedAttendees.length : 0;
+    closeModal('accomplishedEventModal');
+    confirmDeleteActivity(currentAccomplishedAct, attendeesCount);
+  }
+
+  // Confirm Delete Event Modal
+  function confirmDeleteActivity(act, attendeesCount = 0) {
+    document.getElementById('delete_act_id').value = act.id;
+    document.getElementById('delete_act_name').innerText = act.title;
+    const countInfo = document.getElementById('delete_attendees_info');
+    if (countInfo) {
+      countInfo.innerText = attendeesCount + ' registered resident / family member' + (attendeesCount === 1 ? '' : 's');
+    }
+    openModal('deleteActivityModal');
   }
 
   // 2. Edit Button action (time & date CANNOT be edited)

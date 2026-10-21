@@ -45,7 +45,7 @@ if ($role === 'barangay_head' && (int)$act['barangay_id'] !== (int)$user['barang
 }
 
 try {
-    // Ensure column exists
+    // Ensure is_archived column exists in events
     $cols = $db->query("SHOW COLUMNS FROM events LIKE 'is_archived'")->fetchAll();
     if (empty($cols)) {
         $db->exec("ALTER TABLE events ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
@@ -54,17 +54,29 @@ try {
     $upd = $db->prepare("UPDATE events SET is_archived = 1 WHERE id = ?");
     $upd->execute([$id]);
 
-    logSystemEvent('ARCHIVE_ACTIVITY', 'Preparedness', "Archived event #$id: {$act['title']}");
+    // Ensure is_archived column exists in event_attendees and archive all attendee families/members
+    $colsAtt = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'is_archived'")->fetchAll();
+    if (empty($colsAtt)) {
+        $db->exec("ALTER TABLE event_attendees ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER phone");
+    }
 
+    $updAtt = $db->prepare("UPDATE event_attendees SET is_archived = 1 WHERE activity_id = ?");
+    $updAtt->execute([$id]);
+    $archivedAttendeesCount = $updAtt->rowCount();
+
+    logSystemEvent('ARCHIVE_ACTIVITY', 'Preparedness', "Archived event #$id: {$act['title']} and its $archivedAttendeesCount registered participant(s)");
+
+    $msg = "Event '{$act['title']}' and its registered participant families/members moved to Archives.";
     if ($isAjax) {
         jsonResponse([
             'success' => true,
-            'message' => "Event '{$act['title']}' moved to Archives.",
-            'id' => $id
+            'message' => $msg,
+            'id' => $id,
+            'archived_attendees_count' => $archivedAttendeesCount
         ]);
     }
 
-    redirectWithFlash($returnUrl, 'success', "Event '{$act['title']}' has been moved to Archives.");
+    redirectWithFlash($returnUrl, 'success', $msg);
 } catch (Exception $e) {
     if ($isAjax) jsonResponse(['success' => false, 'message' => 'Database Error: ' . $e->getMessage()], 500);
     redirectWithFlash($returnUrl, 'error', 'Failed to archive event: ' . $e->getMessage());
