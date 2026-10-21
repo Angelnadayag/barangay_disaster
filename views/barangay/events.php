@@ -72,15 +72,20 @@ $evacStmt = $db->prepare("
 $evacStmt->execute([$barangayId, $barangayId]);
 $evacuationVenues = $evacStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch active puroks for this barangay
+// Fetch active puroks for this barangay with official population records
 $purokStmt = $db->prepare("
-    SELECT id, name 
+    SELECT id, name, population, households 
     FROM puroks 
     WHERE (barangay_id = ? OR barangay_id IS NULL) AND (status = 'active' OR status IS NULL)
     ORDER BY name ASC
 ");
 $purokStmt->execute([$barangayId]);
 $barangayPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$totalPurokPopulation = 0;
+foreach ($barangayPuroks as $p) {
+  $totalPurokPopulation += (int)($p['population'] ?? 0);
+}
 
 // Status breakdown counts for current tab
 $baseWhere = "(barangay_id = ? OR barangay_id IS NULL)" . ($viewTab === 'archived' ? " AND is_archived = 1" : " AND (is_archived = 0 OR is_archived IS NULL)");
@@ -1005,7 +1010,7 @@ require_once __DIR__ . '/../layouts/header.php';
               <input type="checkbox" id="create_all_puroks_toggle" onchange="onAllPuroksToggleChange('create', this.checked)" checked style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
               <span>All Puroks (Barangay-Wide Drill)</span>
             </label>
-            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks Available</span>
+            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks (<?= number_format($totalPurokPopulation) ?> Residents)</span>
           </div>
 
           <!-- Quick Filter Input -->
@@ -1022,14 +1027,20 @@ require_once __DIR__ . '/../layouts/header.php';
 
           <!-- Multi-Select Checkboxes Grid -->
           <div id="create_purok_checkbox_list"
-            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
+            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
             <?php foreach ($barangayPuroks as $p): ?>
-              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>"
-                style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
-                <input type="checkbox" class="create-purok-cb" value="<?= clean($p['name']) ?>" checked
-                  onchange="onSinglePurokChange('create')"
-                  style="cursor:pointer;accent-color:var(--color-primary);margin:0;">
-                <span style="user-select:none;line-height:1.2;font-weight:500;"><?= clean($p['name']) ?></span>
+              <?php $pPop = (int)($p['population'] ?? 0); ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+                style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                  <input type="checkbox" class="create-purok-cb" value="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" checked
+                    onchange="onSinglePurokChange('create')"
+                    style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
+                  <span style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
+                </div>
+                <span style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;" title="Recorded Population">
+                  👥 <?= number_format($pPop) ?>
+                </span>
               </label>
             <?php endforeach; ?>
           </div>
@@ -1037,7 +1048,7 @@ require_once __DIR__ . '/../layouts/header.php';
           <!-- Live Selection Feedback Label & Hidden Submission Input -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
             <div id="create_purok_selection_summary" style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
-              Selected: All Puroks (Barangay-Wide)
+              Selected: All Puroks (Barangay-Wide) • <?= number_format($totalPurokPopulation) ?> residents
             </div>
             <div style="font-size:9.5px;color:var(--color-text-muted);">
               Select single, multi, or all
@@ -1078,8 +1089,16 @@ require_once __DIR__ . '/../layouts/header.php';
               placeholder="e.g. Barangay Disaster Committee, CDRRMO Facilitator" required>
           </div>
           <div class="form-group">
-            <label class="form-label form-label-required">Target Residents</label>
-            <input type="number" name="target_participants" class="form-control" min="5" value="60" required>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="form-label form-label-required" style="margin:0;">Target Residents</label>
+              <span id="create_target_pop_hint" style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
+                👥 Recorded Pop: <?= number_format($totalPurokPopulation) ?>
+              </span>
+            </div>
+            <input type="number" name="target_participants" id="create_target_participants" class="form-control" min="1" value="<?= (int)$totalPurokPopulation ?>" required>
+            <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
+              Auto-calculated from selected purok population records
+            </div>
           </div>
         </div>
 
@@ -1198,7 +1217,7 @@ require_once __DIR__ . '/../layouts/header.php';
               <input type="checkbox" id="edit_all_puroks_toggle" onchange="onAllPuroksToggleChange('edit', this.checked)" checked style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
               <span>All Puroks (Barangay-Wide Drill)</span>
             </label>
-            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks Available</span>
+            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks (<?= number_format($totalPurokPopulation) ?> Residents)</span>
           </div>
 
           <!-- Quick Filter Input for Edit -->
@@ -1215,14 +1234,20 @@ require_once __DIR__ . '/../layouts/header.php';
 
           <!-- Multi-Select Checkboxes Grid for Edit -->
           <div id="edit_purok_checkbox_list"
-            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
+            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
             <?php foreach ($barangayPuroks as $p): ?>
-              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>"
-                style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
-                <input type="checkbox" class="edit-purok-cb" value="<?= clean($p['name']) ?>" checked
-                  onchange="onSinglePurokChange('edit')"
-                  style="cursor:pointer;accent-color:var(--color-primary);margin:0;">
-                <span style="user-select:none;line-height:1.2;font-weight:500;"><?= clean($p['name']) ?></span>
+              <?php $pPop = (int)($p['population'] ?? 0); ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+                style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                  <input type="checkbox" class="edit-purok-cb" value="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" checked
+                    onchange="onSinglePurokChange('edit')"
+                    style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
+                  <span style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
+                </div>
+                <span style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;" title="Official Recorded Population">
+                  👥 <?= number_format($pPop) ?>
+                </span>
               </label>
             <?php endforeach; ?>
           </div>
@@ -1230,7 +1255,7 @@ require_once __DIR__ . '/../layouts/header.php';
           <!-- Live Selection Feedback Label & Hidden Submission Input for Edit -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
             <div id="edit_purok_selection_summary" style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
-              Selected: All Puroks (Barangay-Wide)
+              Selected: All Puroks (Barangay-Wide) • <?= number_format($totalPurokPopulation) ?> residents
             </div>
             <div style="font-size:9.5px;color:var(--color-text-muted);">
               Select single, multi, or all
@@ -1268,8 +1293,16 @@ require_once __DIR__ . '/../layouts/header.php';
             <input type="text" name="assigned_personnel" id="edit_act_personnel" class="form-control" required>
           </div>
           <div class="form-group">
-            <label class="form-label form-label-required">Target Residents</label>
-            <input type="number" name="target_participants" id="edit_act_target" class="form-control" min="5" required>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="form-label form-label-required" style="margin:0;">Target Residents</label>
+              <span id="edit_target_pop_hint" style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
+                👥 Recorded Pop: 0
+              </span>
+            </div>
+            <input type="number" name="target_participants" id="edit_act_target" class="form-control" min="1" required>
+            <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
+              Auto-calculated from selected purok population records
+            </div>
           </div>
         </div>
 
@@ -3229,7 +3262,7 @@ require_once __DIR__ . '/../layouts/header.php';
     }
 
     // Initialize Target Purok Scope for Edit Modal
-    initPurokScopeForEdit(act.target_puroks);
+    initPurokScopeForEdit(act.target_puroks, act.target_participants);
 
     // Populate expected activities checklist for edit
     let savedExecution = [];
@@ -3487,9 +3520,12 @@ require_once __DIR__ . '/../layouts/header.php';
     const allToggle = document.getElementById(mode + '_all_puroks_toggle');
     if (allToggle) allToggle.checked = selectAll;
 
+    let totalPop = 0;
     const checkboxes = document.querySelectorAll('.' + mode + '-purok-cb');
     checkboxes.forEach(cb => {
       cb.checked = selectAll;
+      const pop = parseInt(cb.getAttribute('data-population') || '0', 10);
+      if (selectAll) totalPop += pop;
       const label = cb.closest('.purok-checkbox-item');
       if (label) {
         if (selectAll) {
@@ -3506,12 +3542,24 @@ require_once __DIR__ . '/../layouts/header.php';
 
     const hiddenInput = document.getElementById(mode + '_target_puroks_hidden');
     const summaryEl = document.getElementById(mode + '_purok_selection_summary');
+    const targetInput = document.getElementById(mode === 'create' ? 'create_target_participants' : 'edit_act_target');
+    const popHint = document.getElementById(mode + '_target_pop_hint');
+
+    // Dynamically update target residents input to the selected population sum
+    if (targetInput) {
+      targetInput.value = totalPop;
+    }
+    if (popHint) {
+      popHint.innerHTML = totalPop > 0
+        ? `👥 Recorded Pop: <strong>${totalPop.toLocaleString()}</strong>`
+        : `👥 Recorded Pop: 0`;
+    }
 
     if (selectAll) {
       if (hiddenInput) hiddenInput.value = 'All Puroks';
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerText = 'Selected: All Puroks (Barangay-Wide)';
+        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalPop.toLocaleString()}</strong> residents`;
       }
     } else {
       if (hiddenInput) hiddenInput.value = '';
@@ -3526,15 +3574,20 @@ require_once __DIR__ . '/../layouts/header.php';
     setAllPuroksScope(mode, isChecked);
   }
 
-  function onSinglePurokChange(mode) {
+  function onSinglePurokChange(mode, skipTargetOverride) {
     const checkboxes = document.querySelectorAll('.' + mode + '-purok-cb');
     const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
     const checkedVals = checkedBoxes.map(cb => cb.value);
     const allToggle = document.getElementById(mode + '_all_puroks_toggle');
     const hiddenInput = document.getElementById(mode + '_target_puroks_hidden');
     const summaryEl = document.getElementById(mode + '_purok_selection_summary');
+    const targetInput = document.getElementById(mode === 'create' ? 'create_target_participants' : 'edit_act_target');
+    const popHint = document.getElementById(mode + '_target_pop_hint');
 
+    let totalPop = 0;
     checkboxes.forEach(cb => {
+      const pop = parseInt(cb.getAttribute('data-population') || '0', 10);
+      if (cb.checked) totalPop += pop;
       const label = cb.closest('.purok-checkbox-item');
       if (label) {
         if (cb.checked) {
@@ -3549,12 +3602,22 @@ require_once __DIR__ . '/../layouts/header.php';
       }
     });
 
+    // Dynamically update target residents input to the selected population sum
+    if (!skipTargetOverride && targetInput) {
+      targetInput.value = totalPop;
+    }
+    if (popHint) {
+      popHint.innerHTML = totalPop > 0
+        ? `👥 Recorded Pop: <strong>${totalPop.toLocaleString()}</strong>`
+        : `👥 Recorded Pop: 0`;
+    }
+
     if (checkedVals.length === checkboxes.length) {
       if (allToggle) allToggle.checked = true;
       if (hiddenInput) hiddenInput.value = 'All Puroks';
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerText = 'Selected: All Puroks (Barangay-Wide)';
+        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalPop.toLocaleString()}</strong> residents`;
       }
     } else if (checkedVals.length === 0) {
       if (allToggle) allToggle.checked = false;
@@ -3568,14 +3631,15 @@ require_once __DIR__ . '/../layouts/header.php';
       if (hiddenInput) hiddenInput.value = checkedVals[0];
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerText = 'Selected: 1 Purok (' + checkedVals[0] + ')';
+        summaryEl.innerHTML = `Selected: 1 Purok (${checkedVals[0]}) • <strong>${totalPop.toLocaleString()}</strong> residents`;
       }
     } else {
       if (allToggle) allToggle.checked = false;
       if (hiddenInput) hiddenInput.value = checkedVals.join(', ');
+      const displayNames = checkedVals.length <= 3 ? checkedVals.join(', ') : checkedVals.slice(0, 3).join(', ') + ' +' + (checkedVals.length - 3) + ' more';
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerText = 'Selected: ' + checkedVals.length + ' Puroks (' + (checkedVals.length <= 3 ? checkedVals.join(', ') : checkedVals.slice(0, 3).join(', ') + ' +' + (checkedVals.length - 3) + ' more') + ')';
+        summaryEl.innerHTML = `Selected: ${checkedVals.length} Puroks (${displayNames}) • <strong>${totalPop.toLocaleString()}</strong> residents`;
       }
     }
   }
@@ -3595,7 +3659,7 @@ require_once __DIR__ . '/../layouts/header.php';
     });
   }
 
-  function initPurokScopeForEdit(targetPuroks) {
+  function initPurokScopeForEdit(targetPuroks, existingTargetCount) {
     const raw = (targetPuroks || 'All Puroks').trim();
     const editSearch = document.getElementById('edit_purok_search');
     if (editSearch) {
@@ -3605,13 +3669,22 @@ require_once __DIR__ . '/../layouts/header.php';
 
     if (raw === 'All Puroks' || raw === 'All' || raw === '') {
       setAllPuroksScope('edit', true);
+      if (existingTargetCount && parseInt(existingTargetCount, 10) > 0) {
+        const targetInput = document.getElementById('edit_act_target');
+        if (targetInput) targetInput.value = existingTargetCount;
+      }
     } else {
       const selectedList = raw.split(',').map(s => s.trim().toLowerCase());
       const checkboxes = document.querySelectorAll('.edit-purok-cb');
       checkboxes.forEach(cb => {
         cb.checked = selectedList.includes(cb.value.trim().toLowerCase());
       });
-      onSinglePurokChange('edit');
+      const hasExisting = existingTargetCount && parseInt(existingTargetCount, 10) > 0;
+      onSinglePurokChange('edit', hasExisting);
+      if (hasExisting) {
+        const targetInput = document.getElementById('edit_act_target');
+        if (targetInput) targetInput.value = existingTargetCount;
+      }
     }
   }
 </script>

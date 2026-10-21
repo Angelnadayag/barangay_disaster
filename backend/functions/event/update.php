@@ -53,7 +53,7 @@ if ($venue === '__custom__') {
     $venue = trim($_POST['venue_custom'] ?? $act['venue']);
 }
 $personnel = trim($_POST['assigned_personnel'] ?? $act['assigned_personnel']);
-$target = max(5, (int)($_POST['target_participants'] ?? $act['target_participants']));
+$target = max(1, (int)($_POST['target_participants'] ?? $act['target_participants']));
 $description = trim($_POST['description'] ?? $act['description']);
 
 // Target Puroks handling (single, multi, or 'All Puroks')

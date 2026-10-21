@@ -36,7 +36,7 @@ if ($venue === '__custom__' || empty($venue)) {
 $startDate = trim($_POST['start_datetime'] ?? '');
 $endDate = trim($_POST['end_datetime'] ?? '');
 $personnel = trim($_POST['assigned_personnel'] ?? '');
-$target = max(10, (int)($_POST['target_participants'] ?? 50));
+$target = max(1, (int)($_POST['target_participants'] ?? 50));
 $description = trim($_POST['description'] ?? '');
 
 // Target Puroks handling (single, multi, or 'All Puroks')
