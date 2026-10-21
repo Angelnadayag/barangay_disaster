@@ -56,6 +56,12 @@ $personnel = trim($_POST['assigned_personnel'] ?? $act['assigned_personnel']);
 $target = max(1, (int)($_POST['target_participants'] ?? $act['target_participants']));
 $description = trim($_POST['description'] ?? $act['description']);
 
+// Target Type handling (household_families vs all_members)
+$targetType = trim($_POST['target_type'] ?? ($act['target_type'] ?? 'household_families'));
+if (!in_array($targetType, ['household_families', 'all_members'], true)) {
+    $targetType = 'household_families';
+}
+
 // Target Puroks handling (single, multi, or 'All Puroks')
 $targetPuroksInput = $_POST['target_puroks'] ?? ($act['target_puroks'] ?? 'All Puroks');
 if (is_array($targetPuroksInput)) {
@@ -104,10 +110,14 @@ if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
 }
 
 try {
-    // Self-heal target_puroks & expected_activities columns if missing
+    // Self-heal target_puroks, target_type & expected_activities columns if missing
     $colsTp = $db->query("SHOW COLUMNS FROM events LIKE 'target_puroks'")->fetchAll();
     if (empty($colsTp)) {
         $db->exec("ALTER TABLE events ADD COLUMN target_puroks VARCHAR(255) NOT NULL DEFAULT 'All Puroks' AFTER venue");
+    }
+    $colsTt = $db->query("SHOW COLUMNS FROM events LIKE 'target_type'")->fetchAll();
+    if (empty($colsTt)) {
+        $db->exec("ALTER TABLE events ADD COLUMN target_type VARCHAR(50) NOT NULL DEFAULT 'household_families' AFTER target_puroks");
     }
     $colsEa = $db->query("SHOW COLUMNS FROM events LIKE 'expected_activities'")->fetchAll();
     if (empty($colsEa)) {
@@ -122,6 +132,7 @@ try {
                     activity_type = ?,
                     venue = ?,
                     target_puroks = ?,
+                    target_type = ?,
                     start_datetime = ?,
                     end_datetime = ?,
                     assigned_personnel = ?,
@@ -131,7 +142,7 @@ try {
                 WHERE id = ?
             ");
             $updateStmt->execute([
-                $title, $type, $venue, $targetPuroks, $startDate, $endDate,
+                $title, $type, $venue, $targetPuroks, $targetType, $startDate, $endDate,
                 $personnel, $target, $description, $contentExecutionJson, $id
             ]);
         } else {
@@ -141,6 +152,7 @@ try {
                     activity_type = ?,
                     venue = ?,
                     target_puroks = ?,
+                    target_type = ?,
                     start_datetime = ?,
                     end_datetime = ?,
                     assigned_personnel = ?,
@@ -151,7 +163,7 @@ try {
                 WHERE id = ?
             ");
             $updateStmt->execute([
-                $title, $type, $venue, $targetPuroks, $startDate, $endDate,
+                $title, $type, $venue, $targetPuroks, $targetType, $startDate, $endDate,
                 $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $id
             ]);
         }
@@ -162,6 +174,7 @@ try {
                 activity_type = ?,
                 venue = ?,
                 target_puroks = ?,
+                target_type = ?,
                 start_datetime = ?,
                 end_datetime = ?,
                 assigned_personnel = ?,
@@ -170,7 +183,7 @@ try {
             WHERE id = ?
         ");
         $updateStmt->execute([
-            $title, $type, $venue, $targetPuroks, $startDate, $endDate,
+            $title, $type, $venue, $targetPuroks, $targetType, $startDate, $endDate,
             $personnel, $target, $description, $id
         ]);
     }

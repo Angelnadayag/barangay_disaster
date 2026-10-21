@@ -99,6 +99,18 @@ $hhQueryStmt = $db->prepare("
 $hhQueryStmt->execute([$barangayId]);
 $barangayHouseholds = $hhQueryStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch active individual household members for this barangay (to list when event is set to all members)
+$memQueryStmt = $db->prepare("
+    SELECT hm.id, hm.household_id, hm.full_name, hm.relationship, hm.gender, hm.age, hm.is_authorized_rep,
+           ph.family_name, ph.household_code, ph.purok_name, ph.purok_id, COALESCE(ph.head_phone, '') AS phone
+    FROM household_members hm
+    INNER JOIN purok_households ph ON hm.household_id = ph.id
+    WHERE (ph.barangay_id = ? OR ph.barangay_id IS NULL) AND (ph.status = 'active' OR ph.status IS NULL)
+    ORDER BY ph.purok_name ASC, ph.family_name ASC, hm.is_authorized_rep DESC, hm.age DESC
+");
+$memQueryStmt->execute([$barangayId]);
+$barangayMembers = $memQueryStmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Status breakdown counts for current tab
 $baseWhere = "(barangay_id = ? OR barangay_id IS NULL)" . ($viewTab === 'archived' ? " AND is_archived = 1" : " AND (is_archived = 0 OR is_archived IS NULL)");
 
@@ -441,6 +453,11 @@ require_once __DIR__ . '/../layouts/header.php';
     opacity: 1 !important;
     visibility: visible !important;
     pointer-events: auto !important;
+  }
+
+  #householdMembersModal.modal-overlay,
+  #householdMembersModal.modal-overlay.active {
+    z-index: 100005 !important;
   }
 
   .modal-dialog {
@@ -1074,6 +1091,7 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
 
           <!-- Counting Basis Toggle: Household Families vs All Members -->
+          <input type="hidden" name="target_type" id="create_target_type" value="household_families">
           <div
             style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <label
@@ -1316,6 +1334,7 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
 
           <!-- Counting Basis Toggle: Household Families vs All Members for Edit -->
+          <input type="hidden" name="target_type" id="edit_target_type" value="household_families">
           <div
             style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <label
@@ -1614,14 +1633,22 @@ require_once __DIR__ . '/../layouts/header.php';
       <!-- Participant Attendees -->
       <div class="form-group" style="margin-bottom:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:6px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <label class="form-label" style="font-size:10px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;letter-spacing:0.3px;">
               Participant Attendees
             </label>
-            <span style="font-size:10.5px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);padding:1px 6px;border-radius:4px;border:1px solid var(--color-border);" id="acc_attendees_pill"></span>
+            <div style="display:inline-flex;border:1px solid var(--color-border);border-radius:4px;overflow:hidden;background:var(--color-surface-subtle);">
+              <button type="button" id="acc_roster_tab_families" onclick="setAccomplishedRosterMode('household_families')" style="font-size:9.5px;font-weight:600;padding:2px 7px;border:none;cursor:pointer;background:var(--color-primary);color:#FFFFFF;transition:all 0.15s ease;">
+                House Families
+              </button>
+              <button type="button" id="acc_roster_tab_members" onclick="setAccomplishedRosterMode('all_members')" style="font-size:9.5px;font-weight:500;padding:2px 7px;border:none;cursor:pointer;background:transparent;color:var(--color-text-secondary);transition:all 0.15s ease;">
+                All Members
+              </button>
+            </div>
+            <span style="font-size:10px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);padding:1px 6px;border-radius:4px;border:1px solid var(--color-border);" id="acc_attendees_pill"></span>
           </div>
           <div>
-            <input type="text" id="acc_attendees_search" placeholder="Filter household or resident..." oninput="filterAccomplishedAttendees(this.value)" class="form-control" style="width:190px;height:26px;font-size:10.5px;padding:2px 6px;">
+            <input type="text" id="acc_attendees_search" placeholder="Filter roster..." oninput="filterAccomplishedAttendees(this.value)" class="form-control" style="width:170px;height:26px;font-size:10.5px;padding:2px 6px;">
           </div>
         </div>
 
@@ -1640,7 +1667,7 @@ require_once __DIR__ . '/../layouts/header.php';
 <!-- ========================================================================= -->
 <!-- Modal 3A-2: View Household Family Members                                  -->
 <!-- ========================================================================= -->
-<div class="modal-overlay" id="householdMembersModal" style="z-index: 1250 !important;">
+<div class="modal-overlay" id="householdMembersModal" style="z-index: 100005 !important;">
   <div class="modal-dialog" style="max-width:620px;">
     <div class="modal-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -2254,6 +2281,7 @@ require_once __DIR__ . '/../layouts/header.php';
   const TOTAL_PUROK_POPULATION = <?= (int) $totalPurokPopulation ?>;
   const TOTAL_PUROK_HOUSEHOLDS = <?= (int) $totalPurokHouseholds ?>;
   const ALL_BARANGAY_HOUSEHOLDS = <?= json_encode($barangayHouseholds, JSON_UNESCAPED_UNICODE) ?>;
+  const ALL_BARANGAY_MEMBERS = <?= json_encode($barangayMembers, JSON_UNESCAPED_UNICODE) ?>;
 
   function onActivityTypeChange(prefix, type) {
     const container = document.getElementById(prefix + '_expected_activities_list');
@@ -2305,6 +2333,11 @@ require_once __DIR__ . '/../layouts/header.php';
     const badge = document.getElementById(mode + '_counting_unit_badge');
     const targetLabel = document.getElementById(mode + '_target_label');
     const calcSubtext = document.getElementById(mode + '_target_calc_subtext');
+    const targetTypeInput = document.getElementById(mode + '_target_type');
+
+    if (targetTypeInput) {
+      targetTypeInput.value = isFamilies ? 'household_families' : 'all_members';
+    }
 
     if (badge) {
       if (isFamilies) {
@@ -2395,6 +2428,11 @@ require_once __DIR__ . '/../layouts/header.php';
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
+        const hhModal = document.getElementById('householdMembersModal');
+        if (hhModal && hhModal.classList.contains('active')) {
+          closeModal('householdMembersModal');
+          return;
+        }
         document.querySelectorAll('.modal-overlay.active').forEach(m => closeModal(m.id));
       }
     });
@@ -2802,6 +2840,7 @@ require_once __DIR__ . '/../layouts/header.php';
   }
 
   let currentAccomplishedRoster = [];
+  let currentAccomplishedRosterMode = 'household_families';
 
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
@@ -2830,83 +2869,184 @@ require_once __DIR__ . '/../layouts/header.php';
     return trimmed.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   }
 
-  function buildEventParticipantRoster(act, rawAttendees) {
-    const allHh = (typeof ALL_BARANGAY_HOUSEHOLDS !== 'undefined' && Array.isArray(ALL_BARANGAY_HOUSEHOLDS)) 
-      ? ALL_BARANGAY_HOUSEHOLDS 
-      : [];
-    
-    const targetPuroks = parseTargetPuroks(act ? act.target_puroks : '');
-    const isAllPuroks = targetPuroks.length === 0;
+  function setAccomplishedRosterMode(mode, reRender = true) {
+    currentAccomplishedRosterMode = mode || 'household_families';
+    const tabFamilies = document.getElementById('acc_roster_tab_families');
+    const tabMembers = document.getElementById('acc_roster_tab_members');
 
-    // Filter households by event target purok scope
-    let scopedHouseholds = allHh;
-    if (!isAllPuroks) {
-      scopedHouseholds = allHh.filter(hh => {
-        const pName = (hh.purok_name || '').trim().toLowerCase();
-        return targetPuroks.some(tp => pName === tp || pName.includes(tp) || tp.includes(pName));
-      });
+    if (tabFamilies && tabMembers) {
+      if (currentAccomplishedRosterMode === 'household_families') {
+        tabFamilies.style.background = 'var(--color-primary)';
+        tabFamilies.style.color = '#FFFFFF';
+        tabFamilies.style.fontWeight = '600';
+        tabMembers.style.background = 'transparent';
+        tabMembers.style.color = 'var(--color-text-secondary)';
+        tabMembers.style.fontWeight = '500';
+      } else {
+        tabMembers.style.background = 'var(--color-primary)';
+        tabMembers.style.color = '#FFFFFF';
+        tabMembers.style.fontWeight = '600';
+        tabFamilies.style.background = 'transparent';
+        tabFamilies.style.color = 'var(--color-text-secondary)';
+        tabFamilies.style.fontWeight = '500';
+      }
     }
 
+    if (currentAccomplishedAct) {
+      currentAccomplishedRoster = buildEventParticipantRoster(currentAccomplishedAct, currentAccomplishedAttendees, currentAccomplishedRosterMode);
+    }
+
+    if (reRender) {
+      renderAccomplishedAttendeesTable();
+    }
+  }
+
+  function buildEventParticipantRoster(act, rawAttendees, mode) {
+    mode = mode || currentAccomplishedRosterMode || 'household_families';
+    const targetPuroks = parseTargetPuroks(act ? act.target_puroks : '');
+    const isAllPuroks = targetPuroks.length === 0;
     const rawAttList = Array.isArray(rawAttendees) ? rawAttendees : [];
     const matchedAttIds = new Set();
     const roster = [];
 
-    // Match each scoped household with existing attendee records
-    scopedHouseholds.forEach((hh, idx) => {
-      const hhCode = (hh.household_code || '').trim().toLowerCase();
-      const famName = (hh.family_name || '').trim().toLowerCase();
-      const headName = (hh.head_full_name || '').trim().toLowerCase();
-      const phone = (hh.head_phone || '').trim();
+    if (mode === 'all_members') {
+      const allMems = (typeof ALL_BARANGAY_MEMBERS !== 'undefined' && Array.isArray(ALL_BARANGAY_MEMBERS))
+        ? ALL_BARANGAY_MEMBERS
+        : [];
 
-      let matchedAtt = null;
-      if (rawAttList.length > 0) {
-        matchedAtt = rawAttList.find(a => {
-          if (matchedAttIds.has(a.id)) return false;
-          const resName = (a.resident_name || '').toLowerCase();
-          if (hhCode && resName.includes(hhCode)) return true;
-          if (headName && resName.includes(headName)) return true;
-          if (famName && resName.includes(famName)) return true;
-          if (phone && a.phone && a.phone.trim() === phone) return true;
-          return false;
+      let scopedMembers = allMems;
+      if (!isAllPuroks) {
+        scopedMembers = allMems.filter(m => {
+          const pName = (m.purok_name || '').trim().toLowerCase();
+          return targetPuroks.some(tp => pName === tp || pName.includes(tp) || tp.includes(pName));
         });
       }
 
-      if (matchedAtt) {
-        matchedAttIds.add(matchedAtt.id);
-      }
+      scopedMembers.forEach((m, idx) => {
+        const memName = (m.full_name || '').trim().toLowerCase();
+        let matchedAtt = null;
+        if (rawAttList.length > 0) {
+          matchedAtt = rawAttList.find(a => {
+            if (matchedAttIds.has(a.id)) return false;
+            const resName = (a.resident_name || '').toLowerCase();
+            return memName && resName.includes(memName);
+          });
+        }
 
-      const isAttended = matchedAtt ? (matchedAtt.attended == 1 || matchedAtt.attended === '1' || matchedAtt.attended === true) : false;
+        if (matchedAtt) {
+          matchedAttIds.add(matchedAtt.id);
+        }
 
-      roster.push({
-        roster_id: idx,
-        attendee_id: matchedAtt ? matchedAtt.id : null,
-        household_id: hh.id,
-        household_code: hh.household_code || '—',
-        family_name: hh.family_name || 'Family',
-        head_name: hh.head_full_name || 'Family Representative',
-        purok_name: hh.purok_name || '—',
-        phone: (matchedAtt && matchedAtt.phone) ? matchedAtt.phone : (hh.head_phone || '—'),
-        attended: isAttended
-      });
-    });
+        const isAttended = matchedAtt ? (matchedAtt.attended == 1 || matchedAtt.attended === '1' || matchedAtt.attended === true) : false;
 
-    // Append any individual attendee not matched to a household
-    rawAttList.forEach(a => {
-      if (!matchedAttIds.has(a.id)) {
-        const isAttended = (a.attended == 1 || a.attended === '1' || a.attended === true);
         roster.push({
-          roster_id: roster.length,
-          attendee_id: a.id,
-          household_id: null,
-          household_code: '—',
-          family_name: a.resident_name || 'Participant',
-          head_name: a.resident_name || 'Participant',
-          purok_name: act ? (act.target_puroks || '—') : '—',
-          phone: a.phone || '—',
+          roster_id: idx,
+          attendee_id: matchedAtt ? matchedAtt.id : null,
+          member_id: m.id,
+          household_id: m.household_id,
+          household_code: m.household_code || '—',
+          family_name: m.family_name || 'Family',
+          full_name: m.full_name || 'Resident',
+          relationship: m.relationship || 'Member',
+          gender: m.gender || '',
+          age: (m.age !== null && m.age !== undefined && m.age !== '') ? m.age : null,
+          purok_name: m.purok_name || '—',
+          phone: m.phone || '—',
           attended: isAttended
         });
+      });
+
+      // Append unmatched raw attendees
+      rawAttList.forEach(a => {
+        if (!matchedAttIds.has(a.id)) {
+          const isAttended = (a.attended == 1 || a.attended === '1' || a.attended === true);
+          roster.push({
+            roster_id: roster.length,
+            attendee_id: a.id,
+            member_id: null,
+            household_id: null,
+            household_code: '—',
+            family_name: 'Resident',
+            full_name: a.resident_name || 'Participant',
+            relationship: 'Attendee',
+            gender: '',
+            age: null,
+            purok_name: act ? (act.target_puroks || '—') : '—',
+            phone: a.phone || '—',
+            attended: isAttended
+          });
+        }
+      });
+    } else {
+      // household_families mode
+      const allHh = (typeof ALL_BARANGAY_HOUSEHOLDS !== 'undefined' && Array.isArray(ALL_BARANGAY_HOUSEHOLDS)) 
+        ? ALL_BARANGAY_HOUSEHOLDS 
+        : [];
+      
+      let scopedHouseholds = allHh;
+      if (!isAllPuroks) {
+        scopedHouseholds = allHh.filter(hh => {
+          const pName = (hh.purok_name || '').trim().toLowerCase();
+          return targetPuroks.some(tp => pName === tp || pName.includes(tp) || tp.includes(pName));
+        });
       }
-    });
+
+      scopedHouseholds.forEach((hh, idx) => {
+        const hhCode = (hh.household_code || '').trim().toLowerCase();
+        const famName = (hh.family_name || '').trim().toLowerCase();
+        const headName = (hh.head_full_name || '').trim().toLowerCase();
+        const phone = (hh.head_phone || '').trim();
+
+        let matchedAtt = null;
+        if (rawAttList.length > 0) {
+          matchedAtt = rawAttList.find(a => {
+            if (matchedAttIds.has(a.id)) return false;
+            const resName = (a.resident_name || '').toLowerCase();
+            if (hhCode && resName.includes(hhCode)) return true;
+            if (headName && resName.includes(headName)) return true;
+            if (famName && resName.includes(famName)) return true;
+            if (phone && a.phone && a.phone.trim() === phone) return true;
+            return false;
+          });
+        }
+
+        if (matchedAtt) {
+          matchedAttIds.add(matchedAtt.id);
+        }
+
+        const isAttended = matchedAtt ? (matchedAtt.attended == 1 || matchedAtt.attended === '1' || matchedAtt.attended === true) : false;
+
+        roster.push({
+          roster_id: idx,
+          attendee_id: matchedAtt ? matchedAtt.id : null,
+          household_id: hh.id,
+          household_code: hh.household_code || '—',
+          family_name: hh.family_name || 'Family',
+          head_name: hh.head_full_name || 'Family Representative',
+          purok_name: hh.purok_name || '—',
+          phone: (matchedAtt && matchedAtt.phone) ? matchedAtt.phone : (hh.head_phone || '—'),
+          attended: isAttended
+        });
+      });
+
+      // Append unmatched raw attendees
+      rawAttList.forEach(a => {
+        if (!matchedAttIds.has(a.id)) {
+          const isAttended = (a.attended == 1 || a.attended === '1' || a.attended === true);
+          roster.push({
+            roster_id: roster.length,
+            attendee_id: a.id,
+            household_id: null,
+            household_code: '—',
+            family_name: a.resident_name || 'Participant',
+            head_name: a.resident_name || 'Participant',
+            purok_name: act ? (act.target_puroks || '—') : '—',
+            phone: a.phone || '—',
+            attended: isAttended
+          });
+        }
+      });
+    }
 
     return roster;
   }
@@ -2917,47 +3057,64 @@ require_once __DIR__ . '/../layouts/header.php';
 
     if (!currentAccomplishedRoster || currentAccomplishedRoster.length === 0) {
       if (currentAccomplishedAct) {
-        currentAccomplishedRoster = buildEventParticipantRoster(currentAccomplishedAct, currentAccomplishedAttendees);
+        currentAccomplishedRoster = buildEventParticipantRoster(currentAccomplishedAct, currentAccomplishedAttendees, currentAccomplishedRosterMode);
       }
     }
 
     const roster = currentAccomplishedRoster || [];
     const attendedCount = roster.filter(r => r.attended).length;
     const pillEl = document.getElementById('acc_attendees_pill');
+    const unitLabel = (currentAccomplishedRosterMode === 'all_members') ? 'Members' : 'Households';
     if (pillEl) {
-      pillEl.innerHTML = `<strong>${attendedCount}</strong> Attended • <strong>${roster.length}</strong> Households`;
+      pillEl.innerHTML = `<strong>${attendedCount}</strong> Attended • <strong>${roster.length}</strong> ${unitLabel}`;
     }
 
     const q = (typeof filterQuery === 'string' ? filterQuery : (document.getElementById('acc_attendees_search')?.value || '')).trim().toLowerCase();
     let displayList = roster;
     if (q) {
-      displayList = roster.filter(item => {
-        return (item.family_name && item.family_name.toLowerCase().includes(q))
-          || (item.head_name && item.head_name.toLowerCase().includes(q))
-          || (item.household_code && item.household_code.toLowerCase().includes(q))
-          || (item.purok_name && item.purok_name.toLowerCase().includes(q))
-          || (item.phone && item.phone.toLowerCase().includes(q));
-      });
+      if (currentAccomplishedRosterMode === 'all_members') {
+        displayList = roster.filter(item => {
+          return (item.full_name && item.full_name.toLowerCase().includes(q))
+            || (item.family_name && item.family_name.toLowerCase().includes(q))
+            || (item.household_code && item.household_code.toLowerCase().includes(q))
+            || (item.purok_name && item.purok_name.toLowerCase().includes(q))
+            || (item.relationship && item.relationship.toLowerCase().includes(q));
+        });
+      } else {
+        displayList = roster.filter(item => {
+          return (item.family_name && item.family_name.toLowerCase().includes(q))
+            || (item.head_name && item.head_name.toLowerCase().includes(q))
+            || (item.household_code && item.household_code.toLowerCase().includes(q))
+            || (item.purok_name && item.purok_name.toLowerCase().includes(q))
+            || (item.phone && item.phone.toLowerCase().includes(q));
+        });
+      }
     }
 
     if (!displayList || displayList.length === 0) {
       attBox.innerHTML = `
         <div style="text-align:center;padding:22px 14px;font-size:11px;color:var(--color-text-muted);">
-          No matching household families found.
+          ${currentAccomplishedRosterMode === 'all_members' ? 'No matching members found.' : 'No matching household families found.'}
         </div>
       `;
       return;
     }
 
+    const isAllMembers = (currentAccomplishedRosterMode === 'all_members');
+
     let attHtml = `
       <table class="data-table" style="font-size:11px;width:100%;margin:0;border-collapse:collapse;">
         <thead>
           <tr style="position:sticky;top:0;background:var(--color-surface-subtle);z-index:2;border-bottom:1px solid var(--color-border);">
-            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Household Family / Representative</th>
+            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">
+              ${isAllMembers ? 'Member Name / Family' : 'Household Family / Representative'}
+            </th>
             <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:95px;">Purok</th>
-            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:115px;">Contact</th>
+            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:115px;">
+              ${isAllMembers ? 'Age / Rel' : 'Contact'}
+            </th>
             <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:85px;">Status</th>
-            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:145px;">Action</th>
+            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:${isAllMembers ? '95px' : '145px'};">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -2967,52 +3124,91 @@ require_once __DIR__ . '/../layouts/header.php';
       const isAttended = item.attended;
       const rowId = item.roster_id;
 
-      attHtml += `
-        <tr id="acc_roster_row_${rowId}" style="border-bottom:1px solid var(--color-border);transition:background 0.1s ease;">
-          <td style="padding:6px 10px;">
-            <div style="font-weight:600;color:var(--color-text);line-height:1.25;">
-              ${escapeHtml(item.family_name)}
-            </div>
-            <div style="font-size:10px;color:var(--color-text-secondary);margin-top:1px;">
-              Representative: ${escapeHtml(item.head_name)} ${item.household_code && item.household_code !== '—' ? '• ' + escapeHtml(item.household_code) : ''}
-            </div>
-          </td>
-          <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
-            ${escapeHtml(item.purok_name)}
-          </td>
-          <td style="padding:6px 10px;font-family:monospace;font-size:10.5px;color:var(--color-text-secondary);">
-            ${escapeHtml(item.phone)}
-          </td>
-          <td style="padding:6px 10px;text-align:center;" id="acc_status_badge_${rowId}">
-            <span style="display:inline-block;padding:2px 6px;font-size:9.5px;font-weight:600;border-radius:3px;border:1px solid var(--color-border);${isAttended ? 'background:var(--color-surface-subtle);color:var(--color-primary);' : 'background:#FFFFFF;color:var(--color-text-muted);'}">
-              ${isAttended ? 'Attended' : 'Unmarked'}
-            </span>
-          </td>
-          <td style="padding:6px 10px;text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
-              <button type="button" 
-                id="acc_btn_attend_${rowId}" 
-                onclick="toggleRosterItemAttendance(${rowId}, ${isAttended ? 0 : 1})"
-                class="btn btn-sm"
-                style="${isAttended 
-                  ? 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;' 
-                  : 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;'}"
-                title="${isAttended ? 'Click to void attendance' : 'Click to mark as attended'}">
-                ${isAttended ? 'Void' : 'Attended'}
-              </button>
-              ${item.household_id ? `
+      if (isAllMembers) {
+        // All Members Mode - Clean single line, strictly NO sub-details below!
+        const relText = item.relationship ? escapeHtml(item.relationship) : 'Member';
+        const ageText = (item.age !== null && item.age !== undefined && item.age !== '') ? `${item.age} yrs` : '—';
+
+        attHtml += `
+          <tr id="acc_roster_row_${rowId}" style="border-bottom:1px solid var(--color-border);transition:background 0.1s ease;">
+            <td style="padding:6px 10px;">
+              <div style="font-weight:600;color:var(--color-text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(item.full_name)} (${escapeHtml(item.family_name)})">
+                ${escapeHtml(item.full_name)} <span style="font-weight:normal;color:var(--color-text-secondary);">(${escapeHtml(item.family_name)})</span>
+              </div>
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
+              ${escapeHtml(item.purok_name)}
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
+              ${ageText} • ${relText}
+            </td>
+            <td style="padding:6px 10px;text-align:center;" id="acc_status_badge_${rowId}">
+              <span style="display:inline-block;padding:2px 6px;font-size:9.5px;font-weight:600;border-radius:3px;border:1px solid var(--color-border);${isAttended ? 'background:var(--color-surface-subtle);color:var(--color-primary);' : 'background:#FFFFFF;color:var(--color-text-muted);'}">
+                ${isAttended ? 'Attended' : 'Unmarked'}
+              </span>
+            </td>
+            <td style="padding:6px 10px;text-align:center;">
+              <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
                 <button type="button" 
-                  onclick="openHouseholdMembersModal(${item.household_id})" 
+                  id="acc_btn_attend_${rowId}" 
+                  onclick="toggleRosterItemAttendance(${rowId}, ${isAttended ? 0 : 1})"
                   class="btn btn-sm"
-                  style="background:var(--color-surface-subtle);color:var(--color-text);border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;"
-                  title="View family members of this household">
-                  Members
+                  style="${isAttended 
+                    ? 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;' 
+                    : 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;'}"
+                  title="${isAttended ? 'Click to void attendance' : 'Click to mark as attended'}">
+                  ${isAttended ? 'Void' : 'Attended'}
                 </button>
-              ` : ''}
-            </div>
-          </td>
-        </tr>
-      `;
+              </div>
+            </td>
+          </tr>
+        `;
+      } else {
+        // Household Families Mode - Clean single line, strictly NO sub-details below!
+        attHtml += `
+          <tr id="acc_roster_row_${rowId}" style="border-bottom:1px solid var(--color-border);transition:background 0.1s ease;">
+            <td style="padding:6px 10px;">
+              <div style="font-weight:600;color:var(--color-text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(item.family_name)}${item.head_name && item.head_name !== '—' ? ' (' + escapeHtml(item.head_name) + ')' : ''}">
+                ${escapeHtml(item.family_name)}${item.head_name && item.head_name !== '—' ? ' <span style="font-weight:normal;color:var(--color-text-secondary);">(' + escapeHtml(item.head_name) + ')</span>' : ''}
+              </div>
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
+              ${escapeHtml(item.purok_name)}
+            </td>
+            <td style="padding:6px 10px;font-family:monospace;font-size:10.5px;color:var(--color-text-secondary);">
+              ${escapeHtml(item.phone)}
+            </td>
+            <td style="padding:6px 10px;text-align:center;" id="acc_status_badge_${rowId}">
+              <span style="display:inline-block;padding:2px 6px;font-size:9.5px;font-weight:600;border-radius:3px;border:1px solid var(--color-border);${isAttended ? 'background:var(--color-surface-subtle);color:var(--color-primary);' : 'background:#FFFFFF;color:var(--color-text-muted);'}">
+                ${isAttended ? 'Attended' : 'Unmarked'}
+              </span>
+            </td>
+            <td style="padding:6px 10px;text-align:center;">
+              <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+                <button type="button" 
+                  id="acc_btn_attend_${rowId}" 
+                  onclick="toggleRosterItemAttendance(${rowId}, ${isAttended ? 0 : 1})"
+                  class="btn btn-sm"
+                  style="${isAttended 
+                    ? 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;' 
+                    : 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;'}"
+                  title="${isAttended ? 'Click to void attendance' : 'Click to mark as attended'}">
+                  ${isAttended ? 'Void' : 'Attended'}
+                </button>
+                ${item.household_id ? `
+                  <button type="button" 
+                    onclick="openHouseholdMembersModal(${item.household_id})" 
+                    class="btn btn-sm"
+                    style="background:var(--color-surface-subtle);color:var(--color-text);border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;"
+                    title="View family members of this household">
+                    Members
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }
     });
 
     attHtml += '</tbody></table>';
@@ -3059,13 +3255,15 @@ require_once __DIR__ . '/../layouts/header.php';
     // Live update turnout in pill & modal header
     const newAttendedCount = currentAccomplishedRoster.filter(r => r.attended).length;
     const pillEl = document.getElementById('acc_attendees_pill');
+    const unitLabel = (currentAccomplishedRosterMode === 'all_members') ? 'Members' : 'Households';
     if (pillEl) {
-      pillEl.innerHTML = `<strong>${newAttendedCount}</strong> Attended • <strong>${currentAccomplishedRoster.length}</strong> Households`;
+      pillEl.innerHTML = `<strong>${newAttendedCount}</strong> Attended • <strong>${currentAccomplishedRoster.length}</strong> ${unitLabel}`;
     }
     const turnoutEl = document.getElementById('acc_display_attendance');
     if (turnoutEl) {
       const targetPart = parseInt(currentAccomplishedAct.target_participants, 10) || currentAccomplishedRoster.length;
-      turnoutEl.innerText = `${newAttendedCount} attended (${targetPart} targeted)`;
+      const countUnit = (currentAccomplishedRosterMode === 'all_members') ? 'residents' : 'households';
+      turnoutEl.innerText = `${newAttendedCount} attended (${targetPart} targeted ${countUnit})`;
     }
     currentAccomplishedAct.actual_participants = newAttendedCount;
 
@@ -3076,7 +3274,9 @@ require_once __DIR__ . '/../layouts/header.php';
     if (item.attendee_id) {
       formData.append('attendee_id', item.attendee_id);
     }
-    const residentName = `${item.family_name} (Representative: ${item.head_name}) [${item.household_code}]`;
+    const residentName = (currentAccomplishedRosterMode === 'all_members')
+      ? `${item.full_name} (${item.family_name}) [${item.household_code || '—'}]`
+      : `${item.family_name} (Representative: ${item.head_name}) [${item.household_code}]`;
     formData.append('resident_name', residentName);
     formData.append('phone', item.phone !== '—' ? item.phone : '');
     formData.append('attended', targetAttended);
@@ -3140,6 +3340,11 @@ require_once __DIR__ . '/../layouts/header.php';
   // Open Family Members Modal for a Household
   function openHouseholdMembersModal(householdId) {
     if (!householdId) return;
+
+    const modalEl = document.getElementById('householdMembersModal');
+    if (modalEl) {
+      modalEl.style.zIndex = '100005';
+    }
 
     document.getElementById('hh_members_modal_title').innerText = 'Family Members';
     document.getElementById('hh_members_badge').innerText = 'Loading...';
@@ -3358,7 +3563,16 @@ require_once __DIR__ . '/../layouts/header.php';
       attendees = attendeesByActivityMap[act.id];
     }
     currentAccomplishedAttendees = attendees || [];
-    currentAccomplishedRoster = buildEventParticipantRoster(act, currentAccomplishedAttendees);
+
+    // Determine default mode dynamically based on event's target_type
+    const defaultMode = (act.target_type === 'all_members') 
+      ? 'all_members' 
+      : ((act.target_type === 'household_families') 
+          ? 'household_families' 
+          : (parseInt(act.target_participants, 10) > TOTAL_PUROK_HOUSEHOLDS * 1.5 ? 'all_members' : 'household_families')
+        );
+    setAccomplishedRosterMode(defaultMode, false);
+    currentAccomplishedRoster = buildEventParticipantRoster(act, currentAccomplishedAttendees, defaultMode);
 
     const isArchived = (act.is_archived == 1 || act.is_archived === '1' || act.is_archived === true || act.status === 'Archived');
     const isCancelled = (act.status === 'Cancelled');
@@ -3417,7 +3631,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
     const actualPart = currentAccomplishedRoster.filter(r => r.attended).length;
     const targetPart = parseInt(act.target_participants, 10) || currentAccomplishedRoster.length;
-    document.getElementById('acc_display_attendance').innerText = `${actualPart} attended (${targetPart} targeted)`;
+    const unitText = (currentAccomplishedRosterMode === 'all_members') ? 'residents' : 'households';
+    document.getElementById('acc_display_attendance').innerText = `${actualPart} attended (${targetPart} targeted ${unitText})`;
 
     document.getElementById('acc_display_description').innerText = act.description || 'No description recorded for this activity.';
 
@@ -3977,11 +4192,13 @@ require_once __DIR__ . '/../layouts/header.php';
     }
 
     // Initialize Target Purok Scope for Edit Modal
-    const isWelfareEdit = (act.activity_type === 'Social Welfare and Assistance');
+    const isFamiliesEdit = act.target_type 
+      ? (act.target_type === 'household_families') 
+      : (act.activity_type === 'Social Welfare and Assistance' || parseInt(act.target_participants, 10) <= TOTAL_PUROK_HOUSEHOLDS);
     const editFamilyCb = document.getElementById('edit_count_by_families');
     if (editFamilyCb) {
-      editFamilyCb.checked = isWelfareEdit;
-      onCountingUnitCheckboxChange('edit', isWelfareEdit);
+      editFamilyCb.checked = isFamiliesEdit;
+      onCountingUnitCheckboxChange('edit', isFamiliesEdit);
     }
     initPurokScopeForEdit(act.target_puroks, act.target_participants);
 

@@ -63,15 +63,25 @@ if (is_array($contentExecutionInput)) {
     $contentExecutionJson = trim((string)$contentExecutionInput);
 }
 
+// Target Type handling (household_families vs all_members)
+$targetType = trim($_POST['target_type'] ?? 'household_families');
+if (!in_array($targetType, ['household_families', 'all_members'], true)) {
+    $targetType = 'household_families';
+}
+
 if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
     redirectWithFlash($returnUrl, 'error', 'Please provide all required fields including venue.');
 }
 
 try {
-    // Self-heal target_puroks, content_execution & expected_activities columns if missing
+    // Self-heal target_puroks, target_type, content_execution & expected_activities columns if missing
     $colsTp = $db->query("SHOW COLUMNS FROM events LIKE 'target_puroks'")->fetchAll();
     if (empty($colsTp)) {
         $db->exec("ALTER TABLE events ADD COLUMN target_puroks VARCHAR(255) NOT NULL DEFAULT 'All Puroks' AFTER venue");
+    }
+    $colsTt = $db->query("SHOW COLUMNS FROM events LIKE 'target_type'")->fetchAll();
+    if (empty($colsTt)) {
+        $db->exec("ALTER TABLE events ADD COLUMN target_type VARCHAR(50) NOT NULL DEFAULT 'household_families' AFTER target_puroks");
     }
     $colsCe = $db->query("SHOW COLUMNS FROM events LIKE 'content_execution'")->fetchAll();
     if (empty($colsCe)) {
@@ -113,13 +123,13 @@ try {
 
     $stmt = $db->prepare("
         INSERT INTO events (
-            title, activity_type, barangay_id, venue, target_puroks, latitude, longitude, start_datetime, end_datetime,
+            title, activity_type, barangay_id, venue, target_puroks, target_type, latitude, longitude, start_datetime, end_datetime,
             assigned_personnel, target_participants, actual_participants, description,
             status, content_execution, expected_activities, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
     ");
     $stmt->execute([
-        $title, $type, $barangayId, $venue, $targetPuroks, $eventLat, $eventLng, $startDate, $endDate,
+        $title, $type, $barangayId, $venue, $targetPuroks, $targetType, $eventLat, $eventLng, $startDate, $endDate,
         $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $user['id']
     ]);
     $actId = $db->lastInsertId();
