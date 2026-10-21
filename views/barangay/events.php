@@ -83,8 +83,10 @@ $purokStmt->execute([$barangayId]);
 $barangayPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $totalPurokPopulation = 0;
+$totalPurokHouseholds = 0;
 foreach ($barangayPuroks as $p) {
-  $totalPurokPopulation += (int)($p['population'] ?? 0);
+  $totalPurokPopulation += (int) ($p['population'] ?? 0);
+  $totalPurokHouseholds += (int) ($p['households'] ?? 0);
 }
 
 // Status breakdown counts for current tab
@@ -92,22 +94,23 @@ $baseWhere = "(barangay_id = ? OR barangay_id IS NULL)" . ($viewTab === 'archive
 
 $upcomingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime > ?");
 $upcomingCountStmt->execute([$barangayId, $nowStr]);
-$countUpcoming = (int)$upcomingCountStmt->fetchColumn();
+$countUpcoming = (int) $upcomingCountStmt->fetchColumn();
 
 $ongoingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime <= ? AND end_datetime >= ?");
 $ongoingCountStmt->execute([$barangayId, $nowStr, $nowStr]);
-$countOngoing = (int)$ongoingCountStmt->fetchColumn();
+$countOngoing = (int) $ongoingCountStmt->fetchColumn();
 
 $completedCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status = 'Completed'");
 $completedCountStmt->execute([$barangayId]);
-$countCompleted = (int)$completedCountStmt->fetchColumn();
+$countCompleted = (int) $completedCountStmt->fetchColumn();
 
 $cancelledCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status = 'Cancelled'");
 $cancelledCountStmt->execute([$barangayId]);
-$countCancelled = (int)$cancelledCountStmt->fetchColumn();
+$countCancelled = (int) $cancelledCountStmt->fetchColumn();
 
 // Query String helper to preserve filters across actions
-function getEventFilterUrl($newParams = []) {
+function getEventFilterUrl($newParams = [])
+{
   $params = $_GET;
   foreach ($newParams as $k => $v) {
     if ($v === null || $v === '') {
@@ -281,6 +284,7 @@ $defaultExpectedByType = [
     "Job Fair"
   ],
   "Social Welfare and Assistance" => [
+    "Financial Aid Distribution",
     "Financial Assistance Distribution",
     "Food Assistance Distribution",
     "Relief Goods Distribution",
@@ -571,14 +575,17 @@ require_once __DIR__ . '/../layouts/header.php';
     transition: all 0.15s ease;
     user-select: none;
   }
+
   .purok-checkbox-item:hover {
     border-color: var(--color-primary, #17324D) !important;
     background: #F0FDF4 !important;
   }
+
   #create_purok_checkbox_list::-webkit-scrollbar,
   #edit_purok_checkbox_list::-webkit-scrollbar {
     width: 6px;
   }
+
   #create_purok_checkbox_list::-webkit-scrollbar-thumb,
   #edit_purok_checkbox_list::-webkit-scrollbar-thumb {
     background: #94A3B8;
@@ -615,7 +622,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
 <!-- Tabs Navigation: Active Events vs Archived Events -->
 <div class="nav-tabs" style="margin-bottom: var(--space-3, 12px);">
-  <a href="<?= getEventFilterUrl(['tab' => 'active']) ?>" class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
+  <a href="<?= getEventFilterUrl(['tab' => 'active']) ?>"
+    class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
       <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -625,7 +633,8 @@ require_once __DIR__ . '/../layouts/header.php';
     Active Events
     <span class="nav-tab-badge"><?= $activeCount ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['tab' => 'archived']) ?>" class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
+  <a href="<?= getEventFilterUrl(['tab' => 'archived']) ?>"
+    class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="21 8 21 21 3 21 3 8"></polyline>
       <rect x="1" y="3" width="22" height="5"></rect>
@@ -638,56 +647,68 @@ require_once __DIR__ . '/../layouts/header.php';
 
 <!-- Quick Status Filter Selection Buttons -->
 <div class="evac-filter-pills" style="margin-bottom: 12px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-  <span style="font-size:11px; font-weight:700; color:var(--color-text-secondary); margin-right:4px; text-transform:uppercase; letter-spacing:0.3px;">
+  <span
+    style="font-size:11px; font-weight:700; color:var(--color-text-secondary); margin-right:4px; text-transform:uppercase; letter-spacing:0.3px;">
     Quick Status:
   </span>
-  <a href="<?= getEventFilterUrl(['status' => '']) ?>" 
-     class="evac-pill-btn <?= empty($filterStatus) ? 'active' : '' ?>">
-    All Events <span class="badge <?= empty($filterStatus) ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $viewTab === 'archived' ? $archivedCount : $activeCount ?></span>
+  <a href="<?= getEventFilterUrl(['status' => '']) ?>"
+    class="evac-pill-btn <?= empty($filterStatus) ? 'active' : '' ?>">
+    All Events <span class="badge <?= empty($filterStatus) ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $viewTab === 'archived' ? $archivedCount : $activeCount ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['status' => 'Upcoming']) ?>" 
-     class="evac-pill-btn <?= $filterStatus === 'Upcoming' ? 'active' : '' ?>">
-    Upcoming <span class="badge <?= $filterStatus === 'Upcoming' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countUpcoming ?></span>
+  <a href="<?= getEventFilterUrl(['status' => 'Upcoming']) ?>"
+    class="evac-pill-btn <?= $filterStatus === 'Upcoming' ? 'active' : '' ?>">
+    Upcoming <span class="badge <?= $filterStatus === 'Upcoming' ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $countUpcoming ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['status' => 'Ongoing']) ?>" 
-     class="evac-pill-btn <?= $filterStatus === 'Ongoing' ? 'active' : '' ?>">
-    In Progress / Started <span class="badge <?= $filterStatus === 'Ongoing' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countOngoing ?></span>
+  <a href="<?= getEventFilterUrl(['status' => 'Ongoing']) ?>"
+    class="evac-pill-btn <?= $filterStatus === 'Ongoing' ? 'active' : '' ?>">
+    In Progress / Started <span class="badge <?= $filterStatus === 'Ongoing' ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $countOngoing ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['status' => 'Completed']) ?>" 
-     class="evac-pill-btn <?= $filterStatus === 'Completed' ? 'active' : '' ?>">
-    Completed <span class="badge <?= $filterStatus === 'Completed' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countCompleted ?></span>
+  <a href="<?= getEventFilterUrl(['status' => 'Completed']) ?>"
+    class="evac-pill-btn <?= $filterStatus === 'Completed' ? 'active' : '' ?>">
+    Completed <span class="badge <?= $filterStatus === 'Completed' ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $countCompleted ?></span>
   </a>
   <?php if ($countCancelled > 0): ?>
-    <a href="<?= getEventFilterUrl(['status' => 'Cancelled']) ?>" 
-       class="evac-pill-btn <?= $filterStatus === 'Cancelled' ? 'active' : '' ?>">
-      Cancelled <span class="badge <?= $filterStatus === 'Cancelled' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countCancelled ?></span>
+    <a href="<?= getEventFilterUrl(['status' => 'Cancelled']) ?>"
+      class="evac-pill-btn <?= $filterStatus === 'Cancelled' ? 'active' : '' ?>">
+      Cancelled <span class="badge <?= $filterStatus === 'Cancelled' ? 'badge-primary' : 'badge-neutral' ?>"
+        style="font-size:9px; padding:1px 5px;"><?= $countCancelled ?></span>
     </a>
   <?php endif; ?>
 </div>
 
 <!-- Search & Filter Selection Form Card -->
-<div class="card" style="margin-bottom: var(--space-4, 16px); background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 8px;">
+<div class="card"
+  style="margin-bottom: var(--space-4, 16px); background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 8px;">
   <div class="card-body" style="padding: 12px 16px;">
-    <form method="GET" action="" class="filter-form" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+    <form method="GET" action="" class="filter-form"
+      style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
       <input type="hidden" name="tab" value="<?= clean($viewTab) ?>">
 
       <!-- Search Input -->
       <div style="flex:2; min-width:200px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Search Activity
         </label>
         <div style="position:relative; display:flex; align-items:center;">
-          <svg style="position:absolute; left:10px; width:14px; height:14px; color:#94A3B8; pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg style="position:absolute; left:10px; width:14px; height:14px; color:#94A3B8; pointer-events:none;"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="text" name="search" class="form-control" style="padding-left:32px; font-size:12px; height:36px;" placeholder="Search title, facilitator, keyword..." value="<?= clean($search) ?>">
+          <input type="text" name="search" class="form-control" style="padding-left:32px; font-size:12px; height:36px;"
+            placeholder="Search title, facilitator, keyword..." value="<?= clean($search) ?>">
         </div>
       </div>
 
       <!-- Activity Type Filter Selection -->
       <div style="flex:1.2; min-width:170px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Activity Type
         </label>
         <select name="type" class="form-control" style="font-size:12px; height:36px;">
@@ -702,7 +723,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <!-- Venue Location Filter Selection (Strictly Evacuation Areas) -->
       <div style="flex:1.5; min-width:200px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Venue Location (Evacuation Areas)
         </label>
         <select name="venue" class="form-control" style="font-size:12px; height:36px;">
@@ -717,7 +739,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <!-- Status Filter Selection -->
       <div style="flex:1; min-width:130px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Status
         </label>
         <select name="status" class="form-control" style="font-size:12px; height:36px;">
@@ -731,14 +754,17 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <!-- Action Buttons: Filter Selection Button & Reset Button -->
       <div style="display:flex; gap:6px; align-items:center;">
-        <button type="submit" class="btn btn-primary" id="btnFilterSelection" style="height:36px; padding:0 15px; font-size:12px; display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+        <button type="submit" class="btn btn-primary" id="btnFilterSelection"
+          style="height:36px; padding:0 15px; font-size:12px; display:inline-flex; align-items:center; gap:6px; font-weight:600;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
           </svg>
           Filter Selection
         </button>
         <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
-          <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline" style="height:36px; padding:0 12px; font-size:12px; color:var(--color-text-muted); display:inline-flex; align-items:center; gap:4px;" title="Reset All Filters">
+          <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline"
+            style="height:36px; padding:0 12px; font-size:12px; color:var(--color-text-muted); display:inline-flex; align-items:center; gap:4px;"
+            title="Reset All Filters">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -751,30 +777,36 @@ require_once __DIR__ . '/../layouts/header.php';
 
     <!-- Active Filters Summary Line if any filter is set -->
     <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
-      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #E2E8F0; display:flex; justify-content:space-between; align-items:center; font-size:11px; flex-wrap:wrap; gap:8px;">
+      <div
+        style="margin-top:10px; padding-top:8px; border-top:1px dashed #E2E8F0; display:flex; justify-content:space-between; align-items:center; font-size:11px; flex-wrap:wrap; gap:8px;">
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
           <span style="font-weight:600; color:var(--color-text-secondary);">Applied Filters:</span>
           <?php if (!empty($search)): ?>
-            <a href="<?= getEventFilterUrl(['search' => '']) ?>" class="badge badge-neutral" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['search' => '']) ?>" class="badge badge-neutral"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Keyword: "<?= clean($search) ?>" &times;
             </a>
           <?php endif; ?>
           <?php if (!empty($filterType)): ?>
-            <a href="<?= getEventFilterUrl(['type' => '']) ?>" class="badge badge-info" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['type' => '']) ?>" class="badge badge-info"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Type: <?= clean($filterType) ?> &times;
             </a>
           <?php endif; ?>
           <?php if (!empty($filterVenue)): ?>
-            <a href="<?= getEventFilterUrl(['venue' => '']) ?>" class="badge badge-success" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['venue' => '']) ?>" class="badge badge-success"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Venue: <?= clean($filterVenue) ?> &times;
             </a>
           <?php endif; ?>
           <?php if (!empty($filterStatus)): ?>
-            <a href="<?= getEventFilterUrl(['status' => '']) ?>" class="badge badge-primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['status' => '']) ?>" class="badge badge-primary"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Status: <?= clean($filterStatus) ?> &times;
             </a>
           <?php endif; ?>
-          <a href="?tab=<?= clean($viewTab) ?>" style="font-size:10.5px; color:#DC2626; margin-left:6px; font-weight:600; text-decoration:underline;">
+          <a href="?tab=<?= clean($viewTab) ?>"
+            style="font-size:10.5px; color:#DC2626; margin-left:6px; font-weight:600; text-decoration:underline;">
             Clear All
           </a>
         </div>
@@ -818,7 +850,8 @@ require_once __DIR__ . '/../layouts/header.php';
             </div>
             <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
               <div style="margin-top:10px;">
-                <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline btn-xs" style="font-size:11px;padding:4px 10px;">
+                <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline btn-xs"
+                  style="font-size:11px;padding:4px 10px;">
                   Clear Filter Selection
                 </a>
               </div>
@@ -856,9 +889,13 @@ require_once __DIR__ . '/../layouts/header.php';
               <?php endif; ?>
             </td>
             <td>
-              <div style="font-weight:600;color:var(--color-primary);"><?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?></div>
+              <div style="font-weight:600;color:var(--color-primary);">
+                <?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?>
+              </div>
               <?php $scopePuroks = clean($act['target_puroks'] ?? 'All Puroks'); ?>
-              <div style="font-size:9.5px;color:<?= ($scopePuroks === 'All Puroks') ? 'var(--color-teal, #2F6F73)' : '#0284C7' ?>;margin-top:3px;display:flex;align-items:center;gap:3px;font-weight:600;" title="Target Purok Scope: <?= $scopePuroks ?>">
+              <div
+                style="font-size:9.5px;color:<?= ($scopePuroks === 'All Puroks') ? 'var(--color-teal, #2F6F73)' : '#0284C7' ?>;margin-top:3px;display:flex;align-items:center;gap:3px;font-weight:600;"
+                title="Target Purok Scope: <?= $scopePuroks ?>">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                   <circle cx="12" cy="10" r="3"></circle>
@@ -987,35 +1024,52 @@ require_once __DIR__ . '/../layouts/header.php';
         <!-- Target Purok Scope Selection (Single, Multi, or All Puroks) -->
         <div class="form-group" style="margin-top:10px;margin-bottom:14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <label class="form-label form-label-required" style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
+            <label class="form-label form-label-required"
+              style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
               Target Purok Scope
             </label>
             <div style="display:flex;gap:6px;">
-              <button type="button" class="btn btn-outline btn-xs"
-                onclick="setAllPuroksScope('create', true)"
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('create', true)"
                 style="font-size:9.5px;padding:2px 7px;">Select All</button>
-              <button type="button" class="btn btn-outline btn-xs"
-                onclick="setAllPuroksScope('create', false)"
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('create', false)"
                 style="font-size:9.5px;padding:2px 7px;">Clear</button>
             </div>
           </div>
 
           <!-- Master All Puroks Toggle Card -->
-          <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
-            <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
-              <input type="checkbox" id="create_all_puroks_toggle" onchange="onAllPuroksToggleChange('create', this.checked)" checked style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
-              <span>All Puroks (Barangay-Wide Drill)</span>
+          <div
+            style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+            <label
+              style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
+              <input type="checkbox" id="create_all_puroks_toggle"
+                onchange="onAllPuroksToggleChange('create', this.checked)" checked
+                style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
+              <span>All Puroks (Barangay-Wide)</span>
             </label>
-            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks (<?= number_format($totalPurokPopulation) ?> Residents)</span>
+            <span class="badge badge-info" id="create_all_puroks_badge" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
+              (<?= number_format($totalPurokPopulation) ?> Residents)</span>
+          </div>
+
+          <!-- Counting Basis Toggle: Household Families vs All Members -->
+          <div
+            style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <label
+              style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:#0F766E;">
+              <input type="checkbox" id="create_count_by_families"
+                onchange="onCountingUnitCheckboxChange('create', this.checked)"
+                style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
+              <span>Count by <strong>House Families</strong> (1 per Household Head) <span style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
+            </label>
+            <span id="create_counting_unit_badge" class="badge"
+              style="font-size:9.5px;padding:2px 7px;background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">
+              👥 All Members
+            </span>
           </div>
 
           <!-- Quick Filter Input -->
           <div style="position:relative;margin-bottom:6px;">
-            <input type="text" id="create_purok_search" class="form-control" placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
+            <input type="text" id="create_purok_search" class="form-control"
+              placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
               oninput="filterPurokCheckboxes('create', this.value)"
               style="font-size:11px;padding:4px 8px;padding-left:26px;height:28px;">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1029,16 +1083,22 @@ require_once __DIR__ . '/../layouts/header.php';
           <div id="create_purok_checkbox_list"
             style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
             <?php foreach ($barangayPuroks as $p): ?>
-              <?php $pPop = (int)($p['population'] ?? 0); ?>
-              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+              <?php 
+                $pPop = (int) ($p['population'] ?? 0); 
+                $pHouseholds = (int) ($p['households'] ?? 0);
+              ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>"
                 style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
                 <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-                  <input type="checkbox" class="create-purok-cb" value="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" checked
-                    onchange="onSinglePurokChange('create')"
+                  <input type="checkbox" class="create-purok-cb" value="<?= clean($p['name']) ?>"
+                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked onchange="onSinglePurokChange('create')"
                     style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
-                  <span style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
+                  <span
+                    style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
                 </div>
-                <span style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;" title="Recorded Population">
+                <span class="create-purok-pill" data-pop="<?= $pPop ?>" data-hh="<?= $pHouseholds ?>"
+                  style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;"
+                  title="Recorded Population">
                   👥 <?= number_format($pPop) ?>
                 </span>
               </label>
@@ -1047,7 +1107,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
           <!-- Live Selection Feedback Label & Hidden Submission Input -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
-            <div id="create_purok_selection_summary" style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
+            <div id="create_purok_selection_summary"
+              style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
               Selected: All Puroks (Barangay-Wide) • <?= number_format($totalPurokPopulation) ?> residents
             </div>
             <div style="font-size:9.5px;color:var(--color-text-muted);">
@@ -1090,13 +1151,15 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
           <div class="form-group">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <label class="form-label form-label-required" style="margin:0;">Target Residents</label>
-              <span id="create_target_pop_hint" style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
-                👥 Recorded Pop: <?= number_format($totalPurokPopulation) ?>
+              <label class="form-label form-label-required" id="create_target_label" style="margin:0;">Target Residents</label>
+              <span id="create_target_pop_hint"
+                style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
+                Recorded Pop: <?= number_format($totalPurokPopulation) ?>
               </span>
             </div>
-            <input type="number" name="target_participants" id="create_target_participants" class="form-control" min="1" value="<?= (int)$totalPurokPopulation ?>" required>
-            <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
+            <input type="number" name="target_participants" id="create_target_participants" class="form-control" min="1"
+              value="<?= (int) $totalPurokPopulation ?>" required>
+            <div id="create_target_calc_subtext" style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
               Auto-calculated from selected purok population records
             </div>
           </div>
@@ -1194,7 +1257,8 @@ require_once __DIR__ . '/../layouts/header.php';
         <!-- Target Purok Scope Selection for Edit (Single, Multi, or All Puroks) -->
         <div class="form-group" style="margin-top:10px;margin-bottom:14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <label class="form-label form-label-required" style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
+            <label class="form-label form-label-required"
+              style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                 <circle cx="12" cy="10" r="3"></circle>
@@ -1202,27 +1266,47 @@ require_once __DIR__ . '/../layouts/header.php';
               Target Purok Scope
             </label>
             <div style="display:flex;gap:6px;">
-              <button type="button" class="btn btn-outline btn-xs"
-                onclick="setAllPuroksScope('edit', true)"
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('edit', true)"
                 style="font-size:9.5px;padding:2px 7px;">Select All</button>
-              <button type="button" class="btn btn-outline btn-xs"
-                onclick="setAllPuroksScope('edit', false)"
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('edit', false)"
                 style="font-size:9.5px;padding:2px 7px;">Clear</button>
             </div>
           </div>
 
           <!-- Master All Puroks Toggle Card for Edit -->
-          <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
-            <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
-              <input type="checkbox" id="edit_all_puroks_toggle" onchange="onAllPuroksToggleChange('edit', this.checked)" checked style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
-              <span>All Puroks (Barangay-Wide Drill)</span>
+          <div
+            style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+            <label
+              style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
+              <input type="checkbox" id="edit_all_puroks_toggle"
+                onchange="onAllPuroksToggleChange('edit', this.checked)" checked
+                style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
+              <span>All Puroks (Barangay-Wide)</span>
             </label>
-            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks (<?= number_format($totalPurokPopulation) ?> Residents)</span>
+            <span class="badge badge-info" id="edit_all_puroks_badge" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
+              (<?= number_format($totalPurokPopulation) ?> Residents)</span>
+          </div>
+
+          <!-- Counting Basis Toggle: Household Families vs All Members for Edit -->
+          <div
+            style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <label
+              style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:#0F766E;">
+              <input type="checkbox" id="edit_count_by_families"
+                onchange="onCountingUnitCheckboxChange('edit', this.checked)"
+                style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
+              <span>Count by <strong>House Families</strong> (1 per Household Head) <span style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
+            </label>
+            <span id="edit_counting_unit_badge" class="badge"
+              style="font-size:9.5px;padding:2px 7px;background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">
+              👥 All Members
+            </span>
           </div>
 
           <!-- Quick Filter Input for Edit -->
           <div style="position:relative;margin-bottom:6px;">
-            <input type="text" id="edit_purok_search" class="form-control" placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
+            <input type="text" id="edit_purok_search" class="form-control"
+              placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
               oninput="filterPurokCheckboxes('edit', this.value)"
               style="font-size:11px;padding:4px 8px;padding-left:26px;height:28px;">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1236,16 +1320,22 @@ require_once __DIR__ . '/../layouts/header.php';
           <div id="edit_purok_checkbox_list"
             style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
             <?php foreach ($barangayPuroks as $p): ?>
-              <?php $pPop = (int)($p['population'] ?? 0); ?>
-              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+              <?php 
+                $pPop = (int) ($p['population'] ?? 0); 
+                $pHouseholds = (int) ($p['households'] ?? 0);
+              ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>"
                 style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
                 <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-                  <input type="checkbox" class="edit-purok-cb" value="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>" checked
-                    onchange="onSinglePurokChange('edit')"
+                  <input type="checkbox" class="edit-purok-cb" value="<?= clean($p['name']) ?>"
+                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked onchange="onSinglePurokChange('edit')"
                     style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
-                  <span style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
+                  <span
+                    style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
                 </div>
-                <span style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;" title="Official Recorded Population">
+                <span class="edit-purok-pill" data-pop="<?= $pPop ?>" data-hh="<?= $pHouseholds ?>"
+                  style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;"
+                  title="Recorded Population">
                   👥 <?= number_format($pPop) ?>
                 </span>
               </label>
@@ -1294,13 +1384,14 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
           <div class="form-group">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <label class="form-label form-label-required" style="margin:0;">Target Residents</label>
-              <span id="edit_target_pop_hint" style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
-                👥 Recorded Pop: 0
+              <label class="form-label form-label-required" id="edit_target_label" style="margin:0;">Target Residents</label>
+              <span id="edit_target_pop_hint"
+                style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
+                Recorded Pop: 0
               </span>
             </div>
             <input type="number" name="target_participants" id="edit_act_target" class="form-control" min="1" required>
-            <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
+            <div id="edit_target_calc_subtext" style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
               Auto-calculated from selected purok population records
             </div>
           </div>
@@ -1316,7 +1407,7 @@ require_once __DIR__ . '/../layouts/header.php';
           style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;margin-top:14px;margin-bottom:6px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div>
-              <span style="font-size:12px;font-weight:700;color:var(--color-primary);">👥 Registered Participants</span>
+              <span style="font-size:12px;font-weight:700;color:var(--color-primary);"> Registered Participants</span>
               <div style="font-size:10px;color:var(--color-text-muted);">Manage and add attendees for this event:</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
@@ -1716,7 +1807,7 @@ require_once __DIR__ . '/../layouts/header.php';
           <div
             style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px solid #E2E8F0;padding-bottom:6px;">
             <div>
-              <span style="font-size:12px;font-weight:700;color:var(--color-primary);">👥 Participants Attended</span>
+              <span style="font-size:12px;font-weight:700;color:var(--color-primary);"> Participants Attended</span>
               <div style="font-size:10px;color:var(--color-text-muted);">Check off attendees who actively attended this
                 event:</div>
             </div>
@@ -2098,6 +2189,8 @@ require_once __DIR__ . '/../layouts/header.php';
   }
 
   const EXPECTED_ACTIVITIES_BY_TYPE = <?= json_encode($defaultExpectedByType, JSON_UNESCAPED_UNICODE) ?>;
+  const TOTAL_PUROK_POPULATION = <?= (int) $totalPurokPopulation ?>;
+  const TOTAL_PUROK_HOUSEHOLDS = <?= (int) $totalPurokHouseholds ?>;
 
   function onActivityTypeChange(prefix, type) {
     const container = document.getElementById(prefix + '_expected_activities_list');
@@ -2108,15 +2201,88 @@ require_once __DIR__ . '/../layouts/header.php';
     items.forEach(item => {
       html += `
       <div class="expected-activity-item" style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--color-text);background:#fff;padding:6px 9px;border-radius:5px;border:1px solid #E2E8F0;transition:all 0.15s ease;">
-        <input type="checkbox" name="content_execution[]" value="${item.replace(/"/g, '&quot;')}" checked style="margin:0;cursor:pointer;">
-        <span style="line-height:1.4;flex:1;cursor:pointer;" onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked;">${item}</span>
-        <button type="button" onclick="this.closest('.expected-activity-item').remove()" title="Delete this activity" style="background:none;border:none;color:#94A3B8;cursor:pointer;padding:2px 5px;font-size:14px;line-height:1;border-radius:3px;display:flex;align-items:center;justify-content:center;transition:color 0.15s;" onmouseover="this.style.color='#DC2626'" onmouseout="this.style.color='#94A3B8'">
+        <input type="checkbox" name="content_execution[]" value="${item.replace(/"/g, '&quot;')}" checked onchange="onExpectedActivityItemCheckboxChange('${prefix}', this)" style="margin:0;cursor:pointer;">
+        <span style="line-height:1.4;flex:1;cursor:pointer;" onclick="const cb = this.previousElementSibling; cb.checked = !cb.checked; onExpectedActivityItemCheckboxChange('${prefix}', cb);">${item}</span>
+        <button type="button" onclick="this.closest('.expected-activity-item').remove(); onExpectedActivityItemCheckboxChange('${prefix}');" title="Delete this activity" style="background:none;border:none;color:#94A3B8;cursor:pointer;padding:2px 5px;font-size:14px;line-height:1;border-radius:3px;display:flex;align-items:center;justify-content:center;transition:color 0.15s;" onmouseover="this.style.color='#DC2626'" onmouseout="this.style.color='#94A3B8'">
           &times;
         </button>
       </div>
     `;
     });
     container.innerHTML = html;
+
+    // Check if Activity Type is Social Welfare and Assistance (defaults to House Families)
+    const shouldDefaultFamilies = (type === 'Social Welfare and Assistance');
+    const familyCb = document.getElementById(prefix + '_count_by_families');
+    if (familyCb) {
+      familyCb.checked = shouldDefaultFamilies;
+      onCountingUnitCheckboxChange(prefix, shouldDefaultFamilies);
+    }
+  }
+
+  function onExpectedActivityItemCheckboxChange(prefix, changedCb) {
+    const container = document.getElementById(prefix + '_expected_activities_list');
+    if (!container) return;
+    const checkedBoxes = Array.from(container.querySelectorAll('input[name="content_execution[]"]:checked'));
+    const hasFinancialAidChecked = checkedBoxes.some(cb => {
+      const val = cb.value.toLowerCase();
+      return val.includes('financial aid') || val.includes('financial assistance') || val.includes('aid distribution') || val.includes('food assistance') || val.includes('relief goods');
+    });
+
+    const familyCb = document.getElementById(prefix + '_count_by_families');
+    if (familyCb) {
+      if (hasFinancialAidChecked && !familyCb.checked) {
+        familyCb.checked = true;
+        onCountingUnitCheckboxChange(prefix, true);
+      }
+    }
+  }
+
+  function onCountingUnitCheckboxChange(mode, isFamilies) {
+    const badge = document.getElementById(mode + '_counting_unit_badge');
+    const targetLabel = document.getElementById(mode + '_target_label');
+    const calcSubtext = document.getElementById(mode + '_target_calc_subtext');
+
+    if (badge) {
+      if (isFamilies) {
+        badge.innerHTML = '🏠 House Families';
+        badge.style.background = '#CCFBF1';
+        badge.style.color = '#0F766E';
+        badge.style.borderColor = '#5EEAD4';
+      } else {
+        badge.innerHTML = '👥 All Members';
+        badge.style.background = '#F1F5F9';
+        badge.style.color = '#475569';
+        badge.style.borderColor = '#CBD5E1';
+      }
+    }
+
+    if (targetLabel) {
+      targetLabel.innerText = isFamilies ? 'Target Households / Families' : 'Target Residents';
+    }
+
+    if (calcSubtext) {
+      calcSubtext.innerText = isFamilies
+        ? 'Auto-calculated from selected purok household records (1 per household head)'
+        : 'Auto-calculated from selected purok population records (all individuals)';
+    }
+
+    // Update each purok count pill representation dynamically
+    const pillEls = document.querySelectorAll('.' + mode + '-purok-pill');
+    pillEls.forEach(pill => {
+      if (isFamilies) {
+        const hh = parseInt(pill.getAttribute('data-hh') || '0', 10);
+        pill.innerHTML = `🏠 ${hh.toLocaleString()} fam`;
+        pill.title = 'Recorded Household Families';
+      } else {
+        const pop = parseInt(pill.getAttribute('data-pop') || '0', 10);
+        pill.innerHTML = `👥 ${pop.toLocaleString()}`;
+        pill.title = 'Recorded Population';
+      }
+    });
+
+    // Re-evaluate target count and scope summary with the selected counting unit
+    onSinglePurokChange(mode);
   }
 
   function toggleExpectedActivitiesCheckboxes(prefix, check) {
@@ -2155,7 +2321,7 @@ require_once __DIR__ . '/../layouts/header.php';
     container.scrollTop = container.scrollHeight;
   }
 
-  function onVenueSelectChange() {}
+  function onVenueSelectChange() { }
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -3262,6 +3428,12 @@ require_once __DIR__ . '/../layouts/header.php';
     }
 
     // Initialize Target Purok Scope for Edit Modal
+    const isWelfareEdit = (act.activity_type === 'Social Welfare and Assistance');
+    const editFamilyCb = document.getElementById('edit_count_by_families');
+    if (editFamilyCb) {
+      editFamilyCb.checked = isWelfareEdit;
+      onCountingUnitCheckboxChange('edit', isWelfareEdit);
+    }
     initPurokScopeForEdit(act.target_puroks, act.target_participants);
 
     // Populate expected activities checklist for edit
@@ -3507,7 +3679,15 @@ require_once __DIR__ . '/../layouts/header.php';
   // Target Purok Scope Handlers (Single, Multi, or All Puroks)
   // ============================================================================
   function openCreateActivityModal() {
-    setAllPuroksScope('create', true);
+    const actType = document.getElementById('create_activity_type')?.value || '';
+    const isWelfare = (actType === 'Social Welfare and Assistance');
+    const familyCb = document.getElementById('create_count_by_families');
+    if (familyCb) {
+      familyCb.checked = isWelfare;
+      onCountingUnitCheckboxChange('create', isWelfare);
+    } else {
+      setAllPuroksScope('create', true);
+    }
     const searchInput = document.getElementById('create_purok_search');
     if (searchInput) {
       searchInput.value = '';
@@ -3520,12 +3700,19 @@ require_once __DIR__ . '/../layouts/header.php';
     const allToggle = document.getElementById(mode + '_all_puroks_toggle');
     if (allToggle) allToggle.checked = selectAll;
 
-    let totalPop = 0;
+    const familyCb = document.getElementById(mode + '_count_by_families');
+    const isFamilies = familyCb ? familyCb.checked : false;
+    const unitWord = isFamilies ? 'house families' : 'residents';
+    const unitLabel = isFamilies ? 'Families' : 'Residents';
+
+    let totalCount = 0;
     const checkboxes = document.querySelectorAll('.' + mode + '-purok-cb');
     checkboxes.forEach(cb => {
       cb.checked = selectAll;
-      const pop = parseInt(cb.getAttribute('data-population') || '0', 10);
-      if (selectAll) totalPop += pop;
+      const count = isFamilies
+        ? parseInt(cb.getAttribute('data-households') || '0', 10)
+        : parseInt(cb.getAttribute('data-population') || '0', 10);
+      if (selectAll) totalCount += count;
       const label = cb.closest('.purok-checkbox-item');
       if (label) {
         if (selectAll) {
@@ -3544,22 +3731,26 @@ require_once __DIR__ . '/../layouts/header.php';
     const summaryEl = document.getElementById(mode + '_purok_selection_summary');
     const targetInput = document.getElementById(mode === 'create' ? 'create_target_participants' : 'edit_act_target');
     const popHint = document.getElementById(mode + '_target_pop_hint');
+    const allPuroksBadge = document.getElementById(mode + '_all_puroks_badge');
 
-    // Dynamically update target residents input to the selected population sum
+    // Dynamically update target residents input to the selected count
     if (targetInput) {
-      targetInput.value = totalPop;
+      targetInput.value = totalCount;
     }
     if (popHint) {
-      popHint.innerHTML = totalPop > 0
-        ? `👥 Recorded Pop: <strong>${totalPop.toLocaleString()}</strong>`
-        : `👥 Recorded Pop: 0`;
+      popHint.innerHTML = totalCount > 0
+        ? `Recorded ${isFamilies ? 'Families' : 'Pop'}: <strong>${totalCount.toLocaleString()}</strong>`
+        : `Recorded ${isFamilies ? 'Families' : 'Pop'}: 0`;
+    }
+    if (allPuroksBadge) {
+      allPuroksBadge.innerHTML = `<?= count($barangayPuroks) ?> Puroks (${totalCount.toLocaleString()} ${unitLabel})`;
     }
 
     if (selectAll) {
       if (hiddenInput) hiddenInput.value = 'All Puroks';
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalPop.toLocaleString()}</strong> residents`;
+        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
       }
     } else {
       if (hiddenInput) hiddenInput.value = '';
@@ -3583,11 +3774,19 @@ require_once __DIR__ . '/../layouts/header.php';
     const summaryEl = document.getElementById(mode + '_purok_selection_summary');
     const targetInput = document.getElementById(mode === 'create' ? 'create_target_participants' : 'edit_act_target');
     const popHint = document.getElementById(mode + '_target_pop_hint');
+    const allPuroksBadge = document.getElementById(mode + '_all_puroks_badge');
 
-    let totalPop = 0;
+    const familyCb = document.getElementById(mode + '_count_by_families');
+    const isFamilies = familyCb ? familyCb.checked : false;
+    const unitWord = isFamilies ? 'house families' : 'residents';
+    const unitLabel = isFamilies ? 'Families' : 'Residents';
+
+    let totalCount = 0;
     checkboxes.forEach(cb => {
-      const pop = parseInt(cb.getAttribute('data-population') || '0', 10);
-      if (cb.checked) totalPop += pop;
+      const count = isFamilies
+        ? parseInt(cb.getAttribute('data-households') || '0', 10)
+        : parseInt(cb.getAttribute('data-population') || '0', 10);
+      if (cb.checked) totalCount += count;
       const label = cb.closest('.purok-checkbox-item');
       if (label) {
         if (cb.checked) {
@@ -3602,14 +3801,19 @@ require_once __DIR__ . '/../layouts/header.php';
       }
     });
 
-    // Dynamically update target residents input to the selected population sum
+    if (allPuroksBadge) {
+      const fullCount = isFamilies ? TOTAL_PUROK_HOUSEHOLDS : TOTAL_PUROK_POPULATION;
+      allPuroksBadge.innerHTML = `<?= count($barangayPuroks) ?> Puroks (${fullCount.toLocaleString()} ${unitLabel})`;
+    }
+
+    // Dynamically update target residents input to the selected count
     if (!skipTargetOverride && targetInput) {
-      targetInput.value = totalPop;
+      targetInput.value = totalCount;
     }
     if (popHint) {
-      popHint.innerHTML = totalPop > 0
-        ? `👥 Recorded Pop: <strong>${totalPop.toLocaleString()}</strong>`
-        : `👥 Recorded Pop: 0`;
+      popHint.innerHTML = totalCount > 0
+        ? `Recorded ${isFamilies ? 'Families' : 'Pop'}: <strong>${totalCount.toLocaleString()}</strong>`
+        : `Recorded ${isFamilies ? 'Families' : 'Pop'}: 0`;
     }
 
     if (checkedVals.length === checkboxes.length) {
@@ -3617,7 +3821,7 @@ require_once __DIR__ . '/../layouts/header.php';
       if (hiddenInput) hiddenInput.value = 'All Puroks';
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalPop.toLocaleString()}</strong> residents`;
+        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
       }
     } else if (checkedVals.length === 0) {
       if (allToggle) allToggle.checked = false;
@@ -3631,7 +3835,7 @@ require_once __DIR__ . '/../layouts/header.php';
       if (hiddenInput) hiddenInput.value = checkedVals[0];
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerHTML = `Selected: 1 Purok (${checkedVals[0]}) • <strong>${totalPop.toLocaleString()}</strong> residents`;
+        summaryEl.innerHTML = `Selected: 1 Purok (${checkedVals[0]}) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
       }
     } else {
       if (allToggle) allToggle.checked = false;
@@ -3639,7 +3843,7 @@ require_once __DIR__ . '/../layouts/header.php';
       const displayNames = checkedVals.length <= 3 ? checkedVals.join(', ') : checkedVals.slice(0, 3).join(', ') + ' +' + (checkedVals.length - 3) + ' more';
       if (summaryEl) {
         summaryEl.style.color = 'var(--color-primary, #17324D)';
-        summaryEl.innerHTML = `Selected: ${checkedVals.length} Puroks (${displayNames}) • <strong>${totalPop.toLocaleString()}</strong> residents`;
+        summaryEl.innerHTML = `Selected: ${checkedVals.length} Puroks (${displayNames}) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
       }
     }
   }
