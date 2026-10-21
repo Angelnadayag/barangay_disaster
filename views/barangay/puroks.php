@@ -80,37 +80,41 @@ $archivedCountStmt = $db->prepare("SELECT COUNT(*) FROM puroks WHERE barangay_id
 $archivedCountStmt->execute([$barangayId]);
 $archivedCount = (int) $archivedCountStmt->fetchColumn();
 
-// Query Puroks
-$sql = "SELECT * FROM puroks WHERE barangay_id = ?";
+// Query Puroks with dynamic households and population
+$sql = "SELECT p.*,
+               (SELECT COUNT(*) FROM purok_households ph WHERE ph.barangay_id = p.barangay_id AND (ph.purok_name = p.name OR ph.purok_id = p.id) AND ph.status = 'active') AS dynamic_households_count,
+               (SELECT COALESCE(SUM(ph.total_members), 0) FROM purok_households ph WHERE ph.barangay_id = p.barangay_id AND (ph.purok_name = p.name OR ph.purok_id = p.id) AND ph.status = 'active') AS dynamic_population_count
+        FROM puroks p 
+        WHERE p.barangay_id = ?";
 $params = [$barangayId];
 
 if ($viewTab === 'archived') {
-  $sql .= " AND status = 'archived'";
+  $sql .= " AND p.status = 'archived'";
 } else {
-  $sql .= " AND (status != 'archived' OR status IS NULL)";
+  $sql .= " AND (p.status != 'archived' OR p.status IS NULL)";
 }
 
 if (!empty($search)) {
-  $sql .= " AND name LIKE ?";
+  $sql .= " AND p.name LIKE ?";
   $params[] = "%$search%";
 }
 
-$sql .= " ORDER BY name ASC";
+$sql .= " ORDER BY p.name ASC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $puroks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 sortPuroksMainFirst($puroks);
 
-// Metrics across active jurisdiction puroks
+// Dynamic metrics across active jurisdiction puroks
 $metricsStmt = $db->prepare("
     SELECT 
         COUNT(*) as total_puroks,
-        COALESCE(SUM(households), 0) as total_households,
-        COALESCE(SUM(population), 0) as total_population
+        (SELECT COUNT(*) FROM purok_households ph WHERE ph.barangay_id = ? AND ph.status = 'active') as total_households,
+        (SELECT COALESCE(SUM(ph.total_members), 0) FROM purok_households ph WHERE ph.barangay_id = ? AND ph.status = 'active') as total_population
     FROM puroks 
     WHERE barangay_id = ? AND (status != 'archived' OR status IS NULL)
 ");
-$metricsStmt->execute([$barangayId]);
+$metricsStmt->execute([$barangayId, $barangayId, $barangayId]);
 $metrics = $metricsStmt->fetch(PDO::FETCH_ASSOC);
 
 $totalPuroks = (int) ($metrics['total_puroks'] ?? 0);
@@ -444,7 +448,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
       </svg>
     </div>
-    <div class="metric-value"><?= number_format($totalHouseholds) ?></div>
+    <div class="metric-value" id="topMetricTotalHouseholds"><?= number_format($totalHouseholds) ?></div>
     <div class="metric-meta">Across Active Puroks</div>
   </div>
 
@@ -458,7 +462,7 @@ require_once __DIR__ . '/../layouts/header.php';
         <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
       </svg>
     </div>
-    <div class="metric-value"><?= number_format($totalPopulation) ?></div>
+    <div class="metric-value" id="topMetricTotalPopulation"><?= number_format($totalPopulation) ?></div>
     <div class="metric-meta">Active Resident Individuals</div>
   </div>
 </div>
@@ -521,6 +525,7 @@ require_once __DIR__ . '/../layouts/header.php';
           <th>Purok Name</th>
           <th>Households</th>
           <th>Population</th>
+          <th>Household Families</th>
           <?php if ($viewTab === 'archived'): ?>
             <th>Status</th>
           <?php endif; ?>
@@ -530,7 +535,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <tbody>
         <?php if (empty($puroks)): ?>
           <tr>
-            <td colspan="<?= $viewTab === 'archived' ? '6' : '5' ?>"
+            <td colspan="<?= $viewTab === 'archived' ? '7' : '6' ?>"
               style="text-align:center;padding:36px;color:var(--color-text-muted);">
               No purok records found in <?= $viewTab === 'archived' ? 'Archived' : 'Active' ?> registry matching your filter
               criteria.
@@ -551,11 +556,19 @@ require_once __DIR__ . '/../layouts/header.php';
                   </div>
                 </a>
               </td>
-              <td style="font-family:var(--font-secondary);font-size:11.5px;">
-                <?= number_format($p['households']) ?>
+              <td style="font-family:var(--font-secondary);font-size:11.5px;" id="purok_households_val_<?= (int)$p['id'] ?>">
+                <?= number_format((int)($p['dynamic_households_count'] ?? $p['households'])) ?>
               </td>
-              <td style="font-family:var(--font-secondary);font-weight:700;font-size:12px;color:var(--color-primary);">
-                <?= number_format($p['population']) ?>
+              <td style="font-family:var(--font-secondary);font-weight:700;font-size:12px;color:var(--color-primary);" id="purok_population_val_<?= (int)$p['id'] ?>">
+                <?= number_format((int)($p['dynamic_population_count'] ?? $p['population'])) ?>
+              </td>
+              <td>
+                <button type="button" class="btn btn-outline btn-sm" style="padding:3px 10px;font-size:10.5px;"
+                  id="purok_families_btn_<?= (int)$p['id'] ?>"
+                  onclick="openPurokHouseholdsModal(<?= (int)$p['id'] ?>, '<?= addslashes(clean($p['name'])) ?>')"
+                  title="View Household Families">
+                  View Families (<?= (int)($p['dynamic_households_count'] ?? 0) ?>)
+                </button>
               </td>
               <?php if ($viewTab === 'archived'): ?>
                 <td>
@@ -2056,4 +2069,5 @@ require_once __DIR__ . '/../layouts/header.php';
   }
 </script>
 
+<?php require_once __DIR__ . '/components/purok_households_modal.php'; ?>
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

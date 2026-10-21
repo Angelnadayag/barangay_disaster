@@ -663,6 +663,12 @@ try {
         $logStmt->execute($sl);
     }
 
+    // -------------------------------------------------------------------------
+    // 11. PUROK HOUSEHOLDS & FAMILY MEMBERS (30 to 50 per purok)
+    // -------------------------------------------------------------------------
+    echo "[11/11] Seeding Purok Household Families & Members...\n";
+    require __DIR__ . '/seed_households.php';
+
     // Re-enable Foreign Key checks
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
 

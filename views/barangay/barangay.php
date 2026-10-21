@@ -29,8 +29,15 @@ if (!$barangay) {
     die("Barangay jurisdiction not found or unassigned.");
 }
 
-// Fetch Puroks in this Barangay
-$pStmt = $db->prepare("SELECT * FROM puroks WHERE barangay_id = ? ORDER BY name ASC");
+// Fetch Puroks with dynamic households and population
+$pStmt = $db->prepare("
+    SELECT p.*,
+           (SELECT COUNT(*) FROM purok_households ph WHERE ph.barangay_id = p.barangay_id AND (ph.purok_name = p.name OR ph.purok_id = p.id) AND ph.status = 'active') AS dynamic_households_count,
+           (SELECT COALESCE(SUM(ph.total_members), 0) FROM purok_households ph WHERE ph.barangay_id = p.barangay_id AND (ph.purok_name = p.name OR ph.purok_id = p.id) AND ph.status = 'active') AS dynamic_population_count
+    FROM puroks p 
+    WHERE p.barangay_id = ? 
+    ORDER BY p.name ASC
+");
 $pStmt->execute([$barangayId]);
 $puroks = $pStmt->fetchAll();
 sortPuroksMainFirst($puroks);
@@ -194,12 +201,13 @@ require_once __DIR__ . '/../layouts/sidebar.php';
             <th>Vulnerability Level</th>
             <th>Households</th>
             <th>Population</th>
+            <th>Household Families</th>
             <th>Coordinates</th>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($puroks)): ?>
-            <tr><td colspan="6" style="text-align:center;padding:28px;">No sub-purok records logged yet.</td></tr>
+            <tr><td colspan="7" style="text-align:center;padding:28px;">No sub-purok records logged yet.</td></tr>
           <?php else: ?>
             <?php foreach ($puroks as $p): ?>
               <?php
@@ -211,8 +219,20 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 <td style="font-weight:700;color:var(--color-primary);"><?= clean($p['name']) ?></td>
                 <td style="font-size:10px;color:var(--color-text-secondary);"><?= clean($p['hazard_types'] ?: 'Standard Flood/Squall') ?></td>
                 <td><span class="badge <?= $pBadge ?>" style="font-size:9px;"><?= clean($pRisk) ?></span></td>
-                <td style="font-family:var(--font-secondary);"><?= number_format($p['households']) ?></td>
-                <td style="font-family:var(--font-secondary);font-weight:600;"><?= number_format($p['population']) ?></td>
+                <td style="font-family:var(--font-secondary);" id="brgy_purok_households_val_<?= (int)$p['id'] ?>">
+                  <?= number_format((int)($p['dynamic_households_count'] ?? $p['households'])) ?>
+                </td>
+                <td style="font-family:var(--font-secondary);font-weight:600;" id="brgy_purok_population_val_<?= (int)$p['id'] ?>">
+                  <?= number_format((int)($p['dynamic_population_count'] ?? $p['population'])) ?>
+                </td>
+                <td>
+                  <button type="button" class="btn btn-outline btn-sm" style="padding:3px 10px;font-size:10.5px;"
+                    id="brgy_purok_families_btn_<?= (int)$p['id'] ?>"
+                    onclick="openPurokHouseholdsModal(<?= (int)$p['id'] ?>, '<?= addslashes(clean($p['name'])) ?>')"
+                    title="View Household Families">
+                    View Families (<?= (int)($p['dynamic_households_count'] ?? 0) ?>)
+                  </button>
+                </td>
                 <td style="font-family:var(--font-secondary);font-size:10px;color:var(--color-text-muted);">
                   <?= clean($p['coordinates_lat']) ?>, <?= clean($p['coordinates_lng']) ?>
                 </td>
@@ -300,4 +320,5 @@ function closeEditBarangayModal() {
 }
 </script>
 
+<?php require_once __DIR__ . '/components/purok_households_modal.php'; ?>
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

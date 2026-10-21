@@ -778,9 +778,64 @@ CREATE TABLE `financial_aid_audits` (
   CONSTRAINT `fk_audit_actor` FOREIGN KEY (`actor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_audit_alloc` FOREIGN KEY (`allocation_id`) REFERENCES `financial_aid_allocations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_audit_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_audit_dist` FOREIGN KEY (`distribution_id`) REFERENCES `financial_aid_distributions` (`id`) ON DELETE SET NULL
+DROP TABLE IF EXISTS `household_members`;
+DROP TABLE IF EXISTS `purok_households`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `purok_households` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `barangay_id` int(11) NOT NULL,
+  `purok_id` int(11) DEFAULT NULL,
+  `purok_name` varchar(100) NOT NULL,
+  `household_code` varchar(50) NOT NULL,
+  `family_name` varchar(150) NOT NULL,
+  `head_resident_id` int(11) DEFAULT NULL,
+  `head_full_name` varchar(150) NOT NULL,
+  `head_relation` varchar(100) NOT NULL DEFAULT 'Household Head',
+  `head_phone` varchar(30) NOT NULL,
+  `head_gender` enum('Male','Female','Other') DEFAULT 'Male',
+  `head_age` int(11) DEFAULT NULL,
+  `is_authorized_rep` tinyint(1) NOT NULL DEFAULT 1,
+  `recognition_status` enum('Recognized & Authorized','Pending Verification','Under Review') DEFAULT 'Recognized & Authorized',
+  `authorized_id_type` varchar(100) DEFAULT 'PhilSys National ID',
+  `authorized_id_number` varchar(100) DEFAULT NULL,
+  `house_number` varchar(255) DEFAULT NULL,
+  `total_members` int(11) NOT NULL DEFAULT 4,
+  `seniors_count` int(11) NOT NULL DEFAULT 0,
+  `minors_count` int(11) NOT NULL DEFAULT 0,
+  `pwd_count` int(11) NOT NULL DEFAULT 0,
+  `housing_type` varchar(100) DEFAULT 'Concrete',
+  `economic_status` varchar(100) DEFAULT 'Indigent / Low Income',
+  `evacuation_priority` enum('Standard','Priority','High Priority') DEFAULT 'Standard',
+  `emergency_notes` text DEFAULT NULL,
+  `status` enum('active','archived') NOT NULL DEFAULT 'active',
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_brgy_purok` (`barangay_id`,`purok_name`),
+  KEY `idx_code` (`household_code`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `household_members` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `household_id` int(11) NOT NULL,
+  `full_name` varchar(150) NOT NULL,
+  `relationship` varchar(100) NOT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT 'Male',
+  `age` int(11) DEFAULT NULL,
+  `is_authorized_rep` tinyint(1) NOT NULL DEFAULT 0,
+  `is_senior` tinyint(1) NOT NULL DEFAULT 0,
+  `is_minor` tinyint(1) NOT NULL DEFAULT 0,
+  `is_pwd` tinyint(1) NOT NULL DEFAULT 0,
+  `health_conditions` varchar(255) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_hh` (`household_id`),
+  CONSTRAINT `fk_hh_members` FOREIGN KEY (`household_id`) REFERENCES `purok_households` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
