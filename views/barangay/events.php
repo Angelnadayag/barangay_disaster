@@ -35,6 +35,10 @@ $colsAtt = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'attended'")->fetc
 if (empty($colsAtt)) {
   $db->exec("ALTER TABLE event_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
 }
+$colsTp = $db->query("SHOW COLUMNS FROM events LIKE 'target_puroks'")->fetchAll();
+if (empty($colsTp)) {
+  $db->exec("ALTER TABLE events ADD COLUMN target_puroks VARCHAR(255) NOT NULL DEFAULT 'All Puroks' AFTER venue");
+}
 
 $now = time();
 $nowStr = date('Y-m-d H:i:s');
@@ -67,6 +71,16 @@ $evacStmt = $db->prepare("
 ");
 $evacStmt->execute([$barangayId, $barangayId]);
 $evacuationVenues = $evacStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch active puroks for this barangay
+$purokStmt = $db->prepare("
+    SELECT id, name 
+    FROM puroks 
+    WHERE (barangay_id = ? OR barangay_id IS NULL) AND (status = 'active' OR status IS NULL)
+    ORDER BY name ASC
+");
+$purokStmt->execute([$barangayId]);
+$barangayPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Status breakdown counts for current tab
 $baseWhere = "(barangay_id = ? OR barangay_id IS NULL)" . ($viewTab === 'archived' ? " AND is_archived = 1" : " AND (is_archived = 0 OR is_archived IS NULL)");
@@ -547,6 +561,24 @@ require_once __DIR__ . '/../layouts/header.php';
     white-space: pre-wrap;
     margin-top: 6px;
   }
+
+  .purok-checkbox-item {
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .purok-checkbox-item:hover {
+    border-color: var(--color-primary, #17324D) !important;
+    background: #F0FDF4 !important;
+  }
+  #create_purok_checkbox_list::-webkit-scrollbar,
+  #edit_purok_checkbox_list::-webkit-scrollbar {
+    width: 6px;
+  }
+  #create_purok_checkbox_list::-webkit-scrollbar-thumb,
+  #edit_purok_checkbox_list::-webkit-scrollbar-thumb {
+    background: #94A3B8;
+    border-radius: 6px;
+  }
 </style>
 
 <div class="page-header">
@@ -566,7 +598,7 @@ require_once __DIR__ . '/../layouts/header.php';
       </svg>
       SMS Dispatch Logs (<?= count($recentSmsLogs) ?>)
     </button>
-    <button class="btn btn-primary" onclick="openModal('createActivityModal')">
+    <button class="btn btn-primary" onclick="openCreateActivityModal()">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -820,6 +852,14 @@ require_once __DIR__ . '/../layouts/header.php';
             </td>
             <td>
               <div style="font-weight:600;color:var(--color-primary);"><?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?></div>
+              <?php $scopePuroks = clean($act['target_puroks'] ?? 'All Puroks'); ?>
+              <div style="font-size:9.5px;color:<?= ($scopePuroks === 'All Puroks') ? 'var(--color-teal, #2F6F73)' : '#0284C7' ?>;margin-top:3px;display:flex;align-items:center;gap:3px;font-weight:600;" title="Target Purok Scope: <?= $scopePuroks ?>">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span><?= ($scopePuroks === 'All Puroks') ? 'All Puroks (Barangay-Wide)' : $scopePuroks ?></span>
+              </div>
             </td>
             <td><span class="badge badge-info"><?= clean($act['activity_type']) ?></span></td>
             <td><?= clean($act['venue']) ?></td>
@@ -937,6 +977,73 @@ require_once __DIR__ . '/../layouts/header.php';
               + Add Activity
             </button>
           </div>
+        </div>
+
+        <!-- Target Purok Scope Selection (Single, Multi, or All Puroks) -->
+        <div class="form-group" style="margin-top:10px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label form-label-required" style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              Target Purok Scope
+            </label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-outline btn-xs"
+                onclick="setAllPuroksScope('create', true)"
+                style="font-size:9.5px;padding:2px 7px;">Select All</button>
+              <button type="button" class="btn btn-outline btn-xs"
+                onclick="setAllPuroksScope('create', false)"
+                style="font-size:9.5px;padding:2px 7px;">Clear</button>
+            </div>
+          </div>
+
+          <!-- Master All Puroks Toggle Card -->
+          <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+            <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
+              <input type="checkbox" id="create_all_puroks_toggle" onchange="onAllPuroksToggleChange('create', this.checked)" checked style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
+              <span>All Puroks (Barangay-Wide Drill)</span>
+            </label>
+            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks Available</span>
+          </div>
+
+          <!-- Quick Filter Input -->
+          <div style="position:relative;margin-bottom:6px;">
+            <input type="text" id="create_purok_search" class="form-control" placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
+              oninput="filterPurokCheckboxes('create', this.value)"
+              style="font-size:11px;padding:4px 8px;padding-left:26px;height:28px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="position:absolute;left:8px;top:8px;color:#94A3B8;pointer-events:none;">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+
+          <!-- Multi-Select Checkboxes Grid -->
+          <div id="create_purok_checkbox_list"
+            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
+            <?php foreach ($barangayPuroks as $p): ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>"
+                style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
+                <input type="checkbox" class="create-purok-cb" value="<?= clean($p['name']) ?>" checked
+                  onchange="onSinglePurokChange('create')"
+                  style="cursor:pointer;accent-color:var(--color-primary);margin:0;">
+                <span style="user-select:none;line-height:1.2;font-weight:500;"><?= clean($p['name']) ?></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+
+          <!-- Live Selection Feedback Label & Hidden Submission Input -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+            <div id="create_purok_selection_summary" style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
+              Selected: All Puroks (Barangay-Wide)
+            </div>
+            <div style="font-size:9.5px;color:var(--color-text-muted);">
+              Select single, multi, or all
+            </div>
+          </div>
+          <input type="hidden" name="target_puroks" id="create_target_puroks_hidden" value="All Puroks">
         </div>
 
         <div class="form-group">
@@ -1063,6 +1170,73 @@ require_once __DIR__ . '/../layouts/header.php';
               + Add Activity
             </button>
           </div>
+        </div>
+
+        <!-- Target Purok Scope Selection for Edit (Single, Multi, or All Puroks) -->
+        <div class="form-group" style="margin-top:10px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label form-label-required" style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              Target Purok Scope
+            </label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-outline btn-xs"
+                onclick="setAllPuroksScope('edit', true)"
+                style="font-size:9.5px;padding:2px 7px;">Select All</button>
+              <button type="button" class="btn btn-outline btn-xs"
+                onclick="setAllPuroksScope('edit', false)"
+                style="font-size:9.5px;padding:2px 7px;">Clear</button>
+            </div>
+          </div>
+
+          <!-- Master All Puroks Toggle Card for Edit -->
+          <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+            <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
+              <input type="checkbox" id="edit_all_puroks_toggle" onchange="onAllPuroksToggleChange('edit', this.checked)" checked style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
+              <span>All Puroks (Barangay-Wide Drill)</span>
+            </label>
+            <span class="badge badge-info" style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks Available</span>
+          </div>
+
+          <!-- Quick Filter Input for Edit -->
+          <div style="position:relative;margin-bottom:6px;">
+            <input type="text" id="edit_purok_search" class="form-control" placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
+              oninput="filterPurokCheckboxes('edit', this.value)"
+              style="font-size:11px;padding:4px 8px;padding-left:26px;height:28px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="position:absolute;left:8px;top:8px;color:#94A3B8;pointer-events:none;">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+
+          <!-- Multi-Select Checkboxes Grid for Edit -->
+          <div id="edit_purok_checkbox_list"
+            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
+            <?php foreach ($barangayPuroks as $p): ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>"
+                style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
+                <input type="checkbox" class="edit-purok-cb" value="<?= clean($p['name']) ?>" checked
+                  onchange="onSinglePurokChange('edit')"
+                  style="cursor:pointer;accent-color:var(--color-primary);margin:0;">
+                <span style="user-select:none;line-height:1.2;font-weight:500;"><?= clean($p['name']) ?></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+
+          <!-- Live Selection Feedback Label & Hidden Submission Input for Edit -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+            <div id="edit_purok_selection_summary" style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
+              Selected: All Puroks (Barangay-Wide)
+            </div>
+            <div style="font-size:9.5px;color:var(--color-text-muted);">
+              Select single, multi, or all
+            </div>
+          </div>
+          <input type="hidden" name="target_puroks" id="edit_target_puroks_hidden" value="All Puroks">
         </div>
 
         <div class="form-group">
@@ -1249,6 +1423,9 @@ require_once __DIR__ . '/../layouts/header.php';
             <div
               style="font-size:11.5px;font-weight:600;color:#1E293B;margin-top:2px;line-height:1.35;word-break:break-word;"
               id="acc_display_venue"></div>
+            <div
+              style="font-size:10px;font-weight:600;color:var(--color-teal, #2F6F73);margin-top:4px;line-height:1.35;word-break:break-word;"
+              id="acc_display_purok_scope"></div>
           </div>
         </div>
 
@@ -1977,6 +2154,12 @@ require_once __DIR__ . '/../layouts/header.php';
           sel.focus();
           return false;
         }
+        const hiddenPurok = document.getElementById(isCreate ? 'create_target_puroks_hidden' : 'edit_target_puroks_hidden');
+        if (hiddenPurok && !hiddenPurok.value.trim()) {
+          e.preventDefault();
+          alert('Please select at least one purok or select All Puroks.');
+          return false;
+        }
       });
     });
   });
@@ -2540,6 +2723,11 @@ require_once __DIR__ . '/../layouts/header.php';
     document.getElementById('acc_display_title').innerText = act.title || 'Event Overview';
     document.getElementById('acc_display_type_badge').innerText = act.activity_type || 'Disaster Drill';
     document.getElementById('acc_display_venue').innerText = act.venue || '—';
+    const purokScope = act.target_puroks || 'All Puroks';
+    const scopeEl = document.getElementById('acc_display_purok_scope');
+    if (scopeEl) {
+      scopeEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;background:#F0FDFA;color:#0F766E;padding:2px 6px;border-radius:4px;border:1px solid #CCFBF1;">📍 Scope: <strong>${purokScope === 'All Puroks' ? 'All Puroks (Barangay-Wide)' : purokScope}</strong></span>`;
+    }
     document.getElementById('acc_display_facilitator').innerText = act.assigned_personnel || 'Barangay Disaster Team';
 
     const startFmt = act.start_datetime ? new Date(act.start_datetime.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
@@ -3040,6 +3228,9 @@ require_once __DIR__ . '/../layouts/header.php';
       }
     }
 
+    // Initialize Target Purok Scope for Edit Modal
+    initPurokScopeForEdit(act.target_puroks);
+
     // Populate expected activities checklist for edit
     let savedExecution = [];
     if (act.content_execution) {
@@ -3277,6 +3468,151 @@ require_once __DIR__ . '/../layouts/header.php';
     }
 
     openModal('viewAttendeesModal');
+  }
+
+  // ============================================================================
+  // Target Purok Scope Handlers (Single, Multi, or All Puroks)
+  // ============================================================================
+  function openCreateActivityModal() {
+    setAllPuroksScope('create', true);
+    const searchInput = document.getElementById('create_purok_search');
+    if (searchInput) {
+      searchInput.value = '';
+      filterPurokCheckboxes('create', '');
+    }
+    openModal('createActivityModal');
+  }
+
+  function setAllPuroksScope(mode, selectAll) {
+    const allToggle = document.getElementById(mode + '_all_puroks_toggle');
+    if (allToggle) allToggle.checked = selectAll;
+
+    const checkboxes = document.querySelectorAll('.' + mode + '-purok-cb');
+    checkboxes.forEach(cb => {
+      cb.checked = selectAll;
+      const label = cb.closest('.purok-checkbox-item');
+      if (label) {
+        if (selectAll) {
+          label.classList.add('is-checked');
+          label.style.borderColor = 'var(--color-primary, #17324D)';
+          label.style.background = '#ECFDF5';
+        } else {
+          label.classList.remove('is-checked');
+          label.style.borderColor = '#E2E8F0';
+          label.style.background = '#FFFFFF';
+        }
+      }
+    });
+
+    const hiddenInput = document.getElementById(mode + '_target_puroks_hidden');
+    const summaryEl = document.getElementById(mode + '_purok_selection_summary');
+
+    if (selectAll) {
+      if (hiddenInput) hiddenInput.value = 'All Puroks';
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerText = 'Selected: All Puroks (Barangay-Wide)';
+      }
+    } else {
+      if (hiddenInput) hiddenInput.value = '';
+      if (summaryEl) {
+        summaryEl.style.color = '#DC2626';
+        summaryEl.innerText = '⚠️ Please select at least one purok or choose All Puroks.';
+      }
+    }
+  }
+
+  function onAllPuroksToggleChange(mode, isChecked) {
+    setAllPuroksScope(mode, isChecked);
+  }
+
+  function onSinglePurokChange(mode) {
+    const checkboxes = document.querySelectorAll('.' + mode + '-purok-cb');
+    const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+    const checkedVals = checkedBoxes.map(cb => cb.value);
+    const allToggle = document.getElementById(mode + '_all_puroks_toggle');
+    const hiddenInput = document.getElementById(mode + '_target_puroks_hidden');
+    const summaryEl = document.getElementById(mode + '_purok_selection_summary');
+
+    checkboxes.forEach(cb => {
+      const label = cb.closest('.purok-checkbox-item');
+      if (label) {
+        if (cb.checked) {
+          label.classList.add('is-checked');
+          label.style.borderColor = 'var(--color-primary, #17324D)';
+          label.style.background = '#ECFDF5';
+        } else {
+          label.classList.remove('is-checked');
+          label.style.borderColor = '#E2E8F0';
+          label.style.background = '#FFFFFF';
+        }
+      }
+    });
+
+    if (checkedVals.length === checkboxes.length) {
+      if (allToggle) allToggle.checked = true;
+      if (hiddenInput) hiddenInput.value = 'All Puroks';
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerText = 'Selected: All Puroks (Barangay-Wide)';
+      }
+    } else if (checkedVals.length === 0) {
+      if (allToggle) allToggle.checked = false;
+      if (hiddenInput) hiddenInput.value = '';
+      if (summaryEl) {
+        summaryEl.style.color = '#DC2626';
+        summaryEl.innerText = '⚠️ Please select at least one purok or choose All Puroks.';
+      }
+    } else if (checkedVals.length === 1) {
+      if (allToggle) allToggle.checked = false;
+      if (hiddenInput) hiddenInput.value = checkedVals[0];
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerText = 'Selected: 1 Purok (' + checkedVals[0] + ')';
+      }
+    } else {
+      if (allToggle) allToggle.checked = false;
+      if (hiddenInput) hiddenInput.value = checkedVals.join(', ');
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerText = 'Selected: ' + checkedVals.length + ' Puroks (' + (checkedVals.length <= 3 ? checkedVals.join(', ') : checkedVals.slice(0, 3).join(', ') + ' +' + (checkedVals.length - 3) + ' more') + ')';
+      }
+    }
+  }
+
+  function filterPurokCheckboxes(mode, term) {
+    const list = document.getElementById(mode + '_purok_checkbox_list');
+    if (!list) return;
+    const filter = (term || '').trim().toLowerCase();
+    const items = list.querySelectorAll('.purok-checkbox-item');
+    items.forEach(item => {
+      const pName = (item.getAttribute('data-purok') || item.textContent || '').toLowerCase();
+      if (!filter || pName.includes(filter)) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
+
+  function initPurokScopeForEdit(targetPuroks) {
+    const raw = (targetPuroks || 'All Puroks').trim();
+    const editSearch = document.getElementById('edit_purok_search');
+    if (editSearch) {
+      editSearch.value = '';
+      filterPurokCheckboxes('edit', '');
+    }
+
+    if (raw === 'All Puroks' || raw === 'All' || raw === '') {
+      setAllPuroksScope('edit', true);
+    } else {
+      const selectedList = raw.split(',').map(s => s.trim().toLowerCase());
+      const checkboxes = document.querySelectorAll('.edit-purok-cb');
+      checkboxes.forEach(cb => {
+        cb.checked = selectedList.includes(cb.value.trim().toLowerCase());
+      });
+      onSinglePurokChange('edit');
+    }
   }
 </script>
 

@@ -162,6 +162,10 @@ try {
 
         // Table: events
         if (in_array('events', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'events', 'target_puroks')) {
+                echo "  [+] Adding column `target_puroks` to `events`...\n";
+                $pdo->exec("ALTER TABLE `events` ADD COLUMN `target_puroks` varchar(255) NOT NULL DEFAULT 'All Puroks' AFTER `venue`;");
+            }
             if (!$hasColumn($pdo, 'events', 'latitude')) {
                 echo "  [+] Adding column `latitude` to `events`...\n";
                 $pdo->exec("ALTER TABLE `events` ADD COLUMN `latitude` decimal(10,6) DEFAULT NULL AFTER `venue`;");

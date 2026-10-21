@@ -39,6 +39,22 @@ $personnel = trim($_POST['assigned_personnel'] ?? '');
 $target = max(10, (int)($_POST['target_participants'] ?? 50));
 $description = trim($_POST['description'] ?? '');
 
+// Target Puroks handling (single, multi, or 'All Puroks')
+$targetPuroksInput = $_POST['target_puroks'] ?? 'All Puroks';
+if (is_array($targetPuroksInput)) {
+    $filteredPuroks = array_values(array_filter(array_map('trim', $targetPuroksInput)));
+    if (empty($filteredPuroks) || in_array('All Puroks', $filteredPuroks, true)) {
+        $targetPuroks = 'All Puroks';
+    } else {
+        $targetPuroks = implode(', ', $filteredPuroks);
+    }
+} else {
+    $targetPuroks = trim((string)$targetPuroksInput);
+    if ($targetPuroks === '' || $targetPuroks === 'All' || strcasecmp($targetPuroks, 'All Puroks') === 0) {
+        $targetPuroks = 'All Puroks';
+    }
+}
+
 // Process expected activities list as initial content execution
 $contentExecutionInput = $_POST['content_execution'] ?? ($_POST['expected_activities'] ?? []);
 if (is_array($contentExecutionInput)) {
@@ -52,7 +68,11 @@ if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
 }
 
 try {
-    // Self-heal content_execution & expected_activities columns if missing
+    // Self-heal target_puroks, content_execution & expected_activities columns if missing
+    $colsTp = $db->query("SHOW COLUMNS FROM events LIKE 'target_puroks'")->fetchAll();
+    if (empty($colsTp)) {
+        $db->exec("ALTER TABLE events ADD COLUMN target_puroks VARCHAR(255) NOT NULL DEFAULT 'All Puroks' AFTER venue");
+    }
     $colsCe = $db->query("SHOW COLUMNS FROM events LIKE 'content_execution'")->fetchAll();
     if (empty($colsCe)) {
         $db->exec("ALTER TABLE events ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
@@ -93,13 +113,13 @@ try {
 
     $stmt = $db->prepare("
         INSERT INTO events (
-            title, activity_type, barangay_id, venue, latitude, longitude, start_datetime, end_datetime,
+            title, activity_type, barangay_id, venue, target_puroks, latitude, longitude, start_datetime, end_datetime,
             assigned_personnel, target_participants, actual_participants, description,
             status, content_execution, expected_activities, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
     ");
     $stmt->execute([
-        $title, $type, $barangayId, $venue, $eventLat, $eventLng, $startDate, $endDate,
+        $title, $type, $barangayId, $venue, $targetPuroks, $eventLat, $eventLng, $startDate, $endDate,
         $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $user['id']
     ]);
     $actId = $db->lastInsertId();
@@ -110,10 +130,11 @@ try {
         VALUES ('all', ?, ?, ?, 'informational', 'events', ?, ?, NOW())
     ");
     $notifTitle = "Community Event: $title";
-    $notifMsg = "Barangay event scheduled: $title ($type) at $venue on " . date('M d, Y h:i A', strtotime($startDate)) . ". Residents and responders are invited to participate.";
+    $scopeDesc = ($targetPuroks === 'All Puroks') ? "Barangay-wide" : "Target Puroks: $targetPuroks";
+    $notifMsg = "Barangay event scheduled: $title ($type) at $venue on " . date('M d, Y h:i A', strtotime($startDate)) . " ($scopeDesc). Residents and responders are invited to participate.";
     $notif->execute([$barangayId, $notifTitle, $notifMsg, $actId, $user['id']]);
 
-    // Send SMS alerts to residents of this barangay
+    // Send SMS alerts to residents of this barangay (filtered by target puroks if specified)
     $smsSentCount = 0;
     if ($barangayId) {
         $brgyStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
@@ -124,12 +145,24 @@ try {
             ? "BARANGAY DISASTER RISK REDUCTION AND MANAGEMENT COMMITTEE ($brgyName)"
             : "BARANGAY DISASTER RISK REDUCTION AND MANAGEMENT COMMITTEE";
 
-        $resStmt = $db->prepare("
-            SELECT id, first_name, last_name, full_name, phone 
+        $resSql = "
+            SELECT id, first_name, last_name, full_name, phone, purok 
             FROM residents 
             WHERE barangay_id = ? AND phone IS NOT NULL AND TRIM(phone) != '' AND status != 'archived'
-        ");
-        $resStmt->execute([$barangayId]);
+        ";
+        $resParams = [$barangayId];
+
+        if ($targetPuroks !== 'All Puroks') {
+            $purokList = array_values(array_filter(array_map('trim', explode(',', $targetPuroks))));
+            if (!empty($purokList)) {
+                $placeholders = implode(',', array_fill(0, count($purokList), '?'));
+                $resSql .= " AND purok IN ($placeholders)";
+                $resParams = array_merge($resParams, $purokList);
+            }
+        }
+
+        $resStmt = $db->prepare($resSql);
+        $resStmt->execute($resParams);
         $residents = $resStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $fStart = date('M d, Y h:i A', strtotime($startDate));
@@ -142,6 +175,7 @@ try {
                 . "Hi $rName!\n"
                 . "A new event has been scheduled in your barangay:\n"
                 . "Event: $title\n"
+                . "Target Scope: $targetPuroks\n"
                 . "Venue: $venue\n"
                 . "Start: $fStart\n"
                 . "End: $fEnd\n"
@@ -154,7 +188,7 @@ try {
         }
     }
 
-    logSystemEvent('SCHEDULE_ACTIVITY', 'Preparedness', "Scheduled activity $title ($type) and sent SMS notices to $smsSentCount residents.");
+    logSystemEvent('SCHEDULE_ACTIVITY', 'Preparedness', "Scheduled activity $title ($type, Scope: $targetPuroks) and sent SMS notices to $smsSentCount residents.");
 
     $flashMsg = "Preparedness activity scheduled successfully." . ($smsSentCount > 0 ? " SMS alerts sent to $smsSentCount resident(s)." : "");
     redirectWithFlash($returnUrl, 'success', $flashMsg);
