@@ -62,6 +62,24 @@ foreach ($centers as $c) {
 }
 $occupancyRate = $totalCapacity > 0 ? round(($totalEvacuees / $totalCapacity) * 100, 1) : 0;
 
+// Evacuee Family Check-In Stats across Centers
+$checkinCounts = [];
+try {
+    $ckStmt = $db->query("
+        SELECT evacuation_area_id, 
+               COUNT(*) AS total_families,
+               SUM(CASE WHEN status = 'Sheltered' THEN 1 ELSE 0 END) AS sheltered_families,
+               SUM(CASE WHEN status = 'Sheltered' THEN pwd_count ELSE 0 END) AS pwd_count,
+               SUM(CASE WHEN status = 'Sheltered' THEN seniors_count ELSE 0 END) AS seniors_count,
+               SUM(relief_packs_given) AS total_packs
+        FROM evacuation_family_checkins
+        GROUP BY evacuation_area_id
+    ");
+    $checkinCounts = $ckStmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
+} catch (Throwable $e) {}
+
+$totalShelteredFamilies = array_sum(array_column($checkinCounts, 'sheltered_families'));
+
 $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll();
 ?>
 
@@ -82,7 +100,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
   </div>
 
   <!-- Overview Metrics -->
-  <div class="metrics-grid">
+  <div class="metrics-grid" style="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;">
     <div class="metric-card">
       <div class="metric-header">
         <span class="metric-label">Designated Centers</span>
@@ -103,7 +121,16 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
 
     <div class="metric-card">
       <div class="metric-header">
-        <span class="metric-label">Sheltered Evacuees</span>
+        <span class="metric-label">Sheltered Families</span>
+        <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      </div>
+      <div class="metric-value" style="color:var(--color-primary);"><?= number_format($totalShelteredFamilies) ?></div>
+      <div class="metric-meta">Admitted to Safe Havens</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <span class="metric-label">Sheltered Individuals</span>
         <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
       </div>
       <div class="metric-value"><?= number_format($totalEvacuees) ?></div>
@@ -112,7 +139,7 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
 
     <div class="metric-card">
       <div class="metric-header">
-        <span class="metric-label">Overall City Occupancy</span>
+        <span class="metric-label">City Occupancy Load</span>
         <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
       </div>
       <div class="metric-value" style="color:var(--color-primary);"><?= $occupancyRate ?>%</div>
@@ -195,6 +222,27 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
             </div>
           </div>
 
+          <?php
+            $cStats = $checkinCounts[$center['id']] ?? [
+                'total_families' => 0,
+                'sheltered_families' => 0,
+                'pwd_count' => 0,
+                'seniors_count' => 0,
+                'total_packs' => 0
+            ];
+          ?>
+          <!-- Family Demographics Strip -->
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;font-size:9.5px;">
+            <span class="badge badge-primary" style="font-size:9.5px;">🏠 <?= (int)$cStats['sheltered_families'] ?> Families Sheltered</span>
+            <?php if ((int)$cStats['pwd_count'] > 0): ?>
+              <span class="badge badge-warning" style="font-size:9.5px;"><?= $cStats['pwd_count'] ?> PWD</span>
+            <?php endif; ?>
+            <?php if ((int)$cStats['seniors_count'] > 0): ?>
+              <span class="badge badge-neutral" style="font-size:9.5px;"><?= $cStats['seniors_count'] ?> Seniors</span>
+            <?php endif; ?>
+            <span class="badge badge-neutral" style="font-size:9.5px;">📦 <?= (int)$cStats['total_packs'] ?> Food Packs</span>
+          </div>
+
           <!-- Accessibility -->
           <div style="font-size:10px;margin-bottom:8px;">
             <span style="font-weight:600;color:var(--color-text);">Road Accessibility:</span>
@@ -220,11 +268,18 @@ $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fet
           </div>
         </div>
 
-        <div class="card-footer">
+        <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
           <span style="font-size:9px;color:var(--color-text-muted);">Coordinates: <?= $center['coordinates_lat'] ?>, <?= $center['coordinates_lng'] ?></span>
-          <button class="btn btn-outline btn-sm" onclick="openUpdateEvacModal(<?= htmlspecialchars(json_encode($center)) ?>)">
-            Update Occupancy
-          </button>
+          <div style="display:flex;gap:4px;">
+            <?php if ((int)$center['barangay_id'] === 12): ?>
+              <a href="<?= BASE_URL ?>/views/barangay/evacuation.php" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 8px;text-decoration:none;" title="View family intake manifest">
+                🏠 Families (<?= (int)$cStats['sheltered_families'] ?>)
+              </a>
+            <?php endif; ?>
+            <button class="btn btn-outline btn-sm" onclick="openUpdateEvacModal(<?= htmlspecialchars(json_encode($center)) ?>)">
+              Update Occupancy
+            </button>
+          </div>
         </div>
       </div>
     <?php endforeach; ?>

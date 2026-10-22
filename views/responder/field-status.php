@@ -9,7 +9,14 @@ require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireRole('responder');
 $user = getCurrentUser();
+$responderBarangayId = (int)($user['barangay_id'] ?? 0);
 $db = getDBConnection();
+
+if ($responderBarangayId === 0) {
+    $bStmt = $db->prepare("SELECT barangay_id FROM users WHERE id = ?");
+    $bStmt->execute([(int)$user['id']]);
+    $responderBarangayId = (int)$bStmt->fetchColumn();
+}
 
 $statStmt = $db->prepare("SELECT * FROM responder_field_updates WHERE responder_id = ? ORDER BY created_at DESC LIMIT 1");
 $statStmt->execute([$user['id']]);
@@ -18,26 +25,36 @@ $activeStatus = $currentStatus['operational_status'] ?? 'Available';
 
 $targetRequestId = isset($_GET['request_id']) ? (int)$_GET['request_id'] : 0;
 
-$activeIncidents = $db->query("
+$incStmt = $db->prepare("
     SELECT dr.id, dr.tracking_code, dr.disaster_type, dr.purok_name, b.name AS barangay_name, dr.barangay_id
     FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     WHERE dr.status NOT IN ('Completed', 'Rejected')
+      AND dr.barangay_id = ?
     ORDER BY dr.created_at DESC
-")->fetchAll();
+");
+$incStmt->execute([$responderBarangayId]);
+$activeIncidents = $incStmt->fetchAll();
 
-$historyStmt = $db->query("
+$historyStmt = $db->prepare("
     SELECT rfu.*, u.full_name AS responder_name, b.name AS barangay_name, dr.tracking_code
     FROM responder_field_updates rfu
     JOIN users u ON rfu.responder_id = u.id
     JOIN barangays b ON rfu.barangay_id = b.id
     LEFT JOIN disaster_reports dr ON rfu.disaster_request_id = dr.id
+    WHERE rfu.barangay_id = ?
     ORDER BY rfu.created_at DESC
     LIMIT 25
 ");
+$historyStmt->execute([$responderBarangayId]);
 $historyLogs = $historyStmt->fetchAll();
 
-$barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll();
+$barangayStmt = $db->prepare("SELECT id, name FROM barangays WHERE id = ?");
+$barangayStmt->execute([$responderBarangayId]);
+$barangays = $barangayStmt->fetchAll();
+if (empty($barangays)) {
+    $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll();
+}
 
 $pageTitle = "Field Status & Situational Report";
 require_once __DIR__ . '/../layouts/header.php';

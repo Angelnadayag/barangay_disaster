@@ -10,6 +10,8 @@ require_once __DIR__ . '/../../backend/services/Auth.php';
 require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireRole('responder');
+header("Location: " . BASE_URL . "/views/responder/active-incidents.php");
+exit;
 $user = getCurrentUser();
 $userId = (int)$user['id'];
 $db = getDBConnection();
@@ -18,7 +20,7 @@ $filterTab = $_GET['tab'] ?? 'upcoming';
 $searchQuery = trim($_GET['q'] ?? '');
 
 // Fetch Responder's Confirmed Event IDs
-$myRsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE user_id = ? OR (phone != '' AND phone = ?)");
+$myRsvpStmt = $db->prepare("SELECT activity_id FROM event_attendees WHERE (is_archived = 0 OR is_archived IS NULL) AND (user_id = ? OR (phone != '' AND phone = ?))");
 $myRsvpStmt->execute([$userId, $user['phone'] ?? '']);
 $myConfirmedEventIds = $myRsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 

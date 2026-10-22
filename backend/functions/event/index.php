@@ -34,6 +34,12 @@ switch ($action) {
     case 'restore':
         require __DIR__ . '/restore.php';
         break;
+    case 'delete':
+        require __DIR__ . '/delete.php';
+        break;
+    case 'toggle_attendance':
+        require __DIR__ . '/toggle_attendance.php';
+        break;
     default:
         require_once __DIR__ . '/../../config/config.php';
         require_once __DIR__ . '/../../services/Helpers.php';

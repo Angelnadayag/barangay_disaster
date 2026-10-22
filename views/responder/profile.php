@@ -1,7 +1,6 @@
 <?php
 // ============================================================================
-// Views (Responder): Responder Profile & Unit Readiness
-// Tactical responder badge, equipment checklist, and security settings
+// Views (Responder): Profile Settings & Security
 // ============================================================================
 
 require_once __DIR__ . '/../../backend/config/config.php';
@@ -15,7 +14,7 @@ $db = getDBConnection();
 $passwordMsg = '';
 $passwordError = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['change_password'])) {
     $currentPass = $_POST['current_password'] ?? '';
     $newPass = $_POST['new_password'] ?? '';
     $confirmPass = $_POST['confirm_password'] ?? '';
@@ -25,11 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     $currentHash = $chkStmt->fetchColumn();
 
     if (!password_verify($currentPass, $currentHash)) {
-        $passwordError = "Current password does not match our records.";
+        $passwordError = "Current password does not match.";
     } elseif (strlen($newPass) < 6) {
-        $passwordError = "New password must be at least 6 characters long.";
+        $passwordError = "New password must be at least 6 characters.";
     } elseif ($newPass !== $confirmPass) {
-        $passwordError = "New password and confirmation do not match.";
+        $passwordError = "New passwords do not match.";
     } else {
         $newHash = password_hash($newPass, PASSWORD_BCRYPT);
         $upd = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
@@ -39,174 +38,333 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     }
 }
 
-$pageTitle = "Responder Profile & Unit Checklist";
+// Fetch fresh responder details with barangay name
+$userStmt = $db->prepare("
+    SELECT u.*, b.name AS barangay_name 
+    FROM users u 
+    LEFT JOIN barangays b ON u.barangay_id = b.id 
+    WHERE u.id = ? 
+    LIMIT 1
+");
+$userStmt->execute([(int)$user['id']]);
+$userData = $userStmt->fetch(PDO::FETCH_ASSOC) ?: $user;
+
+// Latest operational status
+$statStmt = $db->prepare("SELECT operational_status FROM responder_field_updates WHERE responder_id = ? ORDER BY created_at DESC LIMIT 1");
+$statStmt->execute([(int)$user['id']]);
+$activeStatus = $statStmt->fetchColumn() ?: ($userData['availability'] ?? 'Available');
+
+$pageTitle = "Profile Settings";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
-  <div class="page-header" style="margin-bottom:12px;padding-bottom:6px;">
-    <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0;">Responder Unit Profile &amp; Settings</h1>
+<style>
+/* Responder Profile Settings: Anti-Slop, Borderless Surface Design, Palette (#17324D, #2F6F73) */
+.res-profile-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 4px 2px 24px 2px;
+}
+
+.res-profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.res-profile-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  margin: 0;
+}
+
+.res-profile-logout {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.15s ease;
+}
+
+.res-profile-logout:hover {
+  opacity: 0.85;
+}
+
+.res-card-surface {
+  background: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-primary, 10px);
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(16, 35, 54, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.res-user-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.res-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: #EBF3F5;
+  color: var(--color-primary, #17324D);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.res-user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.res-user-name {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.res-role-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--color-secondary, #2F6F73);
+  background: #EBF3F5;
+  padding: 2px 7px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.res-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .res-info-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.res-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.res-info-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted, #8A96A0);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.res-info-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #24313A);
+  word-break: break-word;
+}
+
+.res-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  margin: 0;
+}
+
+.res-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.res-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.res-form-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #66737D);
+}
+
+.res-form-input {
+  background: #F4F6F8;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--color-text, #24313A);
+  outline: none;
+  font-family: var(--font-primary);
+  transition: background 0.15s ease;
+}
+
+.res-form-input:focus {
+  background: #EBF3F5;
+}
+
+.res-submit-btn {
+  background: var(--color-primary, #17324D);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: opacity 0.15s ease;
+}
+
+.res-submit-btn:hover {
+  opacity: 0.9;
+}
+
+.res-alert-success {
+  background: #ECFDF5;
+  color: #065F46;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.res-alert-error {
+  background: #FEF2F2;
+  color: #991B1B;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+</style>
+
+<div class="res-profile-wrap">
+
+  <!-- Header Bar -->
+  <div class="res-profile-header">
+    <h1 class="res-profile-title">Profile Settings</h1>
+    <a href="<?= BASE_URL ?>/backend/functions/auth/logout.php" class="res-profile-logout">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+        <polyline points="16 17 21 12 16 7"></polyline>
+        <line x1="21" y1="12" x2="9" y2="12"></line>
+      </svg>
+      <span>Log Out</span>
+    </a>
+  </div>
+
+  <!-- Responder Information Card -->
+  <div class="res-card-surface">
+    <div class="res-user-header">
+      <div class="res-avatar">
+        <?= strtoupper(substr(trim($userData['full_name'] ?? 'R'), 0, 1)) ?>
+      </div>
+      <div class="res-user-meta">
+        <h2 class="res-user-name"><?= clean($userData['full_name']) ?></h2>
+        <span class="res-role-badge">Tactical Responder</span>
+      </div>
+    </div>
+
+    <div class="res-info-grid">
+      <div class="res-info-item">
+        <span class="res-info-label">Username</span>
+        <span class="res-info-val"><?= clean($userData['username']) ?></span>
+      </div>
+      <div class="res-info-item">
+        <span class="res-info-label">Mobile Number</span>
+        <span class="res-info-val"><?= clean($userData['phone'] ?: '—') ?></span>
+      </div>
+      <div class="res-info-item">
+        <span class="res-info-label">Email</span>
+        <span class="res-info-val"><?= clean($userData['email'] ?: '—') ?></span>
+      </div>
+      <div class="res-info-item">
+        <span class="res-info-label">Assigned Sector</span>
+        <span class="res-info-val">Brgy. <?= clean($userData['barangay_name'] ?? 'Hinaplanon') ?></span>
+      </div>
+      <div class="res-info-item">
+        <span class="res-info-label">Purok</span>
+        <span class="res-info-val"><?= clean($userData['purok'] ?: '—') ?></span>
+      </div>
+      <div class="res-info-item">
+        <span class="res-info-label">Role / Position</span>
+        <span class="res-info-val"><?= clean($userData['position'] ?: 'Field Responder') ?></span>
+      </div>
+      <div class="res-info-item">
+        <span class="res-info-label">Operational Status</span>
+        <span class="res-info-val" style="color:var(--color-secondary,#2F6F73);"><?= clean($activeStatus) ?></span>
+      </div>
+      <?php if (!empty($userData['gender'])): ?>
+        <div class="res-info-item">
+          <span class="res-info-label">Gender</span>
+          <span class="res-info-val"><?= clean($userData['gender']) ?></span>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 
-  <div class="responsive-split-grid split-50-50">
-    <!-- Left Column: Unit Credentials & Security -->
-    <div style="display:flex;flex-direction:column;gap:var(--space-4);">
-      <!-- Profile Card -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <h2 class="card-title">Field Responder Credentials</h2>
-        </div>
-        <div class="card-body">
-          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--color-border);">
-            <div style="width:54px;height:54px;border-radius:12px;background:#e0f2fe;display:flex;align-items:center;justify-content:center;color:#0284c7;font-weight:700;font-size:22px;border:2px solid #bae6fd;">
-              <?= strtoupper(substr($user['full_name'], 0, 1)) ?>
-            </div>
-            <div>
-              <h3 style="font-size:16px;font-weight:700;color:var(--color-text);margin:0 0 4px 0;">
-                <?= clean($user['full_name']) ?>
-              </h3>
-              <div style="font-size:12px;color:var(--color-primary);font-weight:600;">
-                Callsign: Alpha-Echo-1 &bull; Rescue Unit #<?= (int)$user['id'] ?>
-              </div>
-            </div>
-          </div>
+  <!-- Change Password Card -->
+  <div class="res-card-surface">
+    <h3 class="res-card-title">Change Password</h3>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;">
-            <div>
-              <label style="font-weight:600;color:var(--color-text-muted);display:block;margin-bottom:2px;">Username</label>
-              <div style="font-weight:600;color:var(--color-text);"><?= clean($user['username']) ?></div>
-            </div>
-            <div>
-              <label style="font-weight:600;color:var(--color-text-muted);display:block;margin-bottom:2px;">Assigned Sector</label>
-              <div style="font-weight:600;color:var(--color-text);"><?= clean($user['barangay_name'] ?? 'Iligan City Wide') ?></div>
-            </div>
-            <div>
-              <label style="font-weight:600;color:var(--color-text-muted);display:block;margin-bottom:2px;">Contact Phone</label>
-              <div style="font-weight:600;color:var(--color-text);"><?= clean($user['phone'] ?? '+63 917 555 0192') ?></div>
-            </div>
-            <div>
-              <label style="font-weight:600;color:var(--color-text-muted);display:block;margin-bottom:2px;">Duty Status</label>
-              <span class="badge badge-success" style="font-size:10px;">Active On-Duty</span>
-            </div>
-          </div>
-        </div>
+    <?php if (!empty($passwordMsg)): ?>
+      <div class="res-alert-success"><?= clean($passwordMsg) ?></div>
+    <?php elseif (!empty($passwordError)): ?>
+      <div class="res-alert-error"><?= clean($passwordError) ?></div>
+    <?php endif; ?>
+
+    <form method="POST" class="res-form">
+      <div class="res-form-group">
+        <label class="res-form-label">Current Password</label>
+        <input type="password" name="current_password" class="res-form-input" required autocomplete="current-password">
       </div>
-
-      <!-- Password Change -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <h2 class="card-title">Security & Password</h2>
-        </div>
-        <div class="card-body">
-          <?php if (!empty($passwordMsg)): ?>
-            <div style="background:#ecfdf5;border:1px solid #10b981;color:#065f46;padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:14px;">
-              <?= clean($passwordMsg) ?>
-            </div>
-          <?php elseif (!empty($passwordError)): ?>
-            <div style="background:#fef2f2;border:1px solid #ef4444;color:#991b1b;padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:14px;">
-              <?= clean($passwordError) ?>
-            </div>
-          <?php endif; ?>
-
-          <form method="POST">
-            <div class="form-group" style="margin-bottom:12px;">
-              <label class="form-label" style="font-size:12px;">Current Password</label>
-              <input type="password" name="current_password" class="form-control" required style="font-size:12px;">
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-              <label class="form-label" style="font-size:12px;">New Password</label>
-              <input type="password" name="new_password" class="form-control" required minlength="6" style="font-size:12px;">
-            </div>
-            <div class="form-group" style="margin-bottom:16px;">
-              <label class="form-label" style="font-size:12px;">Confirm New Password</label>
-              <input type="password" name="confirm_password" class="form-control" required minlength="6" style="font-size:12px;">
-            </div>
-            <button type="submit" name="change_password" class="btn btn-primary btn-sm">
-              Update Password
-            </button>
-          </form>
-        </div>
+      <div class="res-form-group">
+        <label class="res-form-label">New Password</label>
+        <input type="password" name="new_password" class="res-form-input" required minlength="6" autocomplete="new-password">
       </div>
-    </div>
-
-    <!-- Right Column: Radio Channels & Gear Checklist -->
-    <div style="display:flex;flex-direction:column;gap:var(--space-4);">
-      <!-- VHF Comms Channels -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <h2 class="card-title">Emergency Radio Frequencies</h2>
-        </div>
-        <div class="card-body" style="padding:0;">
-          <table class="table" style="font-size:12px;margin-bottom:0;">
-            <thead>
-              <tr>
-                <th>Channel</th>
-                <th>Frequency</th>
-                <th>Designation</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>CH 1 (Main)</strong></td>
-                <td><code>145.500 MHz</code></td>
-                <td>ICDRRMO Command & Dispatch</td>
-              </tr>
-              <tr>
-                <td><strong>CH 2 (Tactical)</strong></td>
-                <td><code>146.225 MHz</code></td>
-                <td>Riverine Rescue & Search Alpha</td>
-              </tr>
-              <tr>
-                <td><strong>CH 3 (Evac)</strong></td>
-                <td><code>144.875 MHz</code></td>
-                <td>Barangay Evac Center Coord</td>
-              </tr>
-              <tr>
-                <td><strong>CH 4 (Med)</strong></td>
-                <td><code>147.100 MHz</code></td>
-                <td>Triage & Emergency Medical</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="res-form-group">
+        <label class="res-form-label">Confirm New Password</label>
+        <input type="password" name="confirm_password" class="res-form-input" required minlength="6" autocomplete="new-password">
       </div>
-
-      <!-- Rapid Deployment Gear Checklist -->
-      <div class="card" style="margin-bottom:0;">
-        <div class="card-header">
-          <h2 class="card-title">Field Pack Inspection Checklist</h2>
-        </div>
-        <div class="card-body" style="font-size:12px;">
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox" checked>
-              <span>VHF Two-Way Radio with spare charged lithium battery</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox" checked>
-              <span>Type III PFD Life Vest + Whistle + Throw Bag (20m)</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox" checked>
-              <span>Level 2 First Aid Trauma Kit + Tourniquet</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox" checked>
-              <span>Tactical Waterproof Headlamp + spare batteries</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox" checked>
-              <span>Heavy Duty Rescue Gloves & Steel-Toe Boots</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="checkbox">
-              <span>GPS Handheld Locator / offline topo map cache</span>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
+      <button type="submit" name="change_password" class="res-submit-btn">
+        Update Password
+      </button>
+    </form>
   </div>
+
+</div>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

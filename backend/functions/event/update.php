@@ -53,8 +53,30 @@ if ($venue === '__custom__') {
     $venue = trim($_POST['venue_custom'] ?? $act['venue']);
 }
 $personnel = trim($_POST['assigned_personnel'] ?? $act['assigned_personnel']);
-$target = max(5, (int)($_POST['target_participants'] ?? $act['target_participants']));
+$target = max(1, (int)($_POST['target_participants'] ?? $act['target_participants']));
 $description = trim($_POST['description'] ?? $act['description']);
+
+// Target Type handling (household_families vs all_members)
+$targetType = trim($_POST['target_type'] ?? ($act['target_type'] ?? 'household_families'));
+if (!in_array($targetType, ['household_families', 'all_members'], true)) {
+    $targetType = 'household_families';
+}
+
+// Target Puroks handling (single, multi, or 'All Puroks')
+$targetPuroksInput = $_POST['target_puroks'] ?? ($act['target_puroks'] ?? 'All Puroks');
+if (is_array($targetPuroksInput)) {
+    $filteredPuroks = array_values(array_filter(array_map('trim', $targetPuroksInput)));
+    if (empty($filteredPuroks) || in_array('All Puroks', $filteredPuroks, true)) {
+        $targetPuroks = 'All Puroks';
+    } else {
+        $targetPuroks = implode(', ', $filteredPuroks);
+    }
+} else {
+    $targetPuroks = trim((string)$targetPuroksInput);
+    if ($targetPuroks === '' || $targetPuroks === 'All' || strcasecmp($targetPuroks, 'All Puroks') === 0) {
+        $targetPuroks = 'All Puroks';
+    }
+}
 
 // Process content execution checklist if supplied
 $contentExecutionInput = $_POST['content_execution'] ?? ($_POST['expected_activities'] ?? null);
@@ -88,7 +110,15 @@ if (empty($title) || empty($venue) || empty($startDate) || empty($endDate)) {
 }
 
 try {
-    // Self-heal expected_activities column if missing
+    // Self-heal target_puroks, target_type & expected_activities columns if missing
+    $colsTp = $db->query("SHOW COLUMNS FROM events LIKE 'target_puroks'")->fetchAll();
+    if (empty($colsTp)) {
+        $db->exec("ALTER TABLE events ADD COLUMN target_puroks VARCHAR(255) NOT NULL DEFAULT 'All Puroks' AFTER venue");
+    }
+    $colsTt = $db->query("SHOW COLUMNS FROM events LIKE 'target_type'")->fetchAll();
+    if (empty($colsTt)) {
+        $db->exec("ALTER TABLE events ADD COLUMN target_type VARCHAR(50) NOT NULL DEFAULT 'household_families' AFTER target_puroks");
+    }
     $colsEa = $db->query("SHOW COLUMNS FROM events LIKE 'expected_activities'")->fetchAll();
     if (empty($colsEa)) {
         $db->exec("ALTER TABLE events ADD COLUMN expected_activities TEXT NULL AFTER content_execution");
@@ -101,6 +131,8 @@ try {
                     title = ?,
                     activity_type = ?,
                     venue = ?,
+                    target_puroks = ?,
+                    target_type = ?,
                     start_datetime = ?,
                     end_datetime = ?,
                     assigned_personnel = ?,
@@ -110,7 +142,7 @@ try {
                 WHERE id = ?
             ");
             $updateStmt->execute([
-                $title, $type, $venue, $startDate, $endDate,
+                $title, $type, $venue, $targetPuroks, $targetType, $startDate, $endDate,
                 $personnel, $target, $description, $contentExecutionJson, $id
             ]);
         } else {
@@ -119,6 +151,8 @@ try {
                     title = ?,
                     activity_type = ?,
                     venue = ?,
+                    target_puroks = ?,
+                    target_type = ?,
                     start_datetime = ?,
                     end_datetime = ?,
                     assigned_personnel = ?,
@@ -129,7 +163,7 @@ try {
                 WHERE id = ?
             ");
             $updateStmt->execute([
-                $title, $type, $venue, $startDate, $endDate,
+                $title, $type, $venue, $targetPuroks, $targetType, $startDate, $endDate,
                 $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $id
             ]);
         }
@@ -139,6 +173,8 @@ try {
                 title = ?,
                 activity_type = ?,
                 venue = ?,
+                target_puroks = ?,
+                target_type = ?,
                 start_datetime = ?,
                 end_datetime = ?,
                 assigned_personnel = ?,
@@ -147,9 +183,15 @@ try {
             WHERE id = ?
         ");
         $updateStmt->execute([
-            $title, $type, $venue, $startDate, $endDate,
+            $title, $type, $venue, $targetPuroks, $targetType, $startDate, $endDate,
             $personnel, $target, $description, $id
         ]);
+    }
+
+    // Dynamically sync status between Scheduled and Ongoing if event is not completed or cancelled
+    if (!in_array($act['status'], ['Completed', 'Cancelled'], true)) {
+        $updatedStatus = (strtotime($startDate) <= time()) ? 'Ongoing' : 'Scheduled';
+        $db->prepare("UPDATE events SET status = ? WHERE id = ?")->execute([$updatedStatus, $id]);
     }
 
     // Sync coordinates if venue is an evacuation area
@@ -162,6 +204,27 @@ try {
             $coordUpdate->execute([$evacCoord['coordinates_lat'], $evacCoord['coordinates_lng'], $id]);
         }
     }
+
+    // Sync financial aid allocation if this event is Social Welfare / Financial Aid
+    syncEventFinancialAidAllocation($db, $id, $act['barangay_id']);
+
+    // Sync notifications target_puroks, category, and title for this event
+    try {
+        $notifCategory = determineEventNotificationCategory($type, $contentExecutionInput);
+        if ($notifCategory === 'financial_aid') {
+            $notifTitle = "Financial Aid: $title";
+        } elseif ($notifCategory === 'resources') {
+            $notifTitle = "Resources: $title";
+        } else {
+            $notifTitle = "Community Event: $title";
+        }
+        $db->prepare("
+            UPDATE notifications 
+            SET target_puroks = ?, related_module = ?, title = ? 
+            WHERE related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') 
+              AND related_id = ?
+        ")->execute([$targetPuroks, $notifCategory, $notifTitle, $id]);
+    } catch (Throwable $ignore) {}
 
     logSystemEvent('UPDATE_ACTIVITY', 'Preparedness', "Updated event #$id: $title ($type)");
 

@@ -36,6 +36,9 @@ $activityTypes = [
   "Agricultural Programs"
 ];
 
+// Auto-sync event statuses: Scheduled events whose starting time has arrived transition to Ongoing
+syncEventStatuses($db);
+
 $sql = "
     SELECT pa.*, b.name AS barangay_name, u.full_name AS creator_name 
     FROM events pa 

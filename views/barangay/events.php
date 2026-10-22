@@ -35,9 +35,16 @@ $colsAtt = $db->query("SHOW COLUMNS FROM event_attendees LIKE 'attended'")->fetc
 if (empty($colsAtt)) {
   $db->exec("ALTER TABLE event_attendees ADD COLUMN attended TINYINT(1) NOT NULL DEFAULT 1 AFTER resident_name");
 }
+$colsTp = $db->query("SHOW COLUMNS FROM events LIKE 'target_puroks'")->fetchAll();
+if (empty($colsTp)) {
+  $db->exec("ALTER TABLE events ADD COLUMN target_puroks VARCHAR(255) NOT NULL DEFAULT 'All Puroks' AFTER venue");
+}
 
 $now = time();
 $nowStr = date('Y-m-d H:i:s');
+
+// Auto-sync event statuses: Scheduled events whose starting time has arrived transition to Ongoing
+syncEventStatuses($db);
 
 $viewTab = $_GET['tab'] ?? 'active';
 if (!in_array($viewTab, ['active', 'archived'], true)) {
@@ -68,27 +75,73 @@ $evacStmt = $db->prepare("
 $evacStmt->execute([$barangayId, $barangayId]);
 $evacuationVenues = $evacStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch active puroks for this barangay with official population records
+$purokStmt = $db->prepare("
+    SELECT id, name, population, households 
+    FROM puroks 
+    WHERE (barangay_id = ? OR barangay_id IS NULL) AND (status = 'active' OR status IS NULL)
+    ORDER BY name ASC
+");
+$purokStmt->execute([$barangayId]);
+$barangayPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$totalPurokPopulation = 0;
+$totalPurokHouseholds = 0;
+foreach ($barangayPuroks as $p) {
+  $totalPurokPopulation += (int) ($p['population'] ?? 0);
+  $totalPurokHouseholds += (int) ($p['households'] ?? 0);
+}
+
+// Fetch active household families for this barangay (to list in event overview)
+$hhQueryStmt = $db->prepare("
+    SELECT id, household_code, family_name, head_full_name, head_phone, purok_name, purok_id
+    FROM purok_households 
+    WHERE (barangay_id = ? OR barangay_id IS NULL) AND (status = 'active' OR status IS NULL)
+    ORDER BY purok_name ASC, household_code ASC
+");
+$hhQueryStmt->execute([$barangayId]);
+$barangayHouseholds = $hhQueryStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch active individual household members for this barangay (to list when event is set to all members)
+$memQueryStmt = $db->prepare("
+    SELECT hm.id, hm.household_id, hm.full_name, hm.relationship, hm.gender, hm.age, hm.is_authorized_rep,
+           ph.family_name, ph.household_code, ph.purok_name, ph.purok_id, COALESCE(ph.head_phone, '') AS phone
+    FROM household_members hm
+    INNER JOIN purok_households ph ON hm.household_id = ph.id
+    WHERE (ph.barangay_id = ? OR ph.barangay_id IS NULL) AND (ph.status = 'active' OR ph.status IS NULL)
+    ORDER BY ph.purok_name ASC, ph.family_name ASC, hm.is_authorized_rep DESC, hm.age DESC
+");
+$memQueryStmt->execute([$barangayId]);
+$barangayMembers = $memQueryStmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Status breakdown counts for current tab
 $baseWhere = "(barangay_id = ? OR barangay_id IS NULL)" . ($viewTab === 'archived' ? " AND is_archived = 1" : " AND (is_archived = 0 OR is_archived IS NULL)");
 
-$upcomingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime > ?");
+$upcomingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled', 'Ongoing', 'Ended', 'Finished') AND start_datetime > ?");
 $upcomingCountStmt->execute([$barangayId, $nowStr]);
-$countUpcoming = (int)$upcomingCountStmt->fetchColumn();
+$countUpcoming = (int) $upcomingCountStmt->fetchColumn();
 
-$ongoingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime <= ? AND end_datetime >= ?");
+// Ongoing: actively between start_datetime and end_datetime
+$ongoingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled', 'Ended', 'Finished') AND start_datetime <= ? AND end_datetime > ?");
 $ongoingCountStmt->execute([$barangayId, $nowStr, $nowStr]);
-$countOngoing = (int)$ongoingCountStmt->fetchColumn();
+$countOngoing = (int) $ongoingCountStmt->fetchColumn();
+
+// Ended / Finished: end_datetime has been met and not yet marked Completed or Cancelled
+$endedCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND (status IN ('Ended', 'Finished') OR (status NOT IN ('Completed', 'Cancelled') AND end_datetime <= ?))");
+$endedCountStmt->execute([$barangayId, $nowStr]);
+$countEnded = (int) $endedCountStmt->fetchColumn();
 
 $completedCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status = 'Completed'");
 $completedCountStmt->execute([$barangayId]);
-$countCompleted = (int)$completedCountStmt->fetchColumn();
+$countCompleted = (int) $completedCountStmt->fetchColumn();
 
 $cancelledCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status = 'Cancelled'");
 $cancelledCountStmt->execute([$barangayId]);
-$countCancelled = (int)$cancelledCountStmt->fetchColumn();
+$countCancelled = (int) $cancelledCountStmt->fetchColumn();
 
 // Query String helper to preserve filters across actions
-function getEventFilterUrl($newParams = []) {
+function getEventFilterUrl($newParams = [])
+{
   $params = $_GET;
   foreach ($newParams as $k => $v) {
     if ($v === null || $v === '') {
@@ -128,11 +181,14 @@ if (!empty($filterVenue)) {
 
 if (!empty($filterStatus)) {
   if ($filterStatus === 'Upcoming') {
-    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled') AND pa.start_datetime > ?";
+    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled', 'Ongoing', 'Ended', 'Finished') AND pa.start_datetime > ?";
     $params[] = $nowStr;
   } elseif ($filterStatus === 'Ongoing') {
-    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled') AND pa.start_datetime <= ? AND pa.end_datetime >= ?";
+    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled', 'Ended', 'Finished') AND pa.start_datetime <= ? AND pa.end_datetime > ?";
     $params[] = $nowStr;
+    $params[] = $nowStr;
+  } elseif ($filterStatus === 'Ended' || $filterStatus === 'Finished') {
+    $sql .= " AND (pa.status IN ('Ended', 'Finished') OR (pa.status NOT IN ('Completed', 'Cancelled') AND pa.end_datetime <= ?))";
     $params[] = $nowStr;
   } else {
     $sql .= " AND pa.status = ?";
@@ -262,6 +318,7 @@ $defaultExpectedByType = [
     "Job Fair"
   ],
   "Social Welfare and Assistance" => [
+    "Financial Aid Distribution",
     "Financial Assistance Distribution",
     "Food Assistance Distribution",
     "Relief Goods Distribution",
@@ -410,6 +467,11 @@ require_once __DIR__ . '/../layouts/header.php';
     pointer-events: auto !important;
   }
 
+  #householdMembersModal.modal-overlay,
+  #householdMembersModal.modal-overlay.active {
+    z-index: 100005 !important;
+  }
+
   .modal-dialog {
     background: #ffffff !important;
     width: 100% !important;
@@ -547,6 +609,27 @@ require_once __DIR__ . '/../layouts/header.php';
     white-space: pre-wrap;
     margin-top: 6px;
   }
+
+  .purok-checkbox-item {
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+
+  .purok-checkbox-item:hover {
+    border-color: var(--color-primary, #17324D) !important;
+    background: #F0FDF4 !important;
+  }
+
+  #create_purok_checkbox_list::-webkit-scrollbar,
+  #edit_purok_checkbox_list::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  #create_purok_checkbox_list::-webkit-scrollbar-thumb,
+  #edit_purok_checkbox_list::-webkit-scrollbar-thumb {
+    background: #94A3B8;
+    border-radius: 6px;
+  }
 </style>
 
 <div class="page-header">
@@ -566,7 +649,7 @@ require_once __DIR__ . '/../layouts/header.php';
       </svg>
       SMS Dispatch Logs (<?= count($recentSmsLogs) ?>)
     </button>
-    <button class="btn btn-primary" onclick="openModal('createActivityModal')">
+    <button class="btn btn-primary" onclick="openCreateActivityModal()">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -578,7 +661,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
 <!-- Tabs Navigation: Active Events vs Archived Events -->
 <div class="nav-tabs" style="margin-bottom: var(--space-3, 12px);">
-  <a href="<?= getEventFilterUrl(['tab' => 'active']) ?>" class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
+  <a href="<?= getEventFilterUrl(['tab' => 'active']) ?>"
+    class="nav-tab-item <?= $viewTab === 'active' ? 'active' : '' ?>">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
       <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -588,7 +672,8 @@ require_once __DIR__ . '/../layouts/header.php';
     Active Events
     <span class="nav-tab-badge"><?= $activeCount ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['tab' => 'archived']) ?>" class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
+  <a href="<?= getEventFilterUrl(['tab' => 'archived']) ?>"
+    class="nav-tab-item <?= $viewTab === 'archived' ? 'active' : '' ?>">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="21 8 21 21 3 21 3 8"></polyline>
       <rect x="1" y="3" width="22" height="5"></rect>
@@ -601,56 +686,73 @@ require_once __DIR__ . '/../layouts/header.php';
 
 <!-- Quick Status Filter Selection Buttons -->
 <div class="evac-filter-pills" style="margin-bottom: 12px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-  <span style="font-size:11px; font-weight:700; color:var(--color-text-secondary); margin-right:4px; text-transform:uppercase; letter-spacing:0.3px;">
+  <span
+    style="font-size:11px; font-weight:700; color:var(--color-text-secondary); margin-right:4px; text-transform:uppercase; letter-spacing:0.3px;">
     Quick Status:
   </span>
-  <a href="<?= getEventFilterUrl(['status' => '']) ?>" 
-     class="evac-pill-btn <?= empty($filterStatus) ? 'active' : '' ?>">
-    All Events <span class="badge <?= empty($filterStatus) ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $viewTab === 'archived' ? $archivedCount : $activeCount ?></span>
+  <a href="<?= getEventFilterUrl(['status' => '']) ?>"
+    class="evac-pill-btn <?= empty($filterStatus) ? 'active' : '' ?>">
+    All Events <span class="badge <?= empty($filterStatus) ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $viewTab === 'archived' ? $archivedCount : $activeCount ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['status' => 'Upcoming']) ?>" 
-     class="evac-pill-btn <?= $filterStatus === 'Upcoming' ? 'active' : '' ?>">
-    Upcoming <span class="badge <?= $filterStatus === 'Upcoming' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countUpcoming ?></span>
+  <a href="<?= getEventFilterUrl(['status' => 'Upcoming']) ?>"
+    class="evac-pill-btn <?= $filterStatus === 'Upcoming' ? 'active' : '' ?>">
+    Upcoming <span class="badge <?= $filterStatus === 'Upcoming' ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $countUpcoming ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['status' => 'Ongoing']) ?>" 
-     class="evac-pill-btn <?= $filterStatus === 'Ongoing' ? 'active' : '' ?>">
-    In Progress / Started <span class="badge <?= $filterStatus === 'Ongoing' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countOngoing ?></span>
+  <a href="<?= getEventFilterUrl(['status' => 'Ongoing']) ?>"
+    class="evac-pill-btn <?= $filterStatus === 'Ongoing' ? 'active' : '' ?>">
+    In Progress / Started <span class="badge <?= $filterStatus === 'Ongoing' ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $countOngoing ?></span>
   </a>
-  <a href="<?= getEventFilterUrl(['status' => 'Completed']) ?>" 
-     class="evac-pill-btn <?= $filterStatus === 'Completed' ? 'active' : '' ?>">
-    Completed <span class="badge <?= $filterStatus === 'Completed' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countCompleted ?></span>
+  <a href="<?= getEventFilterUrl(['status' => 'Ended']) ?>"
+    class="evac-pill-btn <?= ($filterStatus === 'Ended' || $filterStatus === 'Finished') ? 'active' : '' ?>">
+    Ended / For Evaluation <span class="badge <?= ($filterStatus === 'Ended' || $filterStatus === 'Finished') ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px; <?= ($countEnded > 0 && $filterStatus !== 'Ended') ? 'background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;' : '' ?>"><?= $countEnded ?></span>
+  </a>
+  <a href="<?= getEventFilterUrl(['status' => 'Completed']) ?>"
+    class="evac-pill-btn <?= $filterStatus === 'Completed' ? 'active' : '' ?>">
+    Completed <span class="badge <?= $filterStatus === 'Completed' ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px;"><?= $countCompleted ?></span>
   </a>
   <?php if ($countCancelled > 0): ?>
-    <a href="<?= getEventFilterUrl(['status' => 'Cancelled']) ?>" 
-       class="evac-pill-btn <?= $filterStatus === 'Cancelled' ? 'active' : '' ?>">
-      Cancelled <span class="badge <?= $filterStatus === 'Cancelled' ? 'badge-primary' : 'badge-neutral' ?>" style="font-size:9px; padding:1px 5px;"><?= $countCancelled ?></span>
+    <a href="<?= getEventFilterUrl(['status' => 'Cancelled']) ?>"
+      class="evac-pill-btn <?= $filterStatus === 'Cancelled' ? 'active' : '' ?>">
+      Cancelled <span class="badge <?= $filterStatus === 'Cancelled' ? 'badge-primary' : 'badge-neutral' ?>"
+        style="font-size:9px; padding:1px 5px;"><?= $countCancelled ?></span>
     </a>
   <?php endif; ?>
 </div>
 
 <!-- Search & Filter Selection Form Card -->
-<div class="card" style="margin-bottom: var(--space-4, 16px); background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 8px;">
+<div class="card"
+  style="margin-bottom: var(--space-4, 16px); background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 8px;">
   <div class="card-body" style="padding: 12px 16px;">
-    <form method="GET" action="" class="filter-form" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
+    <form method="GET" action="" class="filter-form"
+      style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;">
       <input type="hidden" name="tab" value="<?= clean($viewTab) ?>">
 
       <!-- Search Input -->
       <div style="flex:2; min-width:200px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Search Activity
         </label>
         <div style="position:relative; display:flex; align-items:center;">
-          <svg style="position:absolute; left:10px; width:14px; height:14px; color:#94A3B8; pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg style="position:absolute; left:10px; width:14px; height:14px; color:#94A3B8; pointer-events:none;"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="text" name="search" class="form-control" style="padding-left:32px; font-size:12px; height:36px;" placeholder="Search title, facilitator, keyword..." value="<?= clean($search) ?>">
+          <input type="text" name="search" class="form-control" style="padding-left:32px; font-size:12px; height:36px;"
+            placeholder="Search title, facilitator, keyword..." value="<?= clean($search) ?>">
         </div>
       </div>
 
       <!-- Activity Type Filter Selection -->
       <div style="flex:1.2; min-width:170px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Activity Type
         </label>
         <select name="type" class="form-control" style="font-size:12px; height:36px;">
@@ -665,7 +767,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <!-- Venue Location Filter Selection (Strictly Evacuation Areas) -->
       <div style="flex:1.5; min-width:200px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Venue Location (Evacuation Areas)
         </label>
         <select name="venue" class="form-control" style="font-size:12px; height:36px;">
@@ -680,13 +783,15 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <!-- Status Filter Selection -->
       <div style="flex:1; min-width:130px;">
-        <label style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
+        <label
+          style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--color-text-muted); display:block; margin-bottom:4px; letter-spacing:0.3px;">
           Status
         </label>
         <select name="status" class="form-control" style="font-size:12px; height:36px;">
           <option value="">All Statuses</option>
-          <option value="Upcoming" <?= $filterStatus === 'Upcoming' ? 'selected' : '' ?>>Upcoming</option>
+          <option value="Upcoming" <?= $filterStatus === 'Upcoming' ? 'selected' : '' ?>>Upcoming (Scheduled)</option>
           <option value="Ongoing" <?= $filterStatus === 'Ongoing' ? 'selected' : '' ?>>In Progress / Started</option>
+          <option value="Ended" <?= ($filterStatus === 'Ended' || $filterStatus === 'Finished') ? 'selected' : '' ?>>Ended / Finished (Needs Evaluation)</option>
           <option value="Completed" <?= $filterStatus === 'Completed' ? 'selected' : '' ?>>Completed</option>
           <option value="Cancelled" <?= $filterStatus === 'Cancelled' ? 'selected' : '' ?>>Cancelled</option>
         </select>
@@ -694,14 +799,17 @@ require_once __DIR__ . '/../layouts/header.php';
 
       <!-- Action Buttons: Filter Selection Button & Reset Button -->
       <div style="display:flex; gap:6px; align-items:center;">
-        <button type="submit" class="btn btn-primary" id="btnFilterSelection" style="height:36px; padding:0 15px; font-size:12px; display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+        <button type="submit" class="btn btn-primary" id="btnFilterSelection"
+          style="height:36px; padding:0 15px; font-size:12px; display:inline-flex; align-items:center; gap:6px; font-weight:600;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
           </svg>
           Filter Selection
         </button>
         <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
-          <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline" style="height:36px; padding:0 12px; font-size:12px; color:var(--color-text-muted); display:inline-flex; align-items:center; gap:4px;" title="Reset All Filters">
+          <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline"
+            style="height:36px; padding:0 12px; font-size:12px; color:var(--color-text-muted); display:inline-flex; align-items:center; gap:4px;"
+            title="Reset All Filters">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -714,30 +822,36 @@ require_once __DIR__ . '/../layouts/header.php';
 
     <!-- Active Filters Summary Line if any filter is set -->
     <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
-      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed #E2E8F0; display:flex; justify-content:space-between; align-items:center; font-size:11px; flex-wrap:wrap; gap:8px;">
+      <div
+        style="margin-top:10px; padding-top:8px; border-top:1px dashed #E2E8F0; display:flex; justify-content:space-between; align-items:center; font-size:11px; flex-wrap:wrap; gap:8px;">
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
           <span style="font-weight:600; color:var(--color-text-secondary);">Applied Filters:</span>
           <?php if (!empty($search)): ?>
-            <a href="<?= getEventFilterUrl(['search' => '']) ?>" class="badge badge-neutral" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['search' => '']) ?>" class="badge badge-neutral"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Keyword: "<?= clean($search) ?>" &times;
             </a>
           <?php endif; ?>
           <?php if (!empty($filterType)): ?>
-            <a href="<?= getEventFilterUrl(['type' => '']) ?>" class="badge badge-info" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['type' => '']) ?>" class="badge badge-info"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Type: <?= clean($filterType) ?> &times;
             </a>
           <?php endif; ?>
           <?php if (!empty($filterVenue)): ?>
-            <a href="<?= getEventFilterUrl(['venue' => '']) ?>" class="badge badge-success" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['venue' => '']) ?>" class="badge badge-success"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Venue: <?= clean($filterVenue) ?> &times;
             </a>
           <?php endif; ?>
           <?php if (!empty($filterStatus)): ?>
-            <a href="<?= getEventFilterUrl(['status' => '']) ?>" class="badge badge-primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            <a href="<?= getEventFilterUrl(['status' => '']) ?>" class="badge badge-primary"
+              style="text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
               Status: <?= clean($filterStatus) ?> &times;
             </a>
           <?php endif; ?>
-          <a href="?tab=<?= clean($viewTab) ?>" style="font-size:10.5px; color:#DC2626; margin-left:6px; font-weight:600; text-decoration:underline;">
+          <a href="?tab=<?= clean($viewTab) ?>"
+            style="font-size:10.5px; color:#DC2626; margin-left:6px; font-weight:600; text-decoration:underline;">
             Clear All
           </a>
         </div>
@@ -781,7 +895,8 @@ require_once __DIR__ . '/../layouts/header.php';
             </div>
             <?php if (!empty($search) || !empty($filterType) || !empty($filterVenue) || !empty($filterStatus)): ?>
               <div style="margin-top:10px;">
-                <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline btn-xs" style="font-size:11px;padding:4px 10px;">
+                <a href="?tab=<?= clean($viewTab) ?>" class="btn btn-outline btn-xs"
+                  style="font-size:11px;padding:4px 10px;">
                   Clear Filter Selection
                 </a>
               </div>
@@ -791,9 +906,10 @@ require_once __DIR__ . '/../layouts/header.php';
       <?php else: ?>
         <?php foreach ($activities as $act): ?>
           <?php
-          $startTime = strtotime($act['start_datetime']);
+           $startTime = strtotime($act['start_datetime']);
           $endTime = strtotime($act['end_datetime']);
           $isStarted = ($now >= $startTime);
+          $isEnded = ($now >= $endTime);
           $isCompleted = ($act['status'] === 'Completed');
           $isCancelled = ($act['status'] === 'Cancelled');
           $isArchived = !empty($act['is_archived']);
@@ -806,20 +922,21 @@ require_once __DIR__ . '/../layouts/header.php';
               <div style="font-size:9px;color:var(--color-text-muted);">
                 <?= formatDate($act['start_datetime'], 'h:i A') ?> — <?= formatDate($act['end_datetime'], 'h:i A') ?>
               </div>
-              <?php if ($isArchived): ?>
-                <span
-                  style="display:inline-block;margin-top:2px;font-size:8.5px;color:#64748B;background:#F1F5F9;padding:1px 5px;border-radius:4px;font-weight:600;">Archived</span>
-              <?php elseif (!$isStarted && !$isCompleted && !$isCancelled): ?>
-                <span
-                  style="display:inline-block;margin-top:2px;font-size:8.5px;color:var(--color-info,#0284C7);background:#E0F2FE;padding:1px 5px;border-radius:4px;font-weight:600;">Upcoming</span>
-              <?php elseif ($isStarted && !$isCompleted && !$isCancelled): ?>
-                <span
-                  style="display:inline-block;margin-top:2px;font-size:8.5px;color:#16A34A;background:#DCFCE7;padding:1px 5px;border-radius:4px;font-weight:600;">●
-                  Started / In Progress</span>
-              <?php endif; ?>
             </td>
             <td>
-              <div style="font-weight:600;color:var(--color-primary);"><?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?></div>
+              <div style="font-weight:600;color:var(--color-primary);">
+                <?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?>
+              </div>
+              <?php $scopePuroks = clean($act['target_puroks'] ?? 'All Puroks'); ?>
+              <div
+                style="font-size:9.5px;color:<?= ($scopePuroks === 'All Puroks') ? 'var(--color-teal, #2F6F73)' : '#0284C7' ?>;margin-top:3px;display:flex;align-items:center;gap:3px;font-weight:600;"
+                title="Target Purok Scope: <?= $scopePuroks ?>">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span><?= ($scopePuroks === 'All Puroks') ? 'All Puroks (Barangay-Wide)' : $scopePuroks ?></span>
+              </div>
             </td>
             <td><span class="badge badge-info"><?= clean($act['activity_type']) ?></span></td>
             <td><?= clean($act['venue']) ?></td>
@@ -845,8 +962,20 @@ require_once __DIR__ . '/../layouts/header.php';
             <td>
               <?php if ($isArchived): ?>
                 <span class="badge badge-neutral" style="font-size:9.5px;">Archived</span>
+              <?php elseif ($isCancelled): ?>
+                <span class="badge badge-danger" style="font-size:9.5px;">Cancelled</span>
+              <?php elseif ($isCompleted): ?>
+                <span class="badge badge-success" style="font-size:9.5px;">Completed</span>
+              <?php elseif ($isEnded || $act['status'] === 'Ended' || $act['status'] === 'Finished'): ?>
+                <span class="badge badge-warning" style="font-size:9.5px;background:#FEF3C7;color:#B45309;border:1px solid #FDE68A;font-weight:600;display:inline-flex;align-items:center;gap:4px;" title="Event schedule has ended. Ready for evaluation.">
+                  <span style="font-size:7px;">⏹</span> Ended
+                </span>
+              <?php elseif ($act['status'] === 'Ongoing' || $isStarted): ?>
+                <span class="badge badge-warning" style="font-size:9.5px;background:#DCFCE7;color:#16A34A;border:1px solid #BBF7D0;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                  <span style="font-size:7px;">●</span> Ongoing
+                </span>
               <?php else: ?>
-                <?= renderStatusBadge($act['status']) ?>
+                <span class="badge badge-info" style="font-size:9.5px;">Scheduled</span>
               <?php endif; ?>
             </td>
             <td>
@@ -861,6 +990,30 @@ require_once __DIR__ . '/../layouts/header.php';
                   </svg>
                   View
                 </button>
+                <?php if (($isEnded || $act['status'] === 'Ended' || $act['status'] === 'Finished') && !$isCompleted && !$isCancelled && !$isArchived): ?>
+                  <button type="button" class="btn btn-success btn-sm"
+                    onclick='openEvaluateModal(<?= json_encode($act) ?>, <?= json_encode($actAttendees) ?>)'
+                    style="font-size:11px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;background:var(--color-success,#16A34A);border-color:var(--color-success,#16A34A);color:#fff;"
+                    title="Evaluate Event Execution & Attendance">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M9 11l3 3L22 4"></path>
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    Evaluate
+                  </button>
+                <?php endif; ?>
+                <?php if ($isArchived): ?>
+                  <button type="button" class="btn btn-outline btn-sm"
+                    onclick='confirmDeleteActivity(<?= json_encode($act) ?>, <?= count($actAttendees) ?>)'
+                    style="font-size:11px;padding:4px 8px;color:#DC2626;border-color:#FCA5A5;display:inline-flex;align-items:center;gap:3px;"
+                    title="Permanently Delete Event and Registered Attendees">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Delete
+                  </button>
+                <?php endif; ?>
               </div>
             </td>
           </tr>
@@ -939,6 +1092,108 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
         </div>
 
+        <!-- Target Purok Scope Selection (Single, Multi, or All Puroks) -->
+        <div class="form-group" style="margin-top:10px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label form-label-required"
+              style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
+              Target Purok Scope
+            </label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('create', true)"
+                style="font-size:9.5px;padding:2px 7px;">Select All</button>
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('create', false)"
+                style="font-size:9.5px;padding:2px 7px;">Clear</button>
+            </div>
+          </div>
+
+          <!-- Master All Puroks Toggle Card -->
+          <div
+            style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+            <label
+              style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
+              <input type="checkbox" id="create_all_puroks_toggle"
+                onchange="onAllPuroksToggleChange('create', this.checked)" checked
+                style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
+              <span>All Puroks (Barangay-Wide)</span>
+            </label>
+            <span class="badge badge-info" id="create_all_puroks_badge"
+              style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
+              (<?= number_format($totalPurokPopulation) ?> Residents)</span>
+          </div>
+
+          <!-- Counting Basis Toggle: Household Families vs All Members -->
+          <input type="hidden" name="target_type" id="create_target_type" value="household_families">
+          <div
+            style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <label
+              style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:#0F766E;">
+              <input type="checkbox" id="create_count_by_families"
+                onchange="onCountingUnitCheckboxChange('create', this.checked)"
+                style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
+              <span>Count by <strong>House Families</strong> (1 per Household Representative) <span
+                  style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
+            </label>
+            <span id="create_counting_unit_badge" class="badge"
+              style="font-size:9.5px;padding:2px 7px;background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">
+              All Members
+            </span>
+          </div>
+
+          <!-- Quick Filter Input -->
+          <div style="position:relative;margin-bottom:6px;">
+            <input type="text" id="create_purok_search" class="form-control"
+              placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
+              oninput="filterPurokCheckboxes('create', this.value)"
+              style="font-size:11px;padding:4px 8px;padding-left:26px;height:28px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="position:absolute;left:8px;top:8px;color:#94A3B8;pointer-events:none;">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+
+          <!-- Multi-Select Checkboxes Grid -->
+          <div id="create_purok_checkbox_list"
+            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
+            <?php foreach ($barangayPuroks as $p): ?>
+              <?php
+              $pPop = (int) ($p['population'] ?? 0);
+              $pHouseholds = (int) ($p['households'] ?? 0);
+              ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+                data-households="<?= $pHouseholds ?>"
+                style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                  <input type="checkbox" class="create-purok-cb" value="<?= clean($p['name']) ?>"
+                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked
+                    onchange="onSinglePurokChange('create')"
+                    style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
+                  <span
+                    style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
+                </div>
+                <span class="create-purok-pill" data-pop="<?= $pPop ?>" data-hh="<?= $pHouseholds ?>"
+                  style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;"
+                  title="Recorded Population">
+                  <?= number_format($pPop) ?>
+                </span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+
+          <!-- Live Selection Feedback Label & Hidden Submission Input -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+            <div id="create_purok_selection_summary"
+              style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
+              Selected: All Puroks (Barangay-Wide) • <?= number_format($totalPurokPopulation) ?> residents
+            </div>
+            <div style="font-size:9.5px;color:var(--color-text-muted);">
+              Select single, multi, or all
+            </div>
+          </div>
+          <input type="hidden" name="target_puroks" id="create_target_puroks_hidden" value="All Puroks">
+        </div>
+
         <div class="form-group">
           <label class="form-label form-label-required">Venue Location (Evacuation Areas)</label>
           <select name="venue" id="create_venue_select" class="form-control" required>
@@ -971,8 +1226,19 @@ require_once __DIR__ . '/../layouts/header.php';
               placeholder="e.g. Barangay Disaster Committee, CDRRMO Facilitator" required>
           </div>
           <div class="form-group">
-            <label class="form-label form-label-required">Target Residents</label>
-            <input type="number" name="target_participants" class="form-control" min="5" value="60" required>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="form-label form-label-required" id="create_target_label" style="margin:0;">Target
+                Residents</label>
+              <span id="create_target_pop_hint"
+                style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
+                Recorded Pop: <?= number_format($totalPurokPopulation) ?>
+              </span>
+            </div>
+            <input type="number" name="target_participants" id="create_target_participants" class="form-control" min="1"
+              value="<?= (int) $totalPurokPopulation ?>" required>
+            <div id="create_target_calc_subtext" style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
+              Auto-calculated from selected purok population records
+            </div>
           </div>
         </div>
 
@@ -1065,6 +1331,111 @@ require_once __DIR__ . '/../layouts/header.php';
           </div>
         </div>
 
+        <!-- Target Purok Scope Selection for Edit (Single, Multi, or All Puroks) -->
+        <div class="form-group" style="margin-top:10px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label form-label-required"
+              style="margin:0;font-size:11.5px;font-weight:700;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              Target Purok Scope
+            </label>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('edit', true)"
+                style="font-size:9.5px;padding:2px 7px;">Select All</button>
+              <button type="button" class="btn btn-outline btn-xs" onclick="setAllPuroksScope('edit', false)"
+                style="font-size:9.5px;padding:2px 7px;">Clear</button>
+            </div>
+          </div>
+
+          <!-- Master All Puroks Toggle Card for Edit -->
+          <div
+            style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+            <label
+              style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:var(--color-primary);">
+              <input type="checkbox" id="edit_all_puroks_toggle"
+                onchange="onAllPuroksToggleChange('edit', this.checked)" checked
+                style="cursor:pointer;width:15px;height:15px;accent-color:var(--color-primary);">
+              <span>All Puroks (Barangay-Wide)</span>
+            </label>
+            <span class="badge badge-info" id="edit_all_puroks_badge"
+              style="font-size:9.5px;padding:2px 6px;"><?= count($barangayPuroks) ?> Puroks
+              (<?= number_format($totalPurokPopulation) ?> Residents)</span>
+          </div>
+
+          <!-- Counting Basis Toggle: Household Families vs All Members for Edit -->
+          <input type="hidden" name="target_type" id="edit_target_type" value="household_families">
+          <div
+            style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:6px;padding:7px 10px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <label
+              style="display:flex;align-items:center;gap:7px;margin:0;cursor:pointer;font-size:11.5px;font-weight:600;color:#0F766E;">
+              <input type="checkbox" id="edit_count_by_families"
+                onchange="onCountingUnitCheckboxChange('edit', this.checked)"
+                style="cursor:pointer;width:15px;height:15px;accent-color:#0D9488;">
+              <span>Count by <strong>House Families</strong> (1 per Household Representative) <span
+                  style="font-size:10px;color:#64748B;font-weight:normal;">— Uncheck for all members</span></span>
+            </label>
+            <span id="edit_counting_unit_badge" class="badge"
+              style="font-size:9.5px;padding:2px 7px;background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">
+              All Members
+            </span>
+          </div>
+
+          <!-- Quick Filter Input for Edit -->
+          <div style="position:relative;margin-bottom:6px;">
+            <input type="text" id="edit_purok_search" class="form-control"
+              placeholder="Search / filter puroks (e.g. Purok 1, 2a, 5b)..."
+              oninput="filterPurokCheckboxes('edit', this.value)"
+              style="font-size:11px;padding:4px 8px;padding-left:26px;height:28px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="position:absolute;left:8px;top:8px;color:#94A3B8;pointer-events:none;">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+
+          <!-- Multi-Select Checkboxes Grid for Edit -->
+          <div id="edit_purok_checkbox_list"
+            style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:140px;overflow-y:auto;">
+            <?php foreach ($barangayPuroks as $p): ?>
+              <?php
+              $pPop = (int) ($p['population'] ?? 0);
+              $pHouseholds = (int) ($p['households'] ?? 0);
+              ?>
+              <label class="purok-checkbox-item" data-purok="<?= clean($p['name']) ?>" data-population="<?= $pPop ?>"
+                data-households="<?= $pHouseholds ?>"
+                style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:var(--color-text);background:#ECFDF5;padding:5px 8px;border-radius:4px;border:1px solid var(--color-primary, #17324D);margin:0;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                  <input type="checkbox" class="edit-purok-cb" value="<?= clean($p['name']) ?>"
+                    data-population="<?= $pPop ?>" data-households="<?= $pHouseholds ?>" checked
+                    onchange="onSinglePurokChange('edit')"
+                    style="cursor:pointer;accent-color:var(--color-primary);margin:0;flex-shrink:0;">
+                  <span
+                    style="user-select:none;line-height:1.2;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= clean($p['name']) ?></span>
+                </div>
+                <span class="edit-purok-pill" data-pop="<?= $pPop ?>" data-hh="<?= $pHouseholds ?>"
+                  style="flex-shrink:0;font-size:9.5px;color:var(--color-primary);font-weight:700;background:rgba(23,50,77,0.08);padding:1px 5px;border-radius:3px;"
+                  title="Recorded Population">
+                  <?= number_format($pPop) ?>
+                </span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+
+          <!-- Live Selection Feedback Label & Hidden Submission Input for Edit -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+            <div id="edit_purok_selection_summary" style="font-size:10.5px;font-weight:600;color:var(--color-primary);">
+              Selected: All Puroks (Barangay-Wide) • <?= number_format($totalPurokPopulation) ?> residents
+            </div>
+            <div style="font-size:9.5px;color:var(--color-text-muted);">
+              Select single, multi, or all
+            </div>
+          </div>
+          <input type="hidden" name="target_puroks" id="edit_target_puroks_hidden" value="All Puroks">
+        </div>
+
         <div class="form-group">
           <label class="form-label form-label-required">Venue Location (Evacuation Areas)</label>
           <select name="venue" id="edit_venue_select" class="form-control" required>
@@ -1094,8 +1465,18 @@ require_once __DIR__ . '/../layouts/header.php';
             <input type="text" name="assigned_personnel" id="edit_act_personnel" class="form-control" required>
           </div>
           <div class="form-group">
-            <label class="form-label form-label-required">Target Residents</label>
-            <input type="number" name="target_participants" id="edit_act_target" class="form-control" min="5" required>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="form-label form-label-required" id="edit_target_label" style="margin:0;">Target
+                Residents</label>
+              <span id="edit_target_pop_hint"
+                style="font-size:10px;font-weight:700;color:var(--color-primary);background:#EFF6FF;padding:1px 6px;border-radius:3px;border:1px solid #BFDBFE;">
+                Recorded Pop: 0
+              </span>
+            </div>
+            <input type="number" name="target_participants" id="edit_act_target" class="form-control" min="1" required>
+            <div id="edit_target_calc_subtext" style="font-size:9.5px;color:var(--color-text-muted);margin-top:2px;">
+              Auto-calculated from selected purok population records
+            </div>
           </div>
         </div>
 
@@ -1109,7 +1490,7 @@ require_once __DIR__ . '/../layouts/header.php';
           style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;margin-top:14px;margin-bottom:6px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div>
-              <span style="font-size:12px;font-weight:700;color:var(--color-primary);">👥 Registered Participants</span>
+              <span style="font-size:12px;font-weight:700;color:var(--color-primary);"> Registered Participants</span>
               <div style="font-size:10px;color:var(--color-text-muted);">Manage and add attendees for this event:</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
@@ -1187,7 +1568,7 @@ require_once __DIR__ . '/../layouts/header.php';
 <!-- Modal 3A: View Accomplished Event Overview (Archive, Edit, Evaluate)       -->
 <!-- ========================================================================= -->
 <div class="modal-overlay" id="accomplishedEventModal">
-  <div class="modal-dialog" style="max-width:680px;">
+  <div class="modal-dialog" style="max-width:760px;">
     <div class="modal-header">
       <div style="display:flex;align-items:center;gap:8px;">
         <h3 class="modal-title" style="font-size:14px;font-weight:700;color:var(--color-primary);" id="view_acc_title">
@@ -1199,149 +1580,111 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <div class="modal-body" style="padding:16px 20px;">
       <!-- Title & Type Header -->
-      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-          <div>
-            <h4 style="font-size:15px;font-weight:700;color:var(--color-primary);margin:0 0 4px 0;"
-              id="acc_display_title"></h4>
-            <div style="font-size:11px;color:var(--color-text-muted);" id="acc_display_type_wrap"></div>
-          </div>
-          <span id="acc_display_type_badge" class="badge badge-info" style="font-size:10.5px;"></span>
+      <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div>
+          <h4 style="font-size:14px;font-weight:700;color:var(--color-primary);margin:0 0 2px 0;" id="acc_display_title"></h4>
+          <div style="font-size:11px;color:var(--color-text-secondary);" id="acc_display_type_wrap"></div>
         </div>
+        <span id="acc_display_type_badge" class="badge badge-info" style="font-size:10px;padding:3px 8px;"></span>
       </div>
 
-      <!-- Redesigned Meta Information Grid (Balanced 2x2 Layout) -->
-      <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;margin-bottom:14px;">
-        <!-- Card 1: Event Schedule -->
-        <div
-          style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-          <div
-            style="width:34px;height:34px;border-radius:7px;background:#EFF6FF;color:#2563EB;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
+      <!-- Meta Information Grid (Unified Palette, Anti-Slop) -->
+      <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-bottom:12px;">
+        <!-- Card 1: Schedule -->
+        <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:8px 10px;display:flex;align-items:center;gap:10px;">
+          <div style="width:28px;height:28px;border-radius:5px;background:var(--color-surface-subtle);color:var(--color-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:9.5px;color:#64748B;text-transform:uppercase;font-weight:700;letter-spacing:0.4px;">
-              Event Schedule</div>
-            <div
-              style="font-size:11.5px;font-weight:600;color:#1E293B;margin-top:2px;line-height:1.35;word-break:break-word;"
-              id="acc_display_schedule"></div>
+            <div style="font-size:9.5px;color:var(--color-text-secondary);text-transform:uppercase;font-weight:600;letter-spacing:0.3px;">Schedule</div>
+            <div style="font-size:11px;font-weight:600;color:var(--color-text);margin-top:1px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="acc_display_schedule"></div>
           </div>
         </div>
 
-        <!-- Card 2: Venue Location -->
-        <div
-          style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-          <div
-            style="width:34px;height:34px;border-radius:7px;background:#ECFDF5;color:#059669;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
+        <!-- Card 2: Venue -->
+        <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:8px 10px;display:flex;align-items:center;gap:10px;">
+          <div style="width:28px;height:28px;border-radius:5px;background:var(--color-surface-subtle);color:var(--color-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
           </div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:9.5px;color:#64748B;text-transform:uppercase;font-weight:700;letter-spacing:0.4px;">
-              Venue Location</div>
-            <div
-              style="font-size:11.5px;font-weight:600;color:#1E293B;margin-top:2px;line-height:1.35;word-break:break-word;"
-              id="acc_display_venue"></div>
+            <div style="font-size:9.5px;color:var(--color-text-secondary);text-transform:uppercase;font-weight:600;letter-spacing:0.3px;">Venue & Scope</div>
+            <div style="font-size:11px;font-weight:600;color:var(--color-text);margin-top:1px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="acc_display_venue"></div>
           </div>
         </div>
 
         <!-- Card 3: Lead Facilitator -->
-        <div
-          style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-          <div
-            style="width:34px;height:34px;border-radius:7px;background:#F5F3FF;color:#7C3AED;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
+        <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:8px 10px;display:flex;align-items:center;gap:10px;">
+          <div style="width:28px;height:28px;border-radius:5px;background:var(--color-surface-subtle);color:var(--color-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
           </div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:9.5px;color:#64748B;text-transform:uppercase;font-weight:700;letter-spacing:0.4px;">
-              Lead Facilitator</div>
-            <div
-              style="font-size:11.5px;font-weight:600;color:#1E293B;margin-top:2px;line-height:1.35;word-break:break-word;"
-              id="acc_display_facilitator"></div>
+            <div style="font-size:9.5px;color:var(--color-text-secondary);text-transform:uppercase;font-weight:600;letter-spacing:0.3px;">Facilitator</div>
+            <div style="font-size:11px;font-weight:600;color:var(--color-text);margin-top:1px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="acc_display_facilitator"></div>
           </div>
         </div>
 
         <!-- Card 4: Attendance Turnout -->
-        <div
-          style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-          <div
-            style="width:34px;height:34px;border-radius:7px;background:#FFFBEB;color:#D97706;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+        <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:8px 10px;display:flex;align-items:center;gap:10px;">
+          <div style="width:28px;height:28px;border-radius:5px;background:var(--color-surface-subtle);color:var(--color-primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
           </div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:9.5px;color:#64748B;text-transform:uppercase;font-weight:700;letter-spacing:0.4px;">
-              Attendance Turnout</div>
-            <div
-              style="font-size:11.5px;font-weight:700;color:#059669;margin-top:2px;line-height:1.35;word-break:break-word;"
-              id="acc_display_attendance"></div>
-            <div id="acc_display_eval_meta"
-              style="display:none;font-size:10px;font-weight:700;color:#2563EB;margin-top:2px;line-height:1.35;"></div>
+            <div style="font-size:9.5px;color:var(--color-text-secondary);text-transform:uppercase;font-weight:600;letter-spacing:0.3px;">Turnout</div>
+            <div style="font-size:11px;font-weight:600;color:var(--color-primary);margin-top:1px;line-height:1.3;" id="acc_display_attendance"></div>
           </div>
         </div>
       </div>
 
-      <!-- Description / Objectives -->
+      <!-- Description -->
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label"
-          style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;">Objectives
-          & Description</label>
-        <div
-          style="font-size:11.5px;line-height:1.5;color:var(--color-text);background:#F8FAFC;padding:10px 12px;border-radius:6px;border:1px solid #E2E8F0;"
-          id="acc_display_description"></div>
+        <label class="form-label" style="font-size:10px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;">Description</label>
+        <div style="font-size:11.5px;line-height:1.45;color:var(--color-text);background:#FFFFFF;padding:8px 10px;border-radius:var(--radius-sm, 6px);border:1px solid var(--color-border);" id="acc_display_description"></div>
       </div>
 
-      <!-- Event Content Execution Checklist Status -->
-      <div class="form-group" style="margin-bottom:14px;">
+      <!-- Event Content Execution Milestones -->
+      <div class="form-group" style="margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <label class="form-label"
-            style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;">
-            Event Content Execution Milestones
+          <label class="form-label" style="font-size:10px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;letter-spacing:0.3px;">
+            Execution Milestones
           </label>
-          <span style="font-size:10px;color:var(--color-primary);font-weight:600;" id="acc_content_count_label"></span>
+          <span style="font-size:10.5px;color:var(--color-primary);font-weight:600;" id="acc_content_count_label"></span>
         </div>
-        <div id="acc_content_execution_box"
-          style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:10px;max-height:160px;overflow-y:auto;">
+        <div id="acc_content_execution_box" style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:8px 10px;max-height:130px;overflow-y:auto;">
           <!-- Loaded dynamically -->
         </div>
       </div>
 
-      <!-- Evaluation Remarks & Outcomes -->
-      <div class="form-group" style="margin-bottom:14px;">
-        <label class="form-label"
-          style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;">Accomplishment
-          Remarks & Outcomes</label>
-        <div
-          style="font-size:11.5px;line-height:1.5;color:var(--color-text);background:#F8FAFC;padding:10px 12px;border-radius:6px;border:1px solid #E2E8F0;white-space:pre-wrap;"
-          id="acc_display_summary"></div>
+      <!-- Accomplishment Remarks (Shown when exists) -->
+      <div class="form-group" id="acc_summary_group" style="margin-bottom:12px;display:none;">
+        <label class="form-label" style="font-size:10px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;">
+          Remarks & Outcomes
+        </label>
+        <div style="font-size:11.5px;line-height:1.45;color:var(--color-text);background:#FFFFFF;padding:8px 10px;border-radius:var(--radius-sm, 6px);border:1px solid var(--color-border);white-space:pre-wrap;" id="acc_display_summary"></div>
       </div>
 
-      <!-- Participants Attended Summary -->
+      <!-- Participant Attendees -->
       <div class="form-group" style="margin-bottom:0;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <label class="form-label"
-            style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;">
-            Participants Attended
-          </label>
-          <span style="font-size:10.5px;font-weight:600;color:var(--color-success);" id="acc_attendees_pill"></span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <label class="form-label" style="font-size:10px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;letter-spacing:0.3px;">
+              Participant Attendees
+            </label>
+            <div style="display:inline-flex;border:1px solid var(--color-border);border-radius:4px;overflow:hidden;background:var(--color-surface-subtle);">
+              <button type="button" id="acc_roster_tab_families" onclick="setAccomplishedRosterMode('household_families')" style="font-size:9.5px;font-weight:600;padding:2px 7px;border:none;cursor:pointer;background:var(--color-primary);color:#FFFFFF;transition:all 0.15s ease;">
+                House Families
+              </button>
+              <button type="button" id="acc_roster_tab_members" onclick="setAccomplishedRosterMode('all_members')" style="font-size:9.5px;font-weight:500;padding:2px 7px;border:none;cursor:pointer;background:transparent;color:var(--color-text-secondary);transition:all 0.15s ease;">
+                All Members
+              </button>
+            </div>
+            <span style="font-size:10px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);padding:1px 6px;border-radius:4px;border:1px solid var(--color-border);" id="acc_attendees_pill"></span>
+          </div>
+          <div>
+            <input type="text" id="acc_attendees_search" placeholder="Filter roster..." oninput="filterAccomplishedAttendees(this.value)" class="form-control" style="width:170px;height:26px;font-size:10.5px;padding:2px 6px;">
+          </div>
         </div>
 
-        <div id="acc_attendees_preview_box"
-          style="max-height:160px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:6px;">
+        <div id="acc_attendees_preview_box" style="max-height:260px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);background:#FFFFFF;">
           <!-- Loaded dynamically -->
         </div>
       </div>
@@ -1349,6 +1692,54 @@ require_once __DIR__ . '/../layouts/header.php';
     <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
       <div id="acc_footer_left"></div>
       <div style="display:flex;gap:6px;" id="acc_footer_right"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Modal 3A-2: View Household Family Members                                  -->
+<!-- ========================================================================= -->
+<div class="modal-overlay" id="householdMembersModal" style="z-index: 100005 !important;">
+  <div class="modal-dialog" style="max-width:620px;">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h3 class="modal-title" style="font-size:14px;font-weight:700;color:var(--color-primary);" id="hh_members_modal_title">
+          Family Members
+        </h3>
+        <span class="badge badge-neutral" style="font-size:10px;font-weight:600;" id="hh_members_badge"></span>
+      </div>
+      <button class="modal-close-btn" onclick="closeModal('householdMembersModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;">
+      <!-- Household Summary Card -->
+      <div style="background:#FFFFFF;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--color-primary);" id="hh_members_family_name">—</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;" id="hh_members_rep_info">—</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:9.5px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.3px;font-weight:600;">Purok & Code</div>
+          <div style="font-size:11px;font-weight:600;color:var(--color-text);" id="hh_members_purok_code">—</div>
+        </div>
+      </div>
+
+      <!-- Members Table Container -->
+      <div class="form-group" style="margin-bottom:0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label class="form-label" style="font-size:10px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;margin:0;letter-spacing:0.3px;">
+            Registered Family Members
+          </label>
+          <span style="font-size:10px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);padding:1px 6px;border-radius:4px;border:1px solid var(--color-border);" id="hh_members_count_pill">
+            0 Members
+          </span>
+        </div>
+        <div id="hh_members_table_box" style="max-height:260px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm, 6px);background:#FFFFFF;">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;align-items:center;">
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('householdMembersModal')">Close</button>
     </div>
   </div>
 </div>
@@ -1372,8 +1763,9 @@ require_once __DIR__ . '/../layouts/header.php';
           Are you sure you want to move the event <strong id="archive_act_name"></strong> to the Archives?
         </p>
         <div
-          style="font-size:11px;color:var(--color-text-muted);background:#FFFBEB;border:1px solid #FCD34D;border-radius:6px;padding:8px 10px;margin-top:10px;">
-          Archived events are kept for historical records and can be reviewed or restored anytime from the
+          style="font-size:11px;color:var(--color-text-muted);background:#FFFBEB;border:1px solid #FCD34D;border-radius:6px;padding:8px 10px;margin-top:10px;line-height:1.45;">
+          All registered participant families and household members for this event will also be archived with it.<br><br>
+          Archived events and participant records are kept for historical records and can be reviewed or restored anytime from the
           <strong>Archived Events</strong> tab.
         </div>
       </div>
@@ -1382,6 +1774,36 @@ require_once __DIR__ . '/../layouts/header.php';
           onclick="closeModal('archiveActivityModal')">Cancel</button>
         <button type="submit" class="btn btn-warning btn-sm"
           style="background:#D97706;border-color:#D97706;color:#fff;">Yes, Move to Archives</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Modal 3B-2: Confirm Delete Event & Attendees Permanently                  -->
+<!-- ========================================================================= -->
+<div class="modal-overlay" id="deleteActivityModal">
+  <div class="modal-dialog" style="max-width:460px;">
+    <div class="modal-header">
+      <h3 class="modal-title" style="font-size:14px;font-weight:700;color:#DC2626;">Permanently Delete Event</h3>
+      <button class="modal-close-btn" onclick="closeModal('deleteActivityModal')">&times;</button>
+    </div>
+    <form id="deleteActivityForm" method="POST" action="<?= BASE_URL ?>/backend/functions/event/index.php">
+      <input type="hidden" name="action" value="delete">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
+      <input type="hidden" name="activity_id" id="delete_act_id">
+      <div class="modal-body">
+        <p style="font-size:12.5px;color:var(--color-text);line-height:1.5;">
+          Are you sure you want to permanently delete <strong id="delete_act_name"></strong>?
+        </p>
+        <div style="font-size:11px;color:#991B1B;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:6px;padding:9px 12px;margin-top:10px;line-height:1.45;">
+          <strong>Warning: This action cannot be undone.</strong><br>
+          This event and all its registered participant families, household members, and attendance records (<span id="delete_attendees_info">0 registered</span>) will be permanently deleted. (Barangay master household records will remain safe.)
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('deleteActivityModal')">Cancel</button>
+        <button type="submit" class="btn btn-sm" style="background:#DC2626;border-color:#DC2626;color:#fff;font-weight:600;">Yes, Delete Permanently</button>
       </div>
     </form>
   </div>
@@ -1506,7 +1928,7 @@ require_once __DIR__ . '/../layouts/header.php';
           <div
             style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px solid #E2E8F0;padding-bottom:6px;">
             <div>
-              <span style="font-size:12px;font-weight:700;color:var(--color-primary);">👥 Participants Attended</span>
+              <span style="font-size:12px;font-weight:700;color:var(--color-primary);"> Participants Attended</span>
               <div style="font-size:10px;color:var(--color-text-muted);">Check off attendees who actively attended this
                 event:</div>
             </div>
@@ -1888,6 +2310,10 @@ require_once __DIR__ . '/../layouts/header.php';
   }
 
   const EXPECTED_ACTIVITIES_BY_TYPE = <?= json_encode($defaultExpectedByType, JSON_UNESCAPED_UNICODE) ?>;
+  const TOTAL_PUROK_POPULATION = <?= (int) $totalPurokPopulation ?>;
+  const TOTAL_PUROK_HOUSEHOLDS = <?= (int) $totalPurokHouseholds ?>;
+  const ALL_BARANGAY_HOUSEHOLDS = <?= json_encode($barangayHouseholds, JSON_UNESCAPED_UNICODE) ?>;
+  const ALL_BARANGAY_MEMBERS = <?= json_encode($barangayMembers, JSON_UNESCAPED_UNICODE) ?>;
 
   function onActivityTypeChange(prefix, type) {
     const container = document.getElementById(prefix + '_expected_activities_list');
@@ -1898,15 +2324,93 @@ require_once __DIR__ . '/../layouts/header.php';
     items.forEach(item => {
       html += `
       <div class="expected-activity-item" style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--color-text);background:#fff;padding:6px 9px;border-radius:5px;border:1px solid #E2E8F0;transition:all 0.15s ease;">
-        <input type="checkbox" name="content_execution[]" value="${item.replace(/"/g, '&quot;')}" checked style="margin:0;cursor:pointer;">
-        <span style="line-height:1.4;flex:1;cursor:pointer;" onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked;">${item}</span>
-        <button type="button" onclick="this.closest('.expected-activity-item').remove()" title="Delete this activity" style="background:none;border:none;color:#94A3B8;cursor:pointer;padding:2px 5px;font-size:14px;line-height:1;border-radius:3px;display:flex;align-items:center;justify-content:center;transition:color 0.15s;" onmouseover="this.style.color='#DC2626'" onmouseout="this.style.color='#94A3B8'">
+        <input type="checkbox" name="content_execution[]" value="${item.replace(/"/g, '&quot;')}" checked onchange="onExpectedActivityItemCheckboxChange('${prefix}', this)" style="margin:0;cursor:pointer;">
+        <span style="line-height:1.4;flex:1;cursor:pointer;" onclick="const cb = this.previousElementSibling; cb.checked = !cb.checked; onExpectedActivityItemCheckboxChange('${prefix}', cb);">${item}</span>
+        <button type="button" onclick="this.closest('.expected-activity-item').remove(); onExpectedActivityItemCheckboxChange('${prefix}');" title="Delete this activity" style="background:none;border:none;color:#94A3B8;cursor:pointer;padding:2px 5px;font-size:14px;line-height:1;border-radius:3px;display:flex;align-items:center;justify-content:center;transition:color 0.15s;" onmouseover="this.style.color='#DC2626'" onmouseout="this.style.color='#94A3B8'">
           &times;
         </button>
       </div>
     `;
     });
     container.innerHTML = html;
+
+    // Check if Activity Type is Social Welfare and Assistance (defaults to House Families)
+    const shouldDefaultFamilies = (type === 'Social Welfare and Assistance');
+    const familyCb = document.getElementById(prefix + '_count_by_families');
+    if (familyCb) {
+      familyCb.checked = shouldDefaultFamilies;
+      onCountingUnitCheckboxChange(prefix, shouldDefaultFamilies);
+    }
+  }
+
+  function onExpectedActivityItemCheckboxChange(prefix, changedCb) {
+    const container = document.getElementById(prefix + '_expected_activities_list');
+    if (!container) return;
+    const checkedBoxes = Array.from(container.querySelectorAll('input[name="content_execution[]"]:checked'));
+    const hasFinancialAidChecked = checkedBoxes.some(cb => {
+      const val = cb.value.toLowerCase();
+      return val.includes('financial aid') || val.includes('financial assistance') || val.includes('aid distribution') || val.includes('food assistance') || val.includes('relief goods');
+    });
+
+    const familyCb = document.getElementById(prefix + '_count_by_families');
+    if (familyCb) {
+      if (hasFinancialAidChecked && !familyCb.checked) {
+        familyCb.checked = true;
+        onCountingUnitCheckboxChange(prefix, true);
+      }
+    }
+  }
+
+  function onCountingUnitCheckboxChange(mode, isFamilies) {
+    const badge = document.getElementById(mode + '_counting_unit_badge');
+    const targetLabel = document.getElementById(mode + '_target_label');
+    const calcSubtext = document.getElementById(mode + '_target_calc_subtext');
+    const targetTypeInput = document.getElementById(mode + '_target_type');
+
+    if (targetTypeInput) {
+      targetTypeInput.value = isFamilies ? 'household_families' : 'all_members';
+    }
+
+    if (badge) {
+      if (isFamilies) {
+        badge.innerHTML = ' House Families';
+        badge.style.background = '#CCFBF1';
+        badge.style.color = '#0F766E';
+        badge.style.borderColor = '#5EEAD4';
+      } else {
+        badge.innerHTML = ' All Members';
+        badge.style.background = '#F1F5F9';
+        badge.style.color = '#475569';
+        badge.style.borderColor = '#CBD5E1';
+      }
+    }
+
+    if (targetLabel) {
+      targetLabel.innerText = isFamilies ? 'Target Households / Families' : 'Target Residents';
+    }
+
+    if (calcSubtext) {
+      calcSubtext.innerText = isFamilies
+        ? 'Auto-calculated from selected purok household records (1 per household representative)'
+        : 'Auto-calculated from selected purok population records (all individuals)';
+    }
+
+    // Update each purok count pill representation dynamically
+    const pillEls = document.querySelectorAll('.' + mode + '-purok-pill');
+    pillEls.forEach(pill => {
+      if (isFamilies) {
+        const hh = parseInt(pill.getAttribute('data-hh') || '0', 10);
+        pill.innerHTML = ` ${hh.toLocaleString()} fam`;
+        pill.title = 'Recorded Household Families';
+      } else {
+        const pop = parseInt(pill.getAttribute('data-pop') || '0', 10);
+        pill.innerHTML = ` ${pop.toLocaleString()}`;
+        pill.title = 'Recorded Population';
+      }
+    });
+
+    // Re-evaluate target count and scope summary with the selected counting unit
+    onSinglePurokChange(mode);
   }
 
   function toggleExpectedActivitiesCheckboxes(prefix, check) {
@@ -1945,7 +2449,7 @@ require_once __DIR__ . '/../layouts/header.php';
     container.scrollTop = container.scrollHeight;
   }
 
-  function onVenueSelectChange() {}
+  function onVenueSelectChange() { }
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -1956,6 +2460,11 @@ require_once __DIR__ . '/../layouts/header.php';
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
+        const hhModal = document.getElementById('householdMembersModal');
+        if (hhModal && hhModal.classList.contains('active')) {
+          closeModal('householdMembersModal');
+          return;
+        }
         document.querySelectorAll('.modal-overlay.active').forEach(m => closeModal(m.id));
       }
     });
@@ -1975,6 +2484,12 @@ require_once __DIR__ . '/../layouts/header.php';
           e.preventDefault();
           alert('Please select a venue from the evacuation areas.');
           sel.focus();
+          return false;
+        }
+        const hiddenPurok = document.getElementById(isCreate ? 'create_target_puroks_hidden' : 'edit_target_puroks_hidden');
+        if (hiddenPurok && !hiddenPurok.value.trim()) {
+          e.preventDefault();
+          alert('Please select at least one purok or select All Puroks.');
           return false;
         }
       });
@@ -2217,6 +2732,7 @@ require_once __DIR__ . '/../layouts/header.php';
           const attPill = document.getElementById('acc_display_attendance');
           if (attPill) attPill.innerText = `${data.actual_participants} attended (${targetPart} targeted)`;
 
+          currentAccomplishedRoster = buildEventParticipantRoster(currentAccomplishedAct, currentAccomplishedAttendees);
           renderAccomplishedAttendeesTable();
         }
 
@@ -2320,6 +2836,9 @@ require_once __DIR__ . '/../layouts/header.php';
             const attPill = document.getElementById('acc_display_attendance');
             if (attPill) attPill.innerText = `${data.actual_participants} attended (${targetPart} targeted)`;
           }
+          if (currentAccomplishedAct) {
+            currentAccomplishedRoster = buildEventParticipantRoster(currentAccomplishedAct, currentAccomplishedAttendees);
+          }
           renderAccomplishedAttendeesTable();
         }
 
@@ -2352,31 +2871,613 @@ require_once __DIR__ . '/../layouts/header.php';
       });
   }
 
-  function renderAccomplishedAttendeesTable() {
-    const attBox = document.getElementById('acc_attendees_preview_box');
-    const attList = currentAccomplishedAttendees || [];
-    const attendedCount = attList.filter(a => a.attended == 1 || a.attended === '1' || a.attended === true).length;
-    document.getElementById('acc_attendees_pill').innerText = `${attendedCount} confirmed attended (${attList.length} registered)`;
+  let currentAccomplishedRoster = [];
+  let currentAccomplishedRosterMode = 'household_families';
 
-    if (!attList || attList.length === 0) {
-      attBox.innerHTML = '<div style="text-align:center;padding:14px;font-size:11.5px;color:var(--color-text-muted);">No participants recorded for this event.</div>';
-    } else {
-      let attHtml = '<table class="data-table" style="font-size:10.5px;width:100%;margin:0;"><thead><tr><th style="padding:6px 8px;">Participant Name</th><th style="padding:6px 8px;">Mobile Phone</th><th style="padding:6px 8px;text-align:center;">Attended Status</th></tr></thead><tbody>';
-      attList.forEach(a => {
-        const isAtt = (a.attended == 1 || a.attended === '1' || a.attended === true);
-        attHtml += `<tr>
-        <td style="padding:6px 8px;font-weight:600;">${a.resident_name}</td>
-        <td style="padding:6px 8px;font-family:monospace;">${a.phone}</td>
-        <td style="padding:6px 8px;text-align:center;">
-          <span class="badge ${isAtt ? 'badge-success' : 'badge-neutral'}" style="font-size:9px;">
-            ${isAtt ? 'Attended ✓' : 'Registered / Absent'}
-          </span>
-        </td>
-      </tr>`;
-      });
-      attHtml += '</tbody></table>';
-      attBox.innerHTML = attHtml;
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function parseTargetPuroks(targetPuroksStr) {
+    if (!targetPuroksStr || typeof targetPuroksStr !== 'string') return [];
+    const trimmed = targetPuroksStr.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'all' || trimmed.toLowerCase().includes('all purok')) {
+      return [];
     }
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+        }
+      } catch (e) {}
+    }
+    return trimmed.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  }
+
+  function setAccomplishedRosterMode(mode, reRender = true) {
+    currentAccomplishedRosterMode = mode || 'household_families';
+    const tabFamilies = document.getElementById('acc_roster_tab_families');
+    const tabMembers = document.getElementById('acc_roster_tab_members');
+
+    if (tabFamilies && tabMembers) {
+      if (currentAccomplishedRosterMode === 'household_families') {
+        tabFamilies.style.background = 'var(--color-primary)';
+        tabFamilies.style.color = '#FFFFFF';
+        tabFamilies.style.fontWeight = '600';
+        tabMembers.style.background = 'transparent';
+        tabMembers.style.color = 'var(--color-text-secondary)';
+        tabMembers.style.fontWeight = '500';
+      } else {
+        tabMembers.style.background = 'var(--color-primary)';
+        tabMembers.style.color = '#FFFFFF';
+        tabMembers.style.fontWeight = '600';
+        tabFamilies.style.background = 'transparent';
+        tabFamilies.style.color = 'var(--color-text-secondary)';
+        tabFamilies.style.fontWeight = '500';
+      }
+    }
+
+    if (currentAccomplishedAct) {
+      currentAccomplishedRoster = buildEventParticipantRoster(currentAccomplishedAct, currentAccomplishedAttendees, currentAccomplishedRosterMode);
+    }
+
+    if (reRender) {
+      renderAccomplishedAttendeesTable();
+    }
+  }
+
+  function buildEventParticipantRoster(act, rawAttendees, mode) {
+    mode = mode || currentAccomplishedRosterMode || 'household_families';
+    const targetPuroks = parseTargetPuroks(act ? act.target_puroks : '');
+    const isAllPuroks = targetPuroks.length === 0;
+    const rawAttList = Array.isArray(rawAttendees) ? rawAttendees : [];
+    const matchedAttIds = new Set();
+    const roster = [];
+
+    if (mode === 'all_members') {
+      const allMems = (typeof ALL_BARANGAY_MEMBERS !== 'undefined' && Array.isArray(ALL_BARANGAY_MEMBERS))
+        ? ALL_BARANGAY_MEMBERS
+        : [];
+
+      let scopedMembers = allMems;
+      if (!isAllPuroks) {
+        scopedMembers = allMems.filter(m => {
+          const pName = (m.purok_name || '').trim().toLowerCase();
+          return targetPuroks.some(tp => pName === tp || pName.includes(tp) || tp.includes(pName));
+        });
+      }
+
+      scopedMembers.forEach((m, idx) => {
+        const memName = (m.full_name || '').trim().toLowerCase();
+        let matchedAtt = null;
+        if (rawAttList.length > 0) {
+          matchedAtt = rawAttList.find(a => {
+            if (matchedAttIds.has(a.id)) return false;
+            const resName = (a.resident_name || '').toLowerCase();
+            return memName && resName.includes(memName);
+          });
+        }
+
+        if (matchedAtt) {
+          matchedAttIds.add(matchedAtt.id);
+        }
+
+        const isAttended = matchedAtt ? (matchedAtt.attended == 1 || matchedAtt.attended === '1' || matchedAtt.attended === true) : false;
+
+        roster.push({
+          roster_id: idx,
+          attendee_id: matchedAtt ? matchedAtt.id : null,
+          member_id: m.id,
+          household_id: m.household_id,
+          household_code: m.household_code || '—',
+          family_name: m.family_name || 'Family',
+          full_name: m.full_name || 'Resident',
+          relationship: m.relationship || 'Member',
+          gender: m.gender || '',
+          age: (m.age !== null && m.age !== undefined && m.age !== '') ? m.age : null,
+          purok_name: m.purok_name || '—',
+          phone: m.phone || '—',
+          attended: isAttended
+        });
+      });
+
+      // Append unmatched raw attendees
+      rawAttList.forEach(a => {
+        if (!matchedAttIds.has(a.id)) {
+          const isAttended = (a.attended == 1 || a.attended === '1' || a.attended === true);
+          roster.push({
+            roster_id: roster.length,
+            attendee_id: a.id,
+            member_id: null,
+            household_id: null,
+            household_code: '—',
+            family_name: 'Resident',
+            full_name: a.resident_name || 'Participant',
+            relationship: 'Attendee',
+            gender: '',
+            age: null,
+            purok_name: act ? (act.target_puroks || '—') : '—',
+            phone: a.phone || '—',
+            attended: isAttended
+          });
+        }
+      });
+    } else {
+      // household_families mode
+      const allHh = (typeof ALL_BARANGAY_HOUSEHOLDS !== 'undefined' && Array.isArray(ALL_BARANGAY_HOUSEHOLDS)) 
+        ? ALL_BARANGAY_HOUSEHOLDS 
+        : [];
+      
+      let scopedHouseholds = allHh;
+      if (!isAllPuroks) {
+        scopedHouseholds = allHh.filter(hh => {
+          const pName = (hh.purok_name || '').trim().toLowerCase();
+          return targetPuroks.some(tp => pName === tp || pName.includes(tp) || tp.includes(pName));
+        });
+      }
+
+      scopedHouseholds.forEach((hh, idx) => {
+        const hhCode = (hh.household_code || '').trim().toLowerCase();
+        const famName = (hh.family_name || '').trim().toLowerCase();
+        const headName = (hh.head_full_name || '').trim().toLowerCase();
+        const phone = (hh.head_phone || '').trim();
+
+        let matchedAtt = null;
+        if (rawAttList.length > 0) {
+          matchedAtt = rawAttList.find(a => {
+            if (matchedAttIds.has(a.id)) return false;
+            const resName = (a.resident_name || '').toLowerCase();
+            if (hhCode && resName.includes(hhCode)) return true;
+            if (headName && resName.includes(headName)) return true;
+            if (famName && resName.includes(famName)) return true;
+            if (phone && a.phone && a.phone.trim() === phone) return true;
+            return false;
+          });
+        }
+
+        if (matchedAtt) {
+          matchedAttIds.add(matchedAtt.id);
+        }
+
+        const isAttended = matchedAtt ? (matchedAtt.attended == 1 || matchedAtt.attended === '1' || matchedAtt.attended === true) : false;
+
+        roster.push({
+          roster_id: idx,
+          attendee_id: matchedAtt ? matchedAtt.id : null,
+          household_id: hh.id,
+          household_code: hh.household_code || '—',
+          family_name: hh.family_name || 'Family',
+          head_name: hh.head_full_name || 'Family Representative',
+          purok_name: hh.purok_name || '—',
+          phone: (matchedAtt && matchedAtt.phone) ? matchedAtt.phone : (hh.head_phone || '—'),
+          attended: isAttended
+        });
+      });
+
+      // Append unmatched raw attendees
+      rawAttList.forEach(a => {
+        if (!matchedAttIds.has(a.id)) {
+          const isAttended = (a.attended == 1 || a.attended === '1' || a.attended === true);
+          roster.push({
+            roster_id: roster.length,
+            attendee_id: a.id,
+            household_id: null,
+            household_code: '—',
+            family_name: a.resident_name || 'Participant',
+            head_name: a.resident_name || 'Participant',
+            purok_name: act ? (act.target_puroks || '—') : '—',
+            phone: a.phone || '—',
+            attended: isAttended
+          });
+        }
+      });
+    }
+
+    return roster;
+  }
+
+  function renderAccomplishedAttendeesTable(filterQuery = '') {
+    const attBox = document.getElementById('acc_attendees_preview_box');
+    if (!attBox) return;
+
+    if (!currentAccomplishedRoster || currentAccomplishedRoster.length === 0) {
+      if (currentAccomplishedAct) {
+        currentAccomplishedRoster = buildEventParticipantRoster(currentAccomplishedAct, currentAccomplishedAttendees, currentAccomplishedRosterMode);
+      }
+    }
+
+    const roster = currentAccomplishedRoster || [];
+    const attendedCount = roster.filter(r => r.attended).length;
+    const pillEl = document.getElementById('acc_attendees_pill');
+    const unitLabel = (currentAccomplishedRosterMode === 'all_members') ? 'Members' : 'Households';
+    if (pillEl) {
+      pillEl.innerHTML = `<strong>${attendedCount}</strong> Attended • <strong>${roster.length}</strong> ${unitLabel}`;
+    }
+
+    const q = (typeof filterQuery === 'string' ? filterQuery : (document.getElementById('acc_attendees_search')?.value || '')).trim().toLowerCase();
+    let displayList = roster;
+    if (q) {
+      if (currentAccomplishedRosterMode === 'all_members') {
+        displayList = roster.filter(item => {
+          return (item.full_name && item.full_name.toLowerCase().includes(q))
+            || (item.family_name && item.family_name.toLowerCase().includes(q))
+            || (item.household_code && item.household_code.toLowerCase().includes(q))
+            || (item.purok_name && item.purok_name.toLowerCase().includes(q))
+            || (item.relationship && item.relationship.toLowerCase().includes(q));
+        });
+      } else {
+        displayList = roster.filter(item => {
+          return (item.family_name && item.family_name.toLowerCase().includes(q))
+            || (item.head_name && item.head_name.toLowerCase().includes(q))
+            || (item.household_code && item.household_code.toLowerCase().includes(q))
+            || (item.purok_name && item.purok_name.toLowerCase().includes(q))
+            || (item.phone && item.phone.toLowerCase().includes(q));
+        });
+      }
+    }
+
+    if (!displayList || displayList.length === 0) {
+      attBox.innerHTML = `
+        <div style="text-align:center;padding:22px 14px;font-size:11px;color:var(--color-text-muted);">
+          ${currentAccomplishedRosterMode === 'all_members' ? 'No matching members found.' : 'No matching household families found.'}
+        </div>
+      `;
+      return;
+    }
+
+    const isAllMembers = (currentAccomplishedRosterMode === 'all_members');
+
+    let attHtml = `
+      <table class="data-table" style="font-size:11px;width:100%;margin:0;border-collapse:collapse;">
+        <thead>
+          <tr style="position:sticky;top:0;background:var(--color-surface-subtle);z-index:2;border-bottom:1px solid var(--color-border);">
+            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">
+              ${isAllMembers ? 'Member Name / Family' : 'Household Family / Representative'}
+            </th>
+            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:95px;">Purok</th>
+            <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:115px;">
+              ${isAllMembers ? 'Age / Rel' : 'Contact'}
+            </th>
+            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:85px;">Status</th>
+            <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:${isAllMembers ? '95px' : '145px'};">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    displayList.forEach(item => {
+      const isAttended = item.attended;
+      const rowId = item.roster_id;
+
+      if (isAllMembers) {
+        // All Members Mode - Clean single line, strictly NO sub-details below!
+        const relText = item.relationship ? escapeHtml(item.relationship) : 'Member';
+        const ageText = (item.age !== null && item.age !== undefined && item.age !== '') ? `${item.age} yrs` : '—';
+
+        attHtml += `
+          <tr id="acc_roster_row_${rowId}" style="border-bottom:1px solid var(--color-border);transition:background 0.1s ease;">
+            <td style="padding:6px 10px;">
+              <div style="font-weight:600;color:var(--color-text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(item.full_name)} (${escapeHtml(item.family_name)})">
+                ${escapeHtml(item.full_name)} <span style="font-weight:normal;color:var(--color-text-secondary);">(${escapeHtml(item.family_name)})</span>
+              </div>
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
+              ${escapeHtml(item.purok_name)}
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
+              ${ageText} • ${relText}
+            </td>
+            <td style="padding:6px 10px;text-align:center;" id="acc_status_badge_${rowId}">
+              <span style="display:inline-block;padding:2px 6px;font-size:9.5px;font-weight:600;border-radius:3px;border:1px solid var(--color-border);${isAttended ? 'background:var(--color-surface-subtle);color:var(--color-primary);' : 'background:#FFFFFF;color:var(--color-text-muted);'}">
+                ${isAttended ? 'Attended' : 'Unmarked'}
+              </span>
+            </td>
+            <td style="padding:6px 10px;text-align:center;">
+              <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+                <button type="button" 
+                  id="acc_btn_attend_${rowId}" 
+                  onclick="toggleRosterItemAttendance(${rowId}, ${isAttended ? 0 : 1})"
+                  class="btn btn-sm"
+                  style="${isAttended 
+                    ? 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;' 
+                    : 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;'}"
+                  title="${isAttended ? 'Click to void attendance' : 'Click to mark as attended'}">
+                  ${isAttended ? 'Void' : 'Attended'}
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      } else {
+        // Household Families Mode - Clean single line, strictly NO sub-details below!
+        attHtml += `
+          <tr id="acc_roster_row_${rowId}" style="border-bottom:1px solid var(--color-border);transition:background 0.1s ease;">
+            <td style="padding:6px 10px;">
+              <div style="font-weight:600;color:var(--color-text);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(item.family_name)}${item.head_name && item.head_name !== '—' ? ' (' + escapeHtml(item.head_name) + ')' : ''}">
+                ${escapeHtml(item.family_name)}${item.head_name && item.head_name !== '—' ? ' <span style="font-weight:normal;color:var(--color-text-secondary);">(' + escapeHtml(item.head_name) + ')</span>' : ''}
+              </div>
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">
+              ${escapeHtml(item.purok_name)}
+            </td>
+            <td style="padding:6px 10px;font-family:monospace;font-size:10.5px;color:var(--color-text-secondary);">
+              ${escapeHtml(item.phone)}
+            </td>
+            <td style="padding:6px 10px;text-align:center;" id="acc_status_badge_${rowId}">
+              <span style="display:inline-block;padding:2px 6px;font-size:9.5px;font-weight:600;border-radius:3px;border:1px solid var(--color-border);${isAttended ? 'background:var(--color-surface-subtle);color:var(--color-primary);' : 'background:#FFFFFF;color:var(--color-text-muted);'}">
+                ${isAttended ? 'Attended' : 'Unmarked'}
+              </span>
+            </td>
+            <td style="padding:6px 10px;text-align:center;">
+              <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+                <button type="button" 
+                  id="acc_btn_attend_${rowId}" 
+                  onclick="toggleRosterItemAttendance(${rowId}, ${isAttended ? 0 : 1})"
+                  class="btn btn-sm"
+                  style="${isAttended 
+                    ? 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;' 
+                    : 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;'}"
+                  title="${isAttended ? 'Click to void attendance' : 'Click to mark as attended'}">
+                  ${isAttended ? 'Void' : 'Attended'}
+                </button>
+                ${item.household_id ? `
+                  <button type="button" 
+                    onclick="openHouseholdMembersModal(${item.household_id})" 
+                    class="btn btn-sm"
+                    style="background:var(--color-surface-subtle);color:var(--color-text);border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;"
+                    title="View family members of this household">
+                    Members
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+    });
+
+    attHtml += '</tbody></table>';
+    attBox.innerHTML = attHtml;
+  }
+
+  function filterAccomplishedAttendees(query) {
+    renderAccomplishedAttendeesTable(query);
+  }
+
+  function toggleRosterItemAttendance(rosterIdx, targetAttended) {
+    if (!currentAccomplishedAct || !currentAccomplishedRoster) return;
+    const item = currentAccomplishedRoster[rosterIdx];
+    if (!item) return;
+
+    const actId = currentAccomplishedAct.id;
+    const btn = document.getElementById(`acc_btn_attend_${rosterIdx}`);
+    const badgeCell = document.getElementById(`acc_status_badge_${rosterIdx}`);
+
+    // Immediate optimistic state update
+    item.attended = (targetAttended === 1);
+
+    if (btn) {
+      btn.disabled = true;
+      if (targetAttended === 1) {
+        btn.innerText = 'Void';
+        btn.style.cssText = 'background:#FFFFFF;color:#C62828;border:1px solid var(--color-border);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;';
+        btn.setAttribute('onclick', `toggleRosterItemAttendance(${rosterIdx}, 0)`);
+        btn.title = 'Click to void attendance';
+      } else {
+        btn.innerText = 'Attended';
+        btn.style.cssText = 'background:var(--color-primary);color:#FFFFFF;border:1px solid var(--color-primary);font-weight:600;font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;';
+        btn.setAttribute('onclick', `toggleRosterItemAttendance(${rosterIdx}, 1)`);
+        btn.title = 'Click to mark as attended';
+      }
+    }
+
+    if (badgeCell) {
+      badgeCell.innerHTML = (targetAttended === 1)
+        ? '<span style="display:inline-block;padding:2px 6px;font-size:9.5px;font-weight:600;border-radius:3px;border:1px solid var(--color-border);background:var(--color-surface-subtle);color:var(--color-primary);">Attended</span>'
+        : '<span style="display:inline-block;padding:2px 6px;font-size:9.5px;font-weight:500;border-radius:3px;border:1px solid var(--color-border);background:#FFFFFF;color:var(--color-text-muted);">Unmarked</span>';
+    }
+
+    // Live update turnout in pill & modal header
+    const newAttendedCount = currentAccomplishedRoster.filter(r => r.attended).length;
+    const pillEl = document.getElementById('acc_attendees_pill');
+    const unitLabel = (currentAccomplishedRosterMode === 'all_members') ? 'Members' : 'Households';
+    if (pillEl) {
+      pillEl.innerHTML = `<strong>${newAttendedCount}</strong> Attended • <strong>${currentAccomplishedRoster.length}</strong> ${unitLabel}`;
+    }
+    const turnoutEl = document.getElementById('acc_display_attendance');
+    if (turnoutEl) {
+      const targetPart = parseInt(currentAccomplishedAct.target_participants, 10) || currentAccomplishedRoster.length;
+      const countUnit = (currentAccomplishedRosterMode === 'all_members') ? 'residents' : 'households';
+      turnoutEl.innerText = `${newAttendedCount} attended (${targetPart} targeted ${countUnit})`;
+    }
+    currentAccomplishedAct.actual_participants = newAttendedCount;
+
+    // Send AJAX request to backend
+    const formData = new FormData();
+    formData.append('action', 'toggle_attendance');
+    formData.append('activity_id', actId);
+    if (item.attendee_id) {
+      formData.append('attendee_id', item.attendee_id);
+    }
+    const residentName = (currentAccomplishedRosterMode === 'all_members')
+      ? `${item.full_name} (${item.family_name}) [${item.household_code || '—'}]`
+      : `${item.family_name} (Representative: ${item.head_name}) [${item.household_code}]`;
+    formData.append('resident_name', residentName);
+    formData.append('phone', item.phone !== '—' ? item.phone : '');
+    formData.append('attended', targetAttended);
+    formData.append('is_ajax', '1');
+
+    fetch('<?= BASE_URL ?>/backend/functions/event/index.php', {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (btn) btn.disabled = false;
+      if (!data.success) {
+        alert(data.message || 'Failed to update attendance status.');
+        item.attended = (targetAttended !== 1);
+        renderAccomplishedAttendeesTable();
+      } else {
+        if (data.attendee_id) {
+          item.attendee_id = data.attendee_id;
+        }
+        if (currentAccomplishedAttendees) {
+          let found = currentAccomplishedAttendees.find(a => a.id == item.attendee_id);
+          if (found) {
+            found.attended = data.attended;
+          } else if (data.attendee_id) {
+            currentAccomplishedAttendees.push({
+              id: data.attendee_id,
+              activity_id: actId,
+              resident_name: residentName,
+              phone: item.phone !== '—' ? item.phone : '',
+              attended: data.attended
+            });
+          }
+        }
+        if (typeof attendeesByActivityMap !== 'undefined' && attendeesByActivityMap[actId]) {
+          let foundMap = attendeesByActivityMap[actId].find(a => a.id == item.attendee_id);
+          if (foundMap) {
+            foundMap.attended = data.attended;
+          } else if (data.attendee_id) {
+            attendeesByActivityMap[actId].push({
+              id: data.attendee_id,
+              activity_id: actId,
+              resident_name: residentName,
+              phone: item.phone !== '—' ? item.phone : '',
+              attended: data.attended
+            });
+          }
+        }
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      if (btn) btn.disabled = false;
+      alert('Network error while updating attendance.');
+      item.attended = (targetAttended !== 1);
+      renderAccomplishedAttendeesTable();
+    });
+  }
+
+  // Open Family Members Modal for a Household
+  function openHouseholdMembersModal(householdId) {
+    if (!householdId) return;
+
+    const modalEl = document.getElementById('householdMembersModal');
+    if (modalEl) {
+      modalEl.style.zIndex = '100005';
+    }
+
+    document.getElementById('hh_members_modal_title').innerText = 'Family Members';
+    document.getElementById('hh_members_badge').innerText = 'Loading...';
+    document.getElementById('hh_members_family_name').innerText = 'Loading family details...';
+    document.getElementById('hh_members_rep_info').innerText = 'Please wait...';
+    document.getElementById('hh_members_purok_code').innerText = '—';
+    document.getElementById('hh_members_count_pill').innerText = '0 Members';
+    document.getElementById('hh_members_table_box').innerHTML = `
+      <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-text-muted);">
+        Loading family members...
+      </div>
+    `;
+
+    openModal('householdMembersModal');
+
+    fetch(`<?= BASE_URL ?>/backend/functions/purok_households/get.php?id=${encodeURIComponent(householdId)}`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success || !data.household) {
+        document.getElementById('hh_members_table_box').innerHTML = `
+          <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-danger);">
+            ${escapeHtml(data.message || 'Unable to load household details.')}
+          </div>
+        `;
+        return;
+      }
+
+      const hh = data.household;
+      const members = hh.members || [];
+
+      document.getElementById('hh_members_badge').innerText = hh.household_code || 'HH';
+      document.getElementById('hh_members_family_name').innerText = hh.family_name || 'Family';
+      document.getElementById('hh_members_rep_info').innerHTML = `Representative: <strong>${escapeHtml(hh.head_full_name || '—')}</strong> ${hh.head_phone ? '• ' + escapeHtml(hh.head_phone) : ''}`;
+      document.getElementById('hh_members_purok_code').innerText = `${hh.purok_name || '—'} (${hh.household_code || '—'})`;
+      document.getElementById('hh_members_count_pill').innerText = `${members.length} Members`;
+
+      if (members.length === 0) {
+        document.getElementById('hh_members_table_box').innerHTML = `
+          <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-text-muted);">
+            No individual family members recorded for this household.
+          </div>
+        `;
+        return;
+      }
+
+      let mHtml = `
+        <table class="data-table" style="font-size:11px;width:100%;margin:0;border-collapse:collapse;">
+          <thead>
+            <tr style="position:sticky;top:0;background:var(--color-surface-subtle);z-index:2;border-bottom:1px solid var(--color-border);">
+              <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:35px;">#</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;">Member Name</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:95px;">Relationship</th>
+              <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:65px;">Gender</th>
+              <th style="padding:6px 10px;text-align:center;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:55px;">Age</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:600;color:var(--color-text-secondary);font-size:10px;text-transform:uppercase;letter-spacing:0.3px;width:110px;">Classification</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      members.forEach((m, idx) => {
+        const isRep = (m.is_authorized_rep == 1 || m.is_authorized_rep === '1' || m.is_authorized_rep === true);
+        const tags = [];
+        if (m.is_senior == 1 || m.is_senior === '1') tags.push('Senior');
+        if (m.is_minor == 1 || m.is_minor === '1') tags.push('Minor');
+        if (m.is_pwd == 1 || m.is_pwd === '1') tags.push('PWD');
+
+        const tagsHtml = tags.length > 0 
+          ? tags.map(t => `<span style="display:inline-block;padding:1px 5px;font-size:9.5px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);border:1px solid var(--color-border);border-radius:3px;margin-right:3px;">${t}</span>`).join('')
+          : '<span style="font-size:10px;color:var(--color-text-muted);">Regular</span>';
+
+        mHtml += `
+          <tr style="border-bottom:1px solid var(--color-border);">
+            <td style="padding:6px 10px;text-align:center;font-size:10.5px;color:var(--color-text-secondary);">${idx + 1}</td>
+            <td style="padding:6px 10px;">
+              <div style="font-weight:600;color:var(--color-text);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span>${escapeHtml(m.full_name || '—')}</span>
+                ${isRep ? '<span style="font-size:9px;color:var(--color-primary);background:var(--color-surface-subtle);border:1px solid var(--color-border);padding:1px 5px;border-radius:3px;font-weight:600;">Representative</span>' : ''}
+              </div>
+            </td>
+            <td style="padding:6px 10px;font-size:10.5px;color:var(--color-text-secondary);">${escapeHtml(m.relationship || 'Member')}</td>
+            <td style="padding:6px 10px;text-align:center;font-size:10.5px;color:var(--color-text-secondary);">${escapeHtml(m.gender || '—')}</td>
+            <td style="padding:6px 10px;text-align:center;font-size:10.5px;color:var(--color-text);">${m.age !== null && m.age !== undefined ? m.age : '—'}</td>
+            <td style="padding:6px 10px;">${tagsHtml}</td>
+          </tr>
+        `;
+      });
+
+      mHtml += '</tbody></table>';
+      document.getElementById('hh_members_table_box').innerHTML = mHtml;
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById('hh_members_table_box').innerHTML = `
+        <div style="text-align:center;padding:24px 16px;font-size:11px;color:var(--color-danger);">
+          Failed to load family members due to network error.
+        </div>
+      `;
+    });
   }
 
   function renderEditAttendeesTable() {
@@ -2495,12 +3596,24 @@ require_once __DIR__ . '/../layouts/header.php';
     }
     currentAccomplishedAttendees = attendees || [];
 
+    // Determine default mode dynamically based on event's target_type
+    const defaultMode = (act.target_type === 'all_members') 
+      ? 'all_members' 
+      : ((act.target_type === 'household_families') 
+          ? 'household_families' 
+          : (parseInt(act.target_participants, 10) > TOTAL_PUROK_HOUSEHOLDS * 1.5 ? 'all_members' : 'household_families')
+        );
+    setAccomplishedRosterMode(defaultMode, false);
+    currentAccomplishedRoster = buildEventParticipantRoster(act, currentAccomplishedAttendees, defaultMode);
+
     const isArchived = (act.is_archived == 1 || act.is_archived === '1' || act.is_archived === true || act.status === 'Archived');
     const isCancelled = (act.status === 'Cancelled');
     const isCompleted = (act.status === 'Completed');
     const now = new Date();
     const startDate = act.start_datetime ? new Date(act.start_datetime.replace(' ', 'T')) : null;
+    const endDate = act.end_datetime ? new Date(act.end_datetime.replace(' ', 'T')) : null;
     const isStarted = startDate && (startDate <= now);
+    const isEnded = endDate && (endDate <= now);
 
     // Update Modal Header Title & Status Badge
     const titleEl = document.getElementById('view_acc_title');
@@ -2509,56 +3622,78 @@ require_once __DIR__ . '/../layouts/header.php';
       if (titleEl) titleEl.innerText = 'Archived Event Overview';
       if (badgeEl) {
         badgeEl.className = 'badge badge-neutral';
-        badgeEl.innerText = '📦 Archived';
+        badgeEl.innerText = 'Archived';
       }
     } else if (isCancelled) {
       if (titleEl) titleEl.innerText = 'Cancelled Event Overview';
       if (badgeEl) {
         badgeEl.className = 'badge badge-danger';
-        badgeEl.innerText = '✕ Cancelled';
+        badgeEl.innerText = 'Cancelled';
       }
     } else if (isCompleted) {
       if (titleEl) titleEl.innerText = 'Accomplished Event Overview';
       if (badgeEl) {
         badgeEl.className = 'badge badge-success';
-        badgeEl.innerText = '✓ Accomplished';
+        badgeEl.innerText = 'Accomplished';
       }
-    } else if (isStarted) {
+    } else if (isEnded || act.status === 'Ended' || act.status === 'Finished') {
+      if (titleEl) titleEl.innerText = 'Ended Event Overview — Ready for Evaluation';
+      if (badgeEl) {
+        badgeEl.className = 'badge badge-warning';
+        badgeEl.style.background = '#FEF3C7';
+        badgeEl.style.color = '#B45309';
+        badgeEl.style.borderColor = '#FDE68A';
+        badgeEl.innerText = 'Ended';
+      }
+    } else if (isStarted || act.status === 'Ongoing') {
       if (titleEl) titleEl.innerText = 'Ongoing Event Overview';
       if (badgeEl) {
-        badgeEl.className = 'badge badge-info';
-        badgeEl.innerText = '⚡ Ongoing';
+        badgeEl.className = 'badge badge-warning';
+        badgeEl.innerText = 'Ongoing';
       }
     } else {
       if (titleEl) titleEl.innerText = 'Scheduled Event Overview';
       if (badgeEl) {
-        badgeEl.className = 'badge badge-neutral';
-        badgeEl.innerText = '⏳ Scheduled';
+        badgeEl.className = 'badge badge-info';
+        badgeEl.innerText = 'Scheduled';
       }
     }
 
     document.getElementById('acc_display_title').innerText = act.title || 'Event Overview';
     document.getElementById('acc_display_type_badge').innerText = act.activity_type || 'Disaster Drill';
-    document.getElementById('acc_display_venue').innerText = act.venue || '—';
+    const purokScope = act.target_puroks || 'All Puroks';
+    const venueEl = document.getElementById('acc_display_venue');
+    if (venueEl) {
+      venueEl.innerText = act.venue ? `${act.venue} (${purokScope})` : purokScope;
+    }
     document.getElementById('acc_display_facilitator').innerText = act.assigned_personnel || 'Barangay Disaster Team';
 
     const startFmt = act.start_datetime ? new Date(act.start_datetime.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
     const endFmt = act.end_datetime ? new Date(act.end_datetime.replace(' ', 'T')).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
     document.getElementById('acc_display_schedule').innerText = `${startFmt} — ${endFmt}`;
 
-    const actualPart = parseInt(act.actual_participants, 10) || 0;
-    const targetPart = parseInt(act.target_participants, 10) || 50;
-    document.getElementById('acc_display_attendance').innerText = `${actualPart} attended (${targetPart} targeted)`;
+    const actualPart = currentAccomplishedRoster.filter(r => r.attended).length;
+    const targetPart = parseInt(act.target_participants, 10) || currentAccomplishedRoster.length;
+    const unitText = (currentAccomplishedRosterMode === 'all_members') ? 'residents' : 'households';
+    document.getElementById('acc_display_attendance').innerText = `${actualPart} attended (${targetPart} targeted ${unitText})`;
 
     document.getElementById('acc_display_description').innerText = act.description || 'No description recorded for this activity.';
 
+    const summaryGroup = document.getElementById('acc_summary_group');
     if (isCancelled && act.cancellation_reason) {
-      document.getElementById('acc_display_summary').innerHTML = '<span style="color:#DC2626;font-weight:600;">[Cancellation Reason]</span> ' + act.cancellation_reason;
+      if (summaryGroup) summaryGroup.style.display = 'block';
+      document.getElementById('acc_display_summary').innerHTML = '<span style="color:#DC2626;font-weight:600;">[Cancellation Reason]</span> ' + escapeHtml(act.cancellation_reason);
+    } else if (act.evaluation_summary) {
+      if (summaryGroup) summaryGroup.style.display = 'block';
+      document.getElementById('acc_display_summary').innerText = act.evaluation_summary;
+    } else if (isCompleted) {
+      if (summaryGroup) summaryGroup.style.display = 'block';
+      document.getElementById('acc_display_summary').innerText = 'No evaluation remarks recorded yet.';
     } else {
-      document.getElementById('acc_display_summary').innerText = act.evaluation_summary || (isCompleted ? 'No evaluation remarks recorded yet.' : 'Event remarks will be recorded upon completion or evaluation.');
+      if (summaryGroup) summaryGroup.style.display = 'none';
     }
 
-    // Render executed content checklist pills and evaluation percentage
+    // Render executed content checklist pills and evaluation percentage (Anti-Slop Unified Palette)
     let executedItems = [];
     if (act.content_execution) {
       try {
@@ -2582,68 +3717,90 @@ require_once __DIR__ . '/../layouts/header.php';
     }
 
     const contentBox = document.getElementById('acc_content_execution_box');
-    const totalExpected = expectedItems.length;
-    const execCount = executedItems.length;
-    const evalPercent = totalExpected > 0 ? Math.round((execCount / totalExpected) * 100) : 100;
-
-    const evalMeta = document.getElementById('acc_display_eval_meta');
-    if (isCompleted || act.status === 'Completed') {
-      if (evalMeta) {
-        evalMeta.style.display = 'block';
-        evalMeta.innerText = `Evaluation: ${evalPercent}% Executed (${execCount}/${totalExpected} milestones)`;
-        evalMeta.style.color = evalPercent === 100 ? '#059669' : (evalPercent >= 70 ? '#2563EB' : (evalPercent >= 40 ? '#D97706' : '#DC2626'));
-      }
-    } else {
-      if (evalMeta) evalMeta.style.display = 'none';
-    }
+    const contentCountLabel = document.getElementById('acc_content_count_label');
 
     if (isCompleted || act.status === 'Completed') {
-      document.getElementById('acc_content_count_label').innerHTML = `
-      <span class="badge ${evalPercent === 100 ? 'badge-success' : (evalPercent >= 70 ? 'badge-primary' : 'badge-warning')}" style="font-size:10.5px;font-weight:700;">
-        ${evalPercent}% Execution Rate (${execCount} of ${totalExpected} completed)
-      </span>
-    `;
-      let contentHtml = `
-      <div style="margin-bottom:8px;">
-        <div style="height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">
-          <div style="height:100%;width:${evalPercent}%;background:${evalPercent === 100 ? 'linear-gradient(90deg, #10B981, #059669)' : (evalPercent >= 70 ? 'linear-gradient(90deg, #60A5FA, #2563EB)' : 'linear-gradient(90deg, #FBBF24, #D97706)')};border-radius:3px;transition:width 0.3s ease;"></div>
-        </div>
-      </div>
-    `;
-      if (executedItems.length > 0) {
-        contentHtml += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
-        executedItems.forEach(item => {
-          contentHtml += `
-          <span style="display:inline-flex;align-items:center;gap:4px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;padding:4px 9px;border-radius:14px;font-size:11px;font-weight:500;">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            ${item}
+      const totalExpected = expectedItems.length > 0 ? expectedItems.length : (executedItems.length || 1);
+      const execCount = executedItems.length;
+      const evalPercent = totalExpected > 0 ? Math.round((execCount / totalExpected) * 100) : 100;
+
+      if (contentCountLabel) {
+        contentCountLabel.innerHTML = `
+          <span style="font-size:10px;font-weight:600;color:var(--color-primary);background:var(--color-surface-subtle);border:1px solid var(--color-border);padding:2px 7px;border-radius:4px;">
+            ${execCount} of ${totalExpected} Milestones Completed (${evalPercent}%)
           </span>
         `;
+      }
+
+      let contentHtml = `
+        <div style="margin-bottom:8px;">
+          <div style="height:5px;background:var(--color-surface-subtle);border:1px solid var(--color-border);border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:${evalPercent}%;background:var(--color-primary);border-radius:2px;transition:width 0.3s ease;"></div>
+          </div>
+        </div>
+      `;
+
+      if (executedItems.length > 0) {
+        contentHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:6px;">';
+        executedItems.forEach(item => {
+          contentHtml += `
+            <div style="display:flex;align-items:center;gap:6px;background:#FFFFFF;border:1px solid var(--color-border);padding:5px 8px;border-radius:4px;">
+              <div style="width:16px;height:16px;border-radius:3px;background:var(--color-surface-subtle);color:var(--color-primary);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex-shrink:0;">
+                ✓
+              </div>
+              <span style="font-size:11px;font-weight:500;color:var(--color-text);line-height:1.3;flex:1;">
+                ${escapeHtml(item)}
+              </span>
+            </div>
+          `;
         });
         contentHtml += '</div>';
       } else {
-        contentHtml += '<div style="font-size:11px;color:#DC2626;font-style:italic;">0 milestones executed during event.</div>';
+        contentHtml += '<div style="font-size:11px;color:var(--color-text-muted);font-style:italic;padding:4px 0;">No milestones executed.</div>';
       }
       contentBox.innerHTML = contentHtml;
-    } else if (Array.isArray(executedItems) && executedItems.length > 0) {
-      document.getElementById('acc_content_count_label').innerText = `${executedItems.length} milestone(s) planned`;
-      let contentHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
-      executedItems.forEach(item => {
-        contentHtml += `
-        <span style="display:inline-flex;align-items:center;gap:4px;background:#F1F5F9;border:1px solid #CBD5E1;color:#475569;padding:4px 9px;border-radius:14px;font-size:11px;font-weight:500;">
-          ${item}
-        </span>
-      `;
-      });
-      contentHtml += '</div>';
-      contentBox.innerHTML = contentHtml;
     } else {
-      document.getElementById('acc_content_count_label').innerText = '0 executed';
-      contentBox.innerHTML = '<div style="font-size:11.5px;color:var(--color-text-muted);font-style:italic;">No event content execution items recorded yet. Execution milestones can be reviewed during evaluation.</div>';
+      const plannedList = (expectedItems && expectedItems.length > 0) ? expectedItems : executedItems;
+      const countPlanned = plannedList.length;
+
+      if (contentCountLabel) {
+        contentCountLabel.innerHTML = `
+          <span style="font-size:10px;font-weight:600;color:var(--color-text-secondary);background:var(--color-surface-subtle);border:1px solid var(--color-border);padding:2px 7px;border-radius:4px;">
+            ${countPlanned} Milestones Scheduled
+          </span>
+        `;
+      }
+
+      if (plannedList.length > 0) {
+        let contentHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:6px;">';
+        plannedList.forEach((item, idx) => {
+          contentHtml += `
+            <div style="display:flex;align-items:center;gap:6px;background:#FFFFFF;border:1px solid var(--color-border);padding:5px 8px;border-radius:4px;">
+              <div style="width:16px;height:16px;border-radius:3px;background:var(--color-surface-subtle);color:var(--color-text-secondary);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;flex-shrink:0;">
+                ${idx + 1}
+              </div>
+              <div style="font-size:11px;font-weight:500;color:var(--color-text);line-height:1.3;flex:1;">
+                ${escapeHtml(item)}
+              </div>
+              <span style="font-size:9px;color:var(--color-text-muted);background:var(--color-surface-subtle);padding:1px 4px;border-radius:3px;border:1px solid var(--color-border);">
+                Planned
+              </span>
+            </div>
+          `;
+        });
+        contentHtml += '</div>';
+        contentBox.innerHTML = contentHtml;
+      } else {
+        contentBox.innerHTML = '<div style="font-size:11px;color:var(--color-text-muted);font-style:italic;padding:4px 0;">No specific execution milestones configured.</div>';
+      }
     }
 
-    // Render attendees list preview (read-only view)
-    renderAccomplishedAttendeesTable();
+    // Reset attendees search filter
+    const searchInput = document.getElementById('acc_attendees_search');
+    if (searchInput) searchInput.value = '';
+
+    // Render roster of household families in Participant Attendees
+    renderAccomplishedAttendeesTable('');
 
     // Dynamically Configure Footer Actions
     const footerLeft = document.getElementById('acc_footer_left');
@@ -2652,29 +3809,47 @@ require_once __DIR__ . '/../layouts/header.php';
     let leftHtml = '';
     if (isArchived) {
       leftHtml = `
-      <form method="POST" action="<?= BASE_URL ?>/backend/functions/event/index.php" style="margin:0;" onsubmit="return confirm('Restore this event back to active events?');">
-        <input type="hidden" name="action" value="restore">
-        <input type="hidden" name="activity_id" value="${act.id}">
-        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
-        <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 9px;color:var(--color-success);border-color:var(--color-success);" title="Restore Event to Active List">
-          Restore to Active
+      <div style="display:flex;gap:6px;align-items:center;">
+        <form method="POST" action="<?= BASE_URL ?>/backend/functions/event/index.php" style="margin:0;" onsubmit="return confirm('Restore this event back to active events?');">
+          <input type="hidden" name="action" value="restore">
+          <input type="hidden" name="activity_id" value="${act.id}">
+          <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
+          <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 9px;color:var(--color-success);border-color:var(--color-success);" title="Restore Event to Active List">
+            Restore to Active
+          </button>
+        </form>
+        <button type="button" class="btn btn-outline btn-sm" onclick="deleteCurrentEventFromOverview()" style="font-size:11px;padding:4px 9px;color:#DC2626;border-color:#FCA5A5;display:inline-flex;align-items:center;gap:3px;" title="Permanently Delete Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete Permanently
         </button>
-      </form>
+      </div>
     `;
     } else if (isCancelled || isCompleted) {
       leftHtml = `
-      <button type="button" class="btn btn-outline btn-sm" onclick="archiveCurrentAccomplishedEvent()" style="color:#D97706;border-color:#FCD34D;" title="Move Event to Archives">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-        Archive
-      </button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="archiveCurrentAccomplishedEvent()" style="color:#D97706;border-color:#FCD34D;" title="Move Event to Archives">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+          Archive
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="deleteCurrentEventFromOverview()" style="color:#DC2626;border-color:#FCA5A5;" title="Permanently Delete Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete
+        </button>
+      </div>
     `;
     } else {
-      // Scheduled or Ongoing: Cancel button on left
+      // Scheduled or Ongoing: Cancel button on left, plus Delete option
       leftHtml = `
-      <button type="button" class="btn btn-outline btn-sm" onclick="cancelCurrentEventFromOverview()" style="color:var(--color-danger);border-color:var(--color-danger);" title="Cancel Event">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-        Cancel Event
-      </button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="cancelCurrentEventFromOverview()" style="color:var(--color-danger);border-color:var(--color-danger);" title="Cancel Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+          Cancel Event
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="deleteCurrentEventFromOverview()" style="color:#DC2626;border-color:#FCA5A5;" title="Permanently Delete Event">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete
+        </button>
+      </div>
     `;
     }
     if (footerLeft) footerLeft.innerHTML = leftHtml;
@@ -2692,6 +3867,19 @@ require_once __DIR__ . '/../layouts/header.php';
       <button type="button" class="btn btn-success btn-sm" onclick="evaluateCurrentAccomplishedEvent()" style="background:var(--color-success,#16A34A);border-color:var(--color-success,#16A34A);color:#fff;" title="${isAlreadyEvaluated ? 'Review and Re-evaluate Event Execution' : 'Evaluate Event Execution'}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
         ${isAlreadyEvaluated ? 'Re-evaluate' : 'Evaluate'}
+      </button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('accomplishedEventModal')">Close</button>
+    `;
+    } else if (isEnded || act.status === 'Ended' || act.status === 'Finished') {
+      const isAlreadyEvaluated = !!(act.evaluation_summary || act.status === 'Completed');
+      rightHtml = `
+      <button type="button" class="btn btn-success btn-sm" onclick="evaluateCurrentAccomplishedEvent()" style="font-size:11px;padding:4px 10px;background:var(--color-success,#16A34A);border-color:var(--color-success,#16A34A);color:#fff;display:inline-flex;align-items:center;gap:4px;" title="Evaluate Event Execution & Attendance">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        ${isAlreadyEvaluated ? 'Re-evaluate' : 'Evaluate Event'}
+      </button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="editCurrentAccomplishedEvent()" title="Edit Event Details (Date & Time Locked)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        Edit
       </button>
       <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('accomplishedEventModal')">Close</button>
     `;
@@ -2744,6 +3932,25 @@ require_once __DIR__ . '/../layouts/header.php';
     document.getElementById('archive_act_id').value = act.id;
     document.getElementById('archive_act_name').innerText = act.title;
     openModal('archiveActivityModal');
+  }
+
+  // 1B. Delete Button action from Event Modal
+  function deleteCurrentEventFromOverview() {
+    if (!currentAccomplishedAct) return;
+    const attendeesCount = currentAccomplishedAttendees ? currentAccomplishedAttendees.length : 0;
+    closeModal('accomplishedEventModal');
+    confirmDeleteActivity(currentAccomplishedAct, attendeesCount);
+  }
+
+  // Confirm Delete Event Modal
+  function confirmDeleteActivity(act, attendeesCount = 0) {
+    document.getElementById('delete_act_id').value = act.id;
+    document.getElementById('delete_act_name').innerText = act.title;
+    const countInfo = document.getElementById('delete_attendees_info');
+    if (countInfo) {
+      countInfo.innerText = attendeesCount + ' registered resident / family member' + (attendeesCount === 1 ? '' : 's');
+    }
+    openModal('deleteActivityModal');
   }
 
   // 2. Edit Button action (time & date CANNOT be edited)
@@ -3040,6 +4247,17 @@ require_once __DIR__ . '/../layouts/header.php';
       }
     }
 
+    // Initialize Target Purok Scope for Edit Modal
+    const isFamiliesEdit = act.target_type 
+      ? (act.target_type === 'household_families') 
+      : (act.activity_type === 'Social Welfare and Assistance' || parseInt(act.target_participants, 10) <= TOTAL_PUROK_HOUSEHOLDS);
+    const editFamilyCb = document.getElementById('edit_count_by_families');
+    if (editFamilyCb) {
+      editFamilyCb.checked = isFamiliesEdit;
+      onCountingUnitCheckboxChange('edit', isFamiliesEdit);
+    }
+    initPurokScopeForEdit(act.target_puroks, act.target_participants);
+
     // Populate expected activities checklist for edit
     let savedExecution = [];
     if (act.content_execution) {
@@ -3278,6 +4496,243 @@ require_once __DIR__ . '/../layouts/header.php';
 
     openModal('viewAttendeesModal');
   }
+
+  // ============================================================================
+  // Target Purok Scope Handlers (Single, Multi, or All Puroks)
+  // ============================================================================
+  function openCreateActivityModal() {
+    const actType = document.getElementById('create_activity_type')?.value || '';
+    const isWelfare = (actType === 'Social Welfare and Assistance');
+    const familyCb = document.getElementById('create_count_by_families');
+    if (familyCb) {
+      familyCb.checked = isWelfare;
+      onCountingUnitCheckboxChange('create', isWelfare);
+    } else {
+      setAllPuroksScope('create', true);
+    }
+    const searchInput = document.getElementById('create_purok_search');
+    if (searchInput) {
+      searchInput.value = '';
+      filterPurokCheckboxes('create', '');
+    }
+    openModal('createActivityModal');
+  }
+
+  function setAllPuroksScope(mode, selectAll) {
+    const allToggle = document.getElementById(mode + '_all_puroks_toggle');
+    if (allToggle) allToggle.checked = selectAll;
+
+    const familyCb = document.getElementById(mode + '_count_by_families');
+    const isFamilies = familyCb ? familyCb.checked : false;
+    const unitWord = isFamilies ? 'house families' : 'residents';
+    const unitLabel = isFamilies ? 'Families' : 'Residents';
+
+    let totalCount = 0;
+    const checkboxes = document.querySelectorAll('.' + mode + '-purok-cb');
+    checkboxes.forEach(cb => {
+      cb.checked = selectAll;
+      const count = isFamilies
+        ? parseInt(cb.getAttribute('data-households') || '0', 10)
+        : parseInt(cb.getAttribute('data-population') || '0', 10);
+      if (selectAll) totalCount += count;
+      const label = cb.closest('.purok-checkbox-item');
+      if (label) {
+        if (selectAll) {
+          label.classList.add('is-checked');
+          label.style.borderColor = 'var(--color-primary, #17324D)';
+          label.style.background = '#ECFDF5';
+        } else {
+          label.classList.remove('is-checked');
+          label.style.borderColor = '#E2E8F0';
+          label.style.background = '#FFFFFF';
+        }
+      }
+    });
+
+    const hiddenInput = document.getElementById(mode + '_target_puroks_hidden');
+    const summaryEl = document.getElementById(mode + '_purok_selection_summary');
+    const targetInput = document.getElementById(mode === 'create' ? 'create_target_participants' : 'edit_act_target');
+    const popHint = document.getElementById(mode + '_target_pop_hint');
+    const allPuroksBadge = document.getElementById(mode + '_all_puroks_badge');
+
+    // Dynamically update target residents input to the selected count
+    if (targetInput) {
+      targetInput.value = totalCount;
+    }
+    if (popHint) {
+      popHint.innerHTML = totalCount > 0
+        ? `Recorded ${isFamilies ? 'Families' : 'Pop'}: <strong>${totalCount.toLocaleString()}</strong>`
+        : `Recorded ${isFamilies ? 'Families' : 'Pop'}: 0`;
+    }
+    if (allPuroksBadge) {
+      allPuroksBadge.innerHTML = `<?= count($barangayPuroks) ?> Puroks (${totalCount.toLocaleString()} ${unitLabel})`;
+    }
+
+    if (selectAll) {
+      if (hiddenInput) hiddenInput.value = 'All Puroks';
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
+      }
+    } else {
+      if (hiddenInput) hiddenInput.value = '';
+      if (summaryEl) {
+        summaryEl.style.color = '#DC2626';
+        summaryEl.innerText = '⚠️ Please select at least one purok or choose All Puroks.';
+      }
+    }
+  }
+
+  function onAllPuroksToggleChange(mode, isChecked) {
+    setAllPuroksScope(mode, isChecked);
+  }
+
+  function onSinglePurokChange(mode, skipTargetOverride) {
+    const checkboxes = document.querySelectorAll('.' + mode + '-purok-cb');
+    const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+    const checkedVals = checkedBoxes.map(cb => cb.value);
+    const allToggle = document.getElementById(mode + '_all_puroks_toggle');
+    const hiddenInput = document.getElementById(mode + '_target_puroks_hidden');
+    const summaryEl = document.getElementById(mode + '_purok_selection_summary');
+    const targetInput = document.getElementById(mode === 'create' ? 'create_target_participants' : 'edit_act_target');
+    const popHint = document.getElementById(mode + '_target_pop_hint');
+    const allPuroksBadge = document.getElementById(mode + '_all_puroks_badge');
+
+    const familyCb = document.getElementById(mode + '_count_by_families');
+    const isFamilies = familyCb ? familyCb.checked : false;
+    const unitWord = isFamilies ? 'house families' : 'residents';
+    const unitLabel = isFamilies ? 'Families' : 'Residents';
+
+    let totalCount = 0;
+    checkboxes.forEach(cb => {
+      const count = isFamilies
+        ? parseInt(cb.getAttribute('data-households') || '0', 10)
+        : parseInt(cb.getAttribute('data-population') || '0', 10);
+      if (cb.checked) totalCount += count;
+      const label = cb.closest('.purok-checkbox-item');
+      if (label) {
+        if (cb.checked) {
+          label.classList.add('is-checked');
+          label.style.borderColor = 'var(--color-primary, #17324D)';
+          label.style.background = '#ECFDF5';
+        } else {
+          label.classList.remove('is-checked');
+          label.style.borderColor = '#E2E8F0';
+          label.style.background = '#FFFFFF';
+        }
+      }
+    });
+
+    if (allPuroksBadge) {
+      const fullCount = isFamilies ? TOTAL_PUROK_HOUSEHOLDS : TOTAL_PUROK_POPULATION;
+      allPuroksBadge.innerHTML = `<?= count($barangayPuroks) ?> Puroks (${fullCount.toLocaleString()} ${unitLabel})`;
+    }
+
+    // Dynamically update target residents input to the selected count
+    if (!skipTargetOverride && targetInput) {
+      targetInput.value = totalCount;
+    }
+    if (popHint) {
+      popHint.innerHTML = totalCount > 0
+        ? `Recorded ${isFamilies ? 'Families' : 'Pop'}: <strong>${totalCount.toLocaleString()}</strong>`
+        : `Recorded ${isFamilies ? 'Families' : 'Pop'}: 0`;
+    }
+
+    if (checkedVals.length === checkboxes.length) {
+      if (allToggle) allToggle.checked = true;
+      if (hiddenInput) hiddenInput.value = 'All Puroks';
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerHTML = `Selected: All Puroks (Barangay-Wide) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
+      }
+    } else if (checkedVals.length === 0) {
+      if (allToggle) allToggle.checked = false;
+      if (hiddenInput) hiddenInput.value = '';
+      if (summaryEl) {
+        summaryEl.style.color = '#DC2626';
+        summaryEl.innerText = '⚠️ Please select at least one purok or choose All Puroks.';
+      }
+    } else if (checkedVals.length === 1) {
+      if (allToggle) allToggle.checked = false;
+      if (hiddenInput) hiddenInput.value = checkedVals[0];
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerHTML = `Selected: 1 Purok (${checkedVals[0]}) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
+      }
+    } else {
+      if (allToggle) allToggle.checked = false;
+      if (hiddenInput) hiddenInput.value = checkedVals.join(', ');
+      const displayNames = checkedVals.length <= 3 ? checkedVals.join(', ') : checkedVals.slice(0, 3).join(', ') + ' +' + (checkedVals.length - 3) + ' more';
+      if (summaryEl) {
+        summaryEl.style.color = 'var(--color-primary, #17324D)';
+        summaryEl.innerHTML = `Selected: ${checkedVals.length} Puroks (${displayNames}) • <strong>${totalCount.toLocaleString()}</strong> ${unitWord}`;
+      }
+    }
+  }
+
+  function filterPurokCheckboxes(mode, term) {
+    const list = document.getElementById(mode + '_purok_checkbox_list');
+    if (!list) return;
+    const filter = (term || '').trim().toLowerCase();
+    const items = list.querySelectorAll('.purok-checkbox-item');
+    items.forEach(item => {
+      const pName = (item.getAttribute('data-purok') || item.textContent || '').toLowerCase();
+      if (!filter || pName.includes(filter)) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
+
+  function initPurokScopeForEdit(targetPuroks, existingTargetCount) {
+    const raw = (targetPuroks || 'All Puroks').trim();
+    const editSearch = document.getElementById('edit_purok_search');
+    if (editSearch) {
+      editSearch.value = '';
+      filterPurokCheckboxes('edit', '');
+    }
+
+    if (raw === 'All Puroks' || raw === 'All' || raw === '') {
+      setAllPuroksScope('edit', true);
+      if (existingTargetCount && parseInt(existingTargetCount, 10) > 0) {
+        const targetInput = document.getElementById('edit_act_target');
+        if (targetInput) targetInput.value = existingTargetCount;
+      }
+    } else {
+      const selectedList = raw.split(',').map(s => s.trim().toLowerCase());
+      const checkboxes = document.querySelectorAll('.edit-purok-cb');
+      checkboxes.forEach(cb => {
+        cb.checked = selectedList.includes(cb.value.trim().toLowerCase());
+      });
+      const hasExisting = existingTargetCount && parseInt(existingTargetCount, 10) > 0;
+      onSinglePurokChange('edit', hasExisting);
+      if (hasExisting) {
+        const targetInput = document.getElementById('edit_act_target');
+        if (targetInput) targetInput.value = existingTargetCount;
+      }
+    }
+  }
+
+  // Auto-open Schedule Event modal if requested via URL
+  document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('create') === '1' || urlParams.get('open_create') === '1') {
+      const actType = urlParams.get('type') || urlParams.get('activity_type');
+      if (typeof openModal === 'function') {
+        openModal('createActivityModal');
+        if (actType) {
+          const typeSelect = document.getElementById('create_activity_type');
+          if (typeSelect) {
+            typeSelect.value = actType;
+            if (typeof onActivityTypeChange === 'function') {
+              onActivityTypeChange('create', actType);
+            }
+          }
+        }
+      }
+    }
+  });
 </script>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

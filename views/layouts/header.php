@@ -18,34 +18,60 @@ $db = getDBConnection();
 
 // Fetch unread notifications count for this user
 if (($currentUser['role'] ?? '') === 'resident') {
+    $userPurok = trim($currentUser['purok'] ?? '');
     $notifCountStmt = $db->prepare("
         SELECT COUNT(*) FROM notifications n
         LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
         LEFT JOIN users u ON n.created_by = u.id
+        LEFT JOIN events e ON (n.related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') AND n.related_id = e.id)
         WHERE nr.id IS NULL
-          AND (n.target_barangay_id = ? OR n.target_user_id = ?)
-          AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
+          AND (
+              (n.target_user_id IS NOT NULL AND n.target_user_id = ?)
+              OR
+              (n.target_user_id IS NULL AND (n.target_barangay_id = ? OR n.target_barangay_id IS NULL) AND n.target_role IN ('all', 'resident'))
+          )
           AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+          AND (
+              (n.related_module NOT IN ('events', 'event', 'preparedness', 'financial_aid', 'resources'))
+              OR (e.id IS NOT NULL AND (e.is_archived = 0 OR e.is_archived IS NULL))
+              OR (n.related_module = 'financial_aid' AND n.target_user_id IS NOT NULL)
+          )
+          AND (
+              n.target_user_id IS NOT NULL
+              OR COALESCE(n.target_puroks, e.target_puroks) IS NULL
+              OR TRIM(COALESCE(n.target_puroks, e.target_puroks)) = ''
+              OR COALESCE(n.target_puroks, e.target_puroks) IN ('All Puroks', 'All')
+              OR FIND_IN_SET(?, REPLACE(COALESCE(n.target_puroks, e.target_puroks), ', ', ',')) > 0
+          )
     ");
     $notifCountStmt->execute([
-        $currentUser['id'],
+        (int)$currentUser['id'],
+        (int)$currentUser['id'],
         (int)($currentUser['barangay_id'] ?? 0),
-        $currentUser['id'],
-        $currentUser['id'],
-        (int)($currentUser['barangay_id'] ?? 0)
+        (int)($currentUser['barangay_id'] ?? 0),
+        $userPurok
     ]);
 } elseif (($currentUser['role'] ?? '') === 'responder') {
+    $responderBrgyId = (int)($currentUser['barangay_id'] ?? 0);
+    if ($responderBrgyId === 0) {
+        $rBrgyStmt = $db->prepare("SELECT barangay_id FROM users WHERE id = ?");
+        $rBrgyStmt->execute([(int)$currentUser['id']]);
+        $responderBrgyId = (int)$rBrgyStmt->fetchColumn();
+    }
     $notifCountStmt = $db->prepare("
         SELECT COUNT(*) FROM notifications n
         LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
         WHERE nr.id IS NULL
-          AND (n.target_barangay_id = ? OR n.target_user_id = ?)
+          AND n.target_barangay_id = ?
           AND (n.target_role IN ('all', 'responder') OR n.target_user_id = ?)
+          AND n.related_module NOT IN ('events', 'event', 'preparedness', 'financial_aid', 'resources')
+          AND n.title NOT LIKE '%Event%'
+          AND n.title NOT LIKE '%Drill%'
+          AND n.title NOT LIKE '%Training%'
     ");
     $notifCountStmt->execute([
         $currentUser['id'],
-        (int)($currentUser['barangay_id'] ?? 0),
-        $currentUser['id'],
+        $responderBrgyId,
         $currentUser['id']
     ]);
 } else {
@@ -137,7 +163,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <?php if ($isCitizenOrResponder): ?>
       <nav class="topbar-desktop-nav">
         <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="topbar-nav-pill <?= $currentPage === 'dashboard.php' ? 'active' : '' ?>">Home</a>
-        <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/events.php" class="topbar-nav-pill <?= $currentPage === 'events.php' ? 'active' : '' ?>">Events</a>
+        <?php if ($currentUser['role'] === 'responder'): ?>
+          <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="topbar-nav-pill <?= in_array($currentPage, ['active-incidents.php', 'field-status.php'], true) ? 'active' : '' ?>">Disaster Reports</a>
+        <?php else: ?>
+          <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/events.php" class="topbar-nav-pill <?= $currentPage === 'events.php' ? 'active' : '' ?>">Events</a>
+        <?php endif; ?>
         <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/notifications.php" class="topbar-nav-pill <?= $currentPage === 'notifications.php' ? 'active' : '' ?>" style="display:inline-flex;align-items:center;gap:5px;">
           <span>Notification</span>
           <?php if ($unreadCount > 0): ?>

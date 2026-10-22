@@ -16,7 +16,7 @@ class Auth {
         if (!isset($_SESSION['user']['id'])) {
             return null;
         }
-        if (empty($_SESSION['user']['barangay_id']) && ($_SESSION['user']['role'] ?? '') === 'barangay_head') {
+        if (empty($_SESSION['user']['barangay_id']) && in_array($_SESSION['user']['role'] ?? '', ['barangay_head', 'responder', 'resident'], true)) {
             try {
                 $db = getDBConnection();
                 $stmt = $db->prepare("

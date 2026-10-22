@@ -19,6 +19,7 @@ CREATE TABLE `event_attendees` (
   `resident_name` varchar(150) NOT NULL,
   `attended` tinyint(1) NOT NULL DEFAULT 1,
   `phone` varchar(30) NOT NULL,
+  `is_archived` tinyint(1) NOT NULL DEFAULT 0,
   `registered_at` datetime DEFAULT current_timestamp(),
   `sms_status` enum('sent','failed','pending') DEFAULT 'sent',
   `sms_message` text DEFAULT NULL,
@@ -186,6 +187,61 @@ CREATE TABLE `evacuation_center_resources` (
   CONSTRAINT `evacuation_center_resources_ibfk_1` FOREIGN KEY (`evacuation_area_id`) REFERENCES `evacuation_areas` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `evacuation_relief_logs`;
+DROP TABLE IF EXISTS `evacuation_family_checkins`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `evacuation_family_checkins` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `evacuation_area_id` int(11) NOT NULL,
+  `household_id` int(11) NOT NULL,
+  `family_name` varchar(150) NOT NULL,
+  `household_code` varchar(50) NOT NULL,
+  `head_full_name` varchar(150) NOT NULL,
+  `head_phone` varchar(30) DEFAULT NULL,
+  `purok_name` varchar(100) NOT NULL,
+  `room_tent_number` varchar(100) DEFAULT NULL,
+  `members_count` int(11) NOT NULL DEFAULT 1,
+  `seniors_count` int(11) NOT NULL DEFAULT 0,
+  `minors_count` int(11) NOT NULL DEFAULT 0,
+  `pwd_count` int(11) NOT NULL DEFAULT 0,
+  `special_medical_needs` varchar(255) DEFAULT NULL,
+  `relief_packs_given` int(11) NOT NULL DEFAULT 0,
+  `hot_meals_claimed` int(11) NOT NULL DEFAULT 0,
+  `status` enum('Sheltered','Transferred','Decamped / Returned Home') NOT NULL DEFAULT 'Sheltered',
+  `checkin_time` datetime DEFAULT current_timestamp(),
+  `checkout_time` datetime DEFAULT NULL,
+  `checked_in_by` varchar(100) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_evac_area` (`evacuation_area_id`),
+  KEY `idx_hh_id` (`household_id`),
+  KEY `idx_status` (`status`),
+  CONSTRAINT `fk_evac_checkins_area` FOREIGN KEY (`evacuation_area_id`) REFERENCES `evacuation_areas` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `evacuation_relief_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `checkin_id` int(11) NOT NULL,
+  `evacuation_area_id` int(11) NOT NULL,
+  `household_id` int(11) NOT NULL,
+  `family_name` varchar(150) NOT NULL,
+  `item_type` varchar(100) NOT NULL DEFAULT 'Family Food Pack',
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `unit` varchar(50) NOT NULL DEFAULT 'packs',
+  `distributed_by` varchar(100) DEFAULT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_erl_checkin` (`checkin_id`),
+  KEY `idx_erl_area` (`evacuation_area_id`),
+  CONSTRAINT `fk_erl_checkin` FOREIGN KEY (`checkin_id`) REFERENCES `evacuation_family_checkins` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 DROP TABLE IF EXISTS `financial_aid_allocations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -337,6 +393,7 @@ CREATE TABLE `events` (
   `activity_type` varchar(100) NOT NULL DEFAULT 'Disaster Drill',
   `barangay_id` int(11) DEFAULT NULL,
   `venue` varchar(150) NOT NULL,
+  `target_puroks` varchar(255) NOT NULL DEFAULT 'All Puroks',
   `latitude` decimal(10,6) DEFAULT NULL,
   `longitude` decimal(10,6) DEFAULT NULL,
   `start_datetime` datetime NOT NULL,
@@ -730,6 +787,7 @@ CREATE TABLE `financial_aid_distributions` (
   `allocation_id` int(11) NOT NULL,
   `barangay_id` int(11) NOT NULL,
   `resident_id` int(11) DEFAULT NULL,
+  `household_id` int(11) DEFAULT NULL,
   `beneficiary_name` varchar(150) NOT NULL,
   `purok` varchar(100) NOT NULL,
   `phone` varchar(30) NOT NULL,
@@ -777,7 +835,10 @@ CREATE TABLE `financial_aid_audits` (
   KEY `fk_audit_actor` (`actor_id`),
   CONSTRAINT `fk_audit_actor` FOREIGN KEY (`actor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_audit_alloc` FOREIGN KEY (`allocation_id`) REFERENCES `financial_aid_allocations` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_audit_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_audit_brgy` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 DROP TABLE IF EXISTS `household_members`;
 DROP TABLE IF EXISTS `purok_households`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

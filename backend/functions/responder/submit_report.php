@@ -19,7 +19,16 @@ if (!in_array($user['role'], ['responder', 'icdrrmo'], true)) {
 }
 
 $requestId = !empty($_POST['disaster_request_id']) ? (int)$_POST['disaster_request_id'] : null;
-$barangayId = (int)($_POST['barangay_id'] ?? ($user['barangay_id'] ?? 1));
+if ($user['role'] === 'responder') {
+    $barangayId = (int)($user['barangay_id'] ?? 0);
+    if ($barangayId === 0) {
+        $bStmt = $db->prepare("SELECT barangay_id FROM users WHERE id = ?");
+        $bStmt->execute([(int)$user['id']]);
+        $barangayId = (int)$bStmt->fetchColumn();
+    }
+} else {
+    $barangayId = (int)($_POST['barangay_id'] ?? ($user['barangay_id'] ?? 1));
+}
 $purok = trim($_POST['purok'] ?? '');
 $status = trim($_POST['operational_status'] ?? 'On Site');
 $condition = trim($_POST['condition_overview'] ?? '');
