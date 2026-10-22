@@ -16,9 +16,9 @@ $barangayId = (int) ($user['barangay_id'] ?? 1);
 $userPurok = trim($user['purok'] ?? '');
 $db = getDBConnection();
 
-$filterTab = $_GET['tab'] ?? 'attending';
-if (!in_array($filterTab, ['attending', 'missed', 'completed'], true)) {
-  $filterTab = 'attending';
+$filterTab = $_GET['tab'] ?? 'upcoming';
+if (!in_array($filterTab, ['upcoming', 'attending', 'missed', 'completed'], true)) {
+  $filterTab = 'upcoming';
 }
 $searchQuery = trim($_GET['q'] ?? '');
 
@@ -28,27 +28,40 @@ $myRsvpStmt->execute([$userId, $user['phone'] ?? '']);
 $myRegisteredEventIds = array_map('intval', $myRsvpStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
 // Base Query: Scoped strictly to resident's barangay, created by Barangay Head
-// AND relevant to the resident (their purok, barangay-wide events, or events they registered for)
+// AND dynamically filtered by target puroks (if All Puroks -> all residents; if specific puroks -> only residents in those puroks or events already registered)
 $baseWhere = "
     e.barangay_id = ?
     AND (e.is_archived = 0 OR e.is_archived IS NULL)
     AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    AND (
+        e.target_puroks IS NULL
+        OR TRIM(e.target_puroks) = ''
+        OR e.target_puroks IN ('All Puroks', 'All')
+        OR FIND_IN_SET(?, REPLACE(e.target_puroks, ', ', ',')) > 0
 ";
-$baseParams = [$barangayId, $barangayId];
+if (!empty($myRegisteredEventIds)) {
+  $inRsvpPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
+  $baseWhere .= " OR e.id IN ($inRsvpPlaceholders)";
+}
+$baseWhere .= " )";
 
-if (!empty($userPurok)) {
-  $purokLike = "%{$userPurok}%";
-  if (!empty($myRegisteredEventIds)) {
-    $inRsvpPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
-    $baseWhere .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.title NOT LIKE 'Purok %' OR e.id IN ($inRsvpPlaceholders))";
-    $baseParams = array_merge($baseParams, [$purokLike, $purokLike], $myRegisteredEventIds);
-  } else {
-    $baseWhere .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.title NOT LIKE 'Purok %')";
-    $baseParams = array_merge($baseParams, [$purokLike, $purokLike]);
-  }
+$baseParams = [$barangayId, $barangayId, $userPurok];
+if (!empty($myRegisteredEventIds)) {
+  $baseParams = array_merge($baseParams, $myRegisteredEventIds);
 }
 
-// 1. Attending Count (Upcoming registered events only)
+// 1. All Upcoming Events Count
+$countUpcomingStmt = $db->prepare("
+    SELECT COUNT(*) FROM events e 
+    LEFT JOIN users u ON e.created_by = u.id 
+    WHERE {$baseWhere}
+      AND e.start_datetime >= CURDATE() 
+      AND e.status != 'Cancelled'
+");
+$countUpcomingStmt->execute($baseParams);
+$countUpcoming = (int) $countUpcomingStmt->fetchColumn();
+
+// 2. Attending Count (Upcoming registered events only)
 $countAttending = 0;
 if (!empty($myRegisteredEventIds)) {
   $inAttending = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
@@ -81,7 +94,7 @@ $countMissedStmt = $db->prepare("
 $countMissedStmt->execute($missedParams);
 $countMissed = (int) $countMissedStmt->fetchColumn();
 
-// 3. Completed Events Count (Past attended events)
+// 4. Completed Events Count (Past attended events)
 $countCompleted = 0;
 if (!empty($myRegisteredEventIds)) {
   $inCompleted = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
@@ -123,7 +136,9 @@ $feedSql = "
 ";
 $feedParams = $baseParams;
 
-if ($filterTab === 'attending') {
+if ($filterTab === 'upcoming') {
+  $feedSql .= " AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled' ORDER BY e.start_datetime ASC";
+} elseif ($filterTab === 'attending') {
   if (!empty($myRegisteredEventIds)) {
     $inPlaceholders = implode(',', array_fill(0, count($myRegisteredEventIds), '?'));
     $feedSql .= " AND e.id IN ($inPlaceholders) AND e.start_datetime >= CURDATE() AND e.status != 'Cancelled' ORDER BY e.start_datetime ASC";
@@ -280,19 +295,12 @@ require_once __DIR__ . '/../layouts/header.php';
     color: #FFFFFF;
   }
 
-  /* Responsive Split on Desktop: Events List (Left) + Safety Protocols (Right) */
+  /* Events Feed Container */
   .event-layout-split {
     display: flex;
     flex-direction: column;
     gap: var(--space-4, 12px);
-  }
-
-  @media (min-width: 901px) {
-    .event-layout-split {
-      display: grid;
-      grid-template-columns: 1.25fr 0.75fr;
-      align-items: start;
-    }
+    width: 100%;
   }
 
   /* Event Card Item - Distinct Clickable Card */
@@ -643,34 +651,6 @@ require_once __DIR__ . '/../layouts/header.php';
     animation: venueSpin 0.7s linear infinite;
   }
 
-  /* Protocols Card */
-  .protocols-side-card {
-    background: var(--color-surface, #FFFFFF);
-    border: 1px solid var(--color-border, #D9E0E3);
-    border-radius: var(--radius-primary, 10px);
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .protocol-item {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--color-text, #24313A);
-  }
-
-  .protocol-bullet {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-secondary, #2F6F73);
-    margin-top: 5px;
-    flex-shrink: 0;
-  }
 </style>
 
 <!-- Page Header -->
@@ -725,8 +705,11 @@ require_once __DIR__ . '/../layouts/header.php';
     </form>
 
     <div class="event-pills-row">
+      <a href="events.php?tab=upcoming" class="event-pill-link <?= ($filterTab === 'upcoming') ? 'active' : '' ?>">
+        Upcoming Events (<?= $countUpcoming ?>)
+      </a>
       <a href="events.php?tab=attending" class="event-pill-link <?= ($filterTab === 'attending') ? 'active' : '' ?>">
-        Attending Events (<?= $countAttending ?>)
+        Attending (<?= $countAttending ?>)
       </a>
       <a href="events.php?tab=missed" class="event-pill-link pill-missed <?= ($filterTab === 'missed') ? 'active' : '' ?>">
         Missed Events (<?= $countMissed ?>)
@@ -743,15 +726,23 @@ require_once __DIR__ . '/../layouts/header.php';
     <!-- Left Column: Events Feed -->
     <div style="display:flex;flex-direction:column;gap:10px;">
       <?php if (empty($eventsList)): ?>
-        <?php if ($filterTab === 'attending'): ?>
+        <?php if ($filterTab === 'upcoming'): ?>
+          <div class="resident-event-card" style="padding:36px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
+            <div style="font-size:26px;">📅</div>
+            <div style="font-size:14px;font-weight:700;color:var(--color-primary);">No Upcoming Events</div>
+            <div style="font-size:11.5px;color:var(--color-text-secondary);max-width:440px;line-height:1.5;">
+              There are currently no upcoming preparedness activities or aid distributions scheduled for your purok. Check back soon!
+            </div>
+          </div>
+        <?php elseif ($filterTab === 'attending'): ?>
           <div class="resident-event-card" style="padding:36px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;">
             <div style="font-size:26px;">📅</div>
             <div style="font-size:14px;font-weight:700;color:var(--color-primary);">No Attending Events</div>
             <div style="font-size:11.5px;color:var(--color-text-secondary);max-width:440px;line-height:1.5;">
-              You have not joined any upcoming drills or community activities yet. All open disaster drills and aid distributions can be joined from your Home dashboard.
+              You have not joined any upcoming drills or activities yet. You can browse and join events in the Upcoming Events tab.
             </div>
-            <a href="dashboard.php#residentCalendarWidget" class="btn btn-primary btn-sm" style="font-size:11px;padding:7px 18px;margin-top:6px;display:inline-flex;align-items:center;gap:6px;">
-              Browse &amp; Join Events on Home &rarr;
+            <a href="events.php?tab=upcoming" class="btn btn-primary btn-sm" style="font-size:11px;padding:7px 18px;margin-top:6px;display:inline-flex;align-items:center;gap:6px;">
+              Browse Upcoming Events &rarr;
             </a>
           </div>
         <?php elseif ($filterTab === 'missed'): ?>
@@ -906,6 +897,11 @@ require_once __DIR__ . '/../layouts/header.php';
                     </svg>
                     Cancel Join
                   </button>
+                <?php else: ?>
+                  <button type="button" class="btn btn-primary btn-sm" id="join-btn-<?= $eventId ?>" style="font-size:10px;padding:5px 12px;border-radius:6px;"
+                    onclick="event.stopPropagation(); handleResidentJoin(<?= $eventId ?>, this)">
+                    Join Event
+                  </button>
                 <?php endif; ?>
               </div>
             </div>
@@ -914,59 +910,6 @@ require_once __DIR__ . '/../layouts/header.php';
         <?php endforeach; ?>
       <?php endif; ?>
     </div>
-
-    <!-- Right Column: Family Emergency Preparedness Protocols -->
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="protocols-side-card">
-        <div
-          style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-border-light);padding-bottom:8px;">
-          <h3
-            style="font-family:var(--font-primary);font-size:12.5px;font-weight:700;color:var(--color-primary);margin:0;">
-            Community Action Protocols
-          </h3>
-          <span class="badge badge-primary" style="font-size:9.5px;">BDRRMC Standard</span>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <div class="protocol-item">
-            <div class="protocol-bullet"></div>
-            <div>
-              <strong>Earthquake: "Duck, Cover &amp; Hold"</strong><br>
-              Drop down onto your hands and knees. Cover your head and neck under a sturdy table. Hold on until shaking
-              ceases completely.
-            </div>
-          </div>
-
-          <div class="protocol-item">
-            <div class="protocol-bullet"></div>
-            <div>
-              <strong>Flood Warning &amp; River Alert:</strong><br>
-              When Mandulog river siren sounds (Red Warning), immediately proceed to your designated barangay
-              high-ground shelter.
-            </div>
-          </div>
-
-          <div class="protocol-item">
-            <div class="protocol-bullet"></div>
-            <div>
-              <strong>Family Go-Bag Check:</strong><br>
-              Ensure your 72-hour survival kit contains drinking water, ready-to-eat canned goods, first-aid medicine,
-              and emergency whistle.
-            </div>
-          </div>
-
-          <div class="protocol-item">
-            <div class="protocol-bullet"></div>
-            <div>
-              <strong>Toll-Free Emergency Hotline:</strong><br>
-              In any immediate distress or life-threatening scenario, dial <strong
-                style="color:var(--color-danger);">161</strong> (ICDRRMO Command).
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -1122,29 +1065,62 @@ require_once __DIR__ . '/../layouts/header.php';
       .then(res => res.json())
       .then(data => {
         if (data.success && !data.is_attending) {
-          // Animate card removal from attending list
+          const urlParams = new URLSearchParams(window.location.search);
+          const currentTab = urlParams.get('tab') || 'upcoming';
           const card = document.getElementById(`event-card-${eventId}`);
-          if (card) {
-            card.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-            card.style.opacity = '0';
-            card.style.transform = 'scale(0.96) translateY(-8px)';
-            setTimeout(() => {
-              card.remove();
-              // Check remaining cards in feed
-              const feedCards = document.querySelectorAll('.resident-events-wrap .resident-event-card');
-              if (feedCards.length === 0) {
-                location.reload();
+
+          if (currentTab === 'attending') {
+            if (card) {
+              card.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+              card.style.opacity = '0';
+              card.style.transform = 'scale(0.96) translateY(-8px)';
+              setTimeout(() => {
+                card.remove();
+                const feedCards = document.querySelectorAll('.resident-events-wrap .resident-event-card');
+                if (feedCards.length === 0) {
+                  location.reload();
+                }
+              }, 300);
+            }
+          } else {
+            // Swap Cancel Join back to Join Event button in place
+            if (cancelBtn) {
+              cancelBtn.outerHTML = `
+                <button type="button" class="btn btn-primary btn-sm" id="join-btn-${eventId}" style="font-size:10px;padding:5px 12px;border-radius:6px;"
+                  onclick="event.stopPropagation(); handleResidentJoin(${eventId}, this)">
+                  Join Event
+                </button>
+              `;
+            }
+            if (card) {
+              card.setAttribute('data-attendance', 'Not Registered');
+              const statusEl = card.querySelector('.event-status-badge');
+              if (statusEl) {
+                statusEl.className = 'badge badge-outline event-status-badge';
+                statusEl.textContent = 'Upcoming';
               }
-            }, 300);
+            }
+          }
+
+          // Update attendee count meter if present
+          const actualEl = document.getElementById(`actual-count-${eventId}`);
+          if (actualEl && data.actual_participants !== undefined) {
+            const m = actualEl.textContent.match(/\/ (\d+) Registered/);
+            const target = m ? parseInt(m[1], 10) : 50;
+            actualEl.textContent = `${data.actual_participants} / ${target} Registered`;
+            const fillEl = document.getElementById(`attendee-fill-${eventId}`);
+            if (fillEl && target > 0) {
+              fillEl.style.width = Math.min(100, Math.round((data.actual_participants / target) * 100)) + '%';
+            }
           }
 
           // Decrement Attending count pill
-          const attPill = document.querySelector('.event-pills-row a.event-pill-link:first-child');
+          const attPill = document.querySelector('.event-pills-row a[href*="tab=attending"]');
           if (attPill) {
             const m = attPill.textContent.match(/\((\d+)\)/);
             if (m) {
               const newCnt = Math.max(0, parseInt(m[1], 10) - 1);
-              attPill.textContent = `Attending Events (${newCnt})`;
+              attPill.innerHTML = `Attending (${newCnt})`;
             }
           }
 
@@ -1161,7 +1137,11 @@ require_once __DIR__ . '/../layouts/header.php';
             cancelBtn.disabled = false;
             cancelBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Cancel Join';
           }
-          alert(data.message || 'Could not cancel attendance.');
+          if (typeof showToast === 'function') {
+            showToast(data.message || 'Failed to cancel attendance.', 'danger');
+          } else {
+            alert(data.message || 'Failed to cancel attendance.');
+          }
         }
       })
       .catch(err => {
@@ -1170,9 +1150,100 @@ require_once __DIR__ . '/../layouts/header.php';
           cancelBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Cancel Join';
         }
         console.error(err);
-        alert('Network error while processing cancellation.');
       });
   }
+
+  function handleResidentJoin(eventId, btnElem) {
+    const origHtml = btnElem.innerHTML;
+    btnElem.disabled = true;
+    btnElem.textContent = 'Joining...';
+
+    const formData = new FormData();
+    formData.append('event_id', eventId);
+
+    fetch('<?= BASE_URL ?>/backend/functions/event/rsvp.php', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.is_attending) {
+          const card = document.getElementById(`event-card-${eventId}`);
+          const title = card ? card.getAttribute('data-title') : 'Event';
+
+          btnElem.outerHTML = `
+            <button type="button" class="btn-cancel-join" id="cancel-btn-${eventId}"
+              onclick="event.stopPropagation(); promptCancelJoin(${eventId}, '${escapeHtml(title).replace(/'/g, "\\'")}')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              Cancel Join
+            </button>
+          `;
+
+          if (card) {
+            card.setAttribute('data-attendance', 'Registered (Joined)');
+            const statusEl = card.querySelector('.event-status-badge');
+            if (statusEl) {
+              statusEl.className = 'badge badge-primary event-status-badge';
+              statusEl.textContent = '✓ Attending';
+            }
+          }
+
+          // Update attendee count meter if present
+          const actualEl = document.getElementById(`actual-count-${eventId}`);
+          if (actualEl && data.actual_participants !== undefined) {
+            const m = actualEl.textContent.match(/\/ (\d+) Registered/);
+            const target = m ? parseInt(m[1], 10) : 50;
+            actualEl.textContent = `${data.actual_participants} / ${target} Registered`;
+            const fillEl = document.getElementById(`attendee-fill-${eventId}`);
+            if (fillEl && target > 0) {
+              fillEl.style.width = Math.min(100, Math.round((data.actual_participants / target) * 100)) + '%';
+            }
+          }
+
+          // Increment Attending count pill
+          const attPill = document.querySelector('.event-pills-row a[href*="tab=attending"]');
+          if (attPill) {
+            const m = attPill.textContent.match(/\((\d+)\)/);
+            if (m) {
+              const newCnt = parseInt(m[1], 10) + 1;
+              attPill.innerHTML = `Attending (${newCnt})`;
+            }
+          }
+
+          if (typeof showToast === 'function') {
+            showToast(data.message || 'Successfully joined event!', 'success');
+          } else {
+            alert(data.message || 'Successfully joined event!');
+          }
+        } else {
+          btnElem.disabled = false;
+          btnElem.innerHTML = origHtml;
+          if (typeof showToast === 'function') {
+            showToast(data.message || 'Could not join event.', 'danger');
+          } else {
+            alert(data.message || 'Could not join event.');
+          }
+        }
+      })
+      .catch(err => {
+        btnElem.disabled = false;
+        btnElem.innerHTML = origHtml;
+        console.error(err);
+      });
+  }
+  window.handleResidentJoin = handleResidentJoin;
+
+  function handleResidentJoinFromModal(eventId, btnElem) {
+    handleResidentJoin(eventId, btnElem);
+    closeEventDetailsModal();
+  }
+  window.handleResidentJoinFromModal = handleResidentJoinFromModal;
 
   // ============================================================================
   // Venue Navigation Leaflet Mapping Tool Engine & Modality Logic
@@ -1381,6 +1452,12 @@ require_once __DIR__ . '/../layouts/header.php';
           <button type="button" class="btn-cancel-join" onclick="promptCancelJoin(${eventId}, '${escapeHtml(title).replace(/'/g, "\\'")}')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             Cancel Join
+          </button>
+        `;
+      } else if (!isPast && !status.includes('Cancelled') && !status.includes('Ended')) {
+        actionSlot.innerHTML = `
+          <button type="button" class="btn btn-primary btn-sm" style="font-size:10.5px;padding:5px 14px;border-radius:6px;" onclick="handleResidentJoinFromModal(${eventId}, this)">
+            Join Event
           </button>
         `;
       } else {

@@ -43,6 +43,9 @@ if (empty($colsTp)) {
 $now = time();
 $nowStr = date('Y-m-d H:i:s');
 
+// Auto-sync event statuses: Scheduled events whose starting time has arrived transition to Ongoing
+syncEventStatuses($db);
+
 $viewTab = $_GET['tab'] ?? 'active';
 if (!in_array($viewTab, ['active', 'archived'], true)) {
   $viewTab = 'active';
@@ -114,13 +117,19 @@ $barangayMembers = $memQueryStmt->fetchAll(PDO::FETCH_ASSOC);
 // Status breakdown counts for current tab
 $baseWhere = "(barangay_id = ? OR barangay_id IS NULL)" . ($viewTab === 'archived' ? " AND is_archived = 1" : " AND (is_archived = 0 OR is_archived IS NULL)");
 
-$upcomingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime > ?");
+$upcomingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled', 'Ongoing', 'Ended', 'Finished') AND start_datetime > ?");
 $upcomingCountStmt->execute([$barangayId, $nowStr]);
 $countUpcoming = (int) $upcomingCountStmt->fetchColumn();
 
-$ongoingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled') AND start_datetime <= ? AND end_datetime >= ?");
+// Ongoing: actively between start_datetime and end_datetime
+$ongoingCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status NOT IN ('Completed', 'Cancelled', 'Ended', 'Finished') AND start_datetime <= ? AND end_datetime > ?");
 $ongoingCountStmt->execute([$barangayId, $nowStr, $nowStr]);
 $countOngoing = (int) $ongoingCountStmt->fetchColumn();
+
+// Ended / Finished: end_datetime has been met and not yet marked Completed or Cancelled
+$endedCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND (status IN ('Ended', 'Finished') OR (status NOT IN ('Completed', 'Cancelled') AND end_datetime <= ?))");
+$endedCountStmt->execute([$barangayId, $nowStr]);
+$countEnded = (int) $endedCountStmt->fetchColumn();
 
 $completedCountStmt = $db->prepare("SELECT COUNT(*) FROM events WHERE $baseWhere AND status = 'Completed'");
 $completedCountStmt->execute([$barangayId]);
@@ -172,11 +181,14 @@ if (!empty($filterVenue)) {
 
 if (!empty($filterStatus)) {
   if ($filterStatus === 'Upcoming') {
-    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled') AND pa.start_datetime > ?";
+    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled', 'Ongoing', 'Ended', 'Finished') AND pa.start_datetime > ?";
     $params[] = $nowStr;
   } elseif ($filterStatus === 'Ongoing') {
-    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled') AND pa.start_datetime <= ? AND pa.end_datetime >= ?";
+    $sql .= " AND pa.status NOT IN ('Completed', 'Cancelled', 'Ended', 'Finished') AND pa.start_datetime <= ? AND pa.end_datetime > ?";
     $params[] = $nowStr;
+    $params[] = $nowStr;
+  } elseif ($filterStatus === 'Ended' || $filterStatus === 'Finished') {
+    $sql .= " AND (pa.status IN ('Ended', 'Finished') OR (pa.status NOT IN ('Completed', 'Cancelled') AND pa.end_datetime <= ?))";
     $params[] = $nowStr;
   } else {
     $sql .= " AND pa.status = ?";
@@ -693,6 +705,11 @@ require_once __DIR__ . '/../layouts/header.php';
     In Progress / Started <span class="badge <?= $filterStatus === 'Ongoing' ? 'badge-primary' : 'badge-neutral' ?>"
       style="font-size:9px; padding:1px 5px;"><?= $countOngoing ?></span>
   </a>
+  <a href="<?= getEventFilterUrl(['status' => 'Ended']) ?>"
+    class="evac-pill-btn <?= ($filterStatus === 'Ended' || $filterStatus === 'Finished') ? 'active' : '' ?>">
+    Ended / For Evaluation <span class="badge <?= ($filterStatus === 'Ended' || $filterStatus === 'Finished') ? 'badge-primary' : 'badge-neutral' ?>"
+      style="font-size:9px; padding:1px 5px; <?= ($countEnded > 0 && $filterStatus !== 'Ended') ? 'background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;' : '' ?>"><?= $countEnded ?></span>
+  </a>
   <a href="<?= getEventFilterUrl(['status' => 'Completed']) ?>"
     class="evac-pill-btn <?= $filterStatus === 'Completed' ? 'active' : '' ?>">
     Completed <span class="badge <?= $filterStatus === 'Completed' ? 'badge-primary' : 'badge-neutral' ?>"
@@ -772,8 +789,9 @@ require_once __DIR__ . '/../layouts/header.php';
         </label>
         <select name="status" class="form-control" style="font-size:12px; height:36px;">
           <option value="">All Statuses</option>
-          <option value="Upcoming" <?= $filterStatus === 'Upcoming' ? 'selected' : '' ?>>Upcoming</option>
+          <option value="Upcoming" <?= $filterStatus === 'Upcoming' ? 'selected' : '' ?>>Upcoming (Scheduled)</option>
           <option value="Ongoing" <?= $filterStatus === 'Ongoing' ? 'selected' : '' ?>>In Progress / Started</option>
+          <option value="Ended" <?= ($filterStatus === 'Ended' || $filterStatus === 'Finished') ? 'selected' : '' ?>>Ended / Finished (Needs Evaluation)</option>
           <option value="Completed" <?= $filterStatus === 'Completed' ? 'selected' : '' ?>>Completed</option>
           <option value="Cancelled" <?= $filterStatus === 'Cancelled' ? 'selected' : '' ?>>Cancelled</option>
         </select>
@@ -888,9 +906,10 @@ require_once __DIR__ . '/../layouts/header.php';
       <?php else: ?>
         <?php foreach ($activities as $act): ?>
           <?php
-          $startTime = strtotime($act['start_datetime']);
+           $startTime = strtotime($act['start_datetime']);
           $endTime = strtotime($act['end_datetime']);
           $isStarted = ($now >= $startTime);
+          $isEnded = ($now >= $endTime);
           $isCompleted = ($act['status'] === 'Completed');
           $isCancelled = ($act['status'] === 'Cancelled');
           $isArchived = !empty($act['is_archived']);
@@ -903,17 +922,6 @@ require_once __DIR__ . '/../layouts/header.php';
               <div style="font-size:9px;color:var(--color-text-muted);">
                 <?= formatDate($act['start_datetime'], 'h:i A') ?> — <?= formatDate($act['end_datetime'], 'h:i A') ?>
               </div>
-              <?php if ($isArchived): ?>
-                <span
-                  style="display:inline-block;margin-top:2px;font-size:8.5px;color:#64748B;background:#F1F5F9;padding:1px 5px;border-radius:4px;font-weight:600;">Archived</span>
-              <?php elseif (!$isStarted && !$isCompleted && !$isCancelled): ?>
-                <span
-                  style="display:inline-block;margin-top:2px;font-size:8.5px;color:var(--color-info,#0284C7);background:#E0F2FE;padding:1px 5px;border-radius:4px;font-weight:600;">Upcoming</span>
-              <?php elseif ($isStarted && !$isCompleted && !$isCancelled): ?>
-                <span
-                  style="display:inline-block;margin-top:2px;font-size:8.5px;color:#16A34A;background:#DCFCE7;padding:1px 5px;border-radius:4px;font-weight:600;">●
-                  Started / In Progress</span>
-              <?php endif; ?>
             </td>
             <td>
               <div style="font-weight:600;color:var(--color-primary);">
@@ -954,8 +962,20 @@ require_once __DIR__ . '/../layouts/header.php';
             <td>
               <?php if ($isArchived): ?>
                 <span class="badge badge-neutral" style="font-size:9.5px;">Archived</span>
+              <?php elseif ($isCancelled): ?>
+                <span class="badge badge-danger" style="font-size:9.5px;">Cancelled</span>
+              <?php elseif ($isCompleted): ?>
+                <span class="badge badge-success" style="font-size:9.5px;">Completed</span>
+              <?php elseif ($isEnded || $act['status'] === 'Ended' || $act['status'] === 'Finished'): ?>
+                <span class="badge badge-warning" style="font-size:9.5px;background:#FEF3C7;color:#B45309;border:1px solid #FDE68A;font-weight:600;display:inline-flex;align-items:center;gap:4px;" title="Event schedule has ended. Ready for evaluation.">
+                  <span style="font-size:7px;">⏹</span> Ended
+                </span>
+              <?php elseif ($act['status'] === 'Ongoing' || $isStarted): ?>
+                <span class="badge badge-warning" style="font-size:9.5px;background:#DCFCE7;color:#16A34A;border:1px solid #BBF7D0;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                  <span style="font-size:7px;">●</span> Ongoing
+                </span>
               <?php else: ?>
-                <?= renderStatusBadge($act['status']) ?>
+                <span class="badge badge-info" style="font-size:9.5px;">Scheduled</span>
               <?php endif; ?>
             </td>
             <td>
@@ -970,6 +990,18 @@ require_once __DIR__ . '/../layouts/header.php';
                   </svg>
                   View
                 </button>
+                <?php if (($isEnded || $act['status'] === 'Ended' || $act['status'] === 'Finished') && !$isCompleted && !$isCancelled && !$isArchived): ?>
+                  <button type="button" class="btn btn-success btn-sm"
+                    onclick='openEvaluateModal(<?= json_encode($act) ?>, <?= json_encode($actAttendees) ?>)'
+                    style="font-size:11px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;background:var(--color-success,#16A34A);border-color:var(--color-success,#16A34A);color:#fff;"
+                    title="Evaluate Event Execution & Attendance">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M9 11l3 3L22 4"></path>
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    Evaluate
+                  </button>
+                <?php endif; ?>
                 <?php if ($isArchived): ?>
                   <button type="button" class="btn btn-outline btn-sm"
                     onclick='confirmDeleteActivity(<?= json_encode($act) ?>, <?= count($actAttendees) ?>)'
@@ -3579,7 +3611,9 @@ require_once __DIR__ . '/../layouts/header.php';
     const isCompleted = (act.status === 'Completed');
     const now = new Date();
     const startDate = act.start_datetime ? new Date(act.start_datetime.replace(' ', 'T')) : null;
+    const endDate = act.end_datetime ? new Date(act.end_datetime.replace(' ', 'T')) : null;
     const isStarted = startDate && (startDate <= now);
+    const isEnded = endDate && (endDate <= now);
 
     // Update Modal Header Title & Status Badge
     const titleEl = document.getElementById('view_acc_title');
@@ -3602,16 +3636,25 @@ require_once __DIR__ . '/../layouts/header.php';
         badgeEl.className = 'badge badge-success';
         badgeEl.innerText = 'Accomplished';
       }
-    } else if (isStarted) {
+    } else if (isEnded || act.status === 'Ended' || act.status === 'Finished') {
+      if (titleEl) titleEl.innerText = 'Ended Event Overview — Ready for Evaluation';
+      if (badgeEl) {
+        badgeEl.className = 'badge badge-warning';
+        badgeEl.style.background = '#FEF3C7';
+        badgeEl.style.color = '#B45309';
+        badgeEl.style.borderColor = '#FDE68A';
+        badgeEl.innerText = 'Ended';
+      }
+    } else if (isStarted || act.status === 'Ongoing') {
       if (titleEl) titleEl.innerText = 'Ongoing Event Overview';
       if (badgeEl) {
-        badgeEl.className = 'badge badge-info';
+        badgeEl.className = 'badge badge-warning';
         badgeEl.innerText = 'Ongoing';
       }
     } else {
       if (titleEl) titleEl.innerText = 'Scheduled Event Overview';
       if (badgeEl) {
-        badgeEl.className = 'badge badge-neutral';
+        badgeEl.className = 'badge badge-info';
         badgeEl.innerText = 'Scheduled';
       }
     }
@@ -3824,6 +3867,19 @@ require_once __DIR__ . '/../layouts/header.php';
       <button type="button" class="btn btn-success btn-sm" onclick="evaluateCurrentAccomplishedEvent()" style="background:var(--color-success,#16A34A);border-color:var(--color-success,#16A34A);color:#fff;" title="${isAlreadyEvaluated ? 'Review and Re-evaluate Event Execution' : 'Evaluate Event Execution'}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
         ${isAlreadyEvaluated ? 'Re-evaluate' : 'Evaluate'}
+      </button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('accomplishedEventModal')">Close</button>
+    `;
+    } else if (isEnded || act.status === 'Ended' || act.status === 'Finished') {
+      const isAlreadyEvaluated = !!(act.evaluation_summary || act.status === 'Completed');
+      rightHtml = `
+      <button type="button" class="btn btn-success btn-sm" onclick="evaluateCurrentAccomplishedEvent()" style="font-size:11px;padding:4px 10px;background:var(--color-success,#16A34A);border-color:var(--color-success,#16A34A);color:#fff;display:inline-flex;align-items:center;gap:4px;" title="Evaluate Event Execution & Attendance">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        ${isAlreadyEvaluated ? 'Re-evaluate' : 'Evaluate Event'}
+      </button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="editCurrentAccomplishedEvent()" title="Edit Event Details (Date & Time Locked)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px;vertical-align:-1px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        Edit
       </button>
       <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('accomplishedEventModal')">Close</button>
     `;

@@ -64,6 +64,8 @@ function renderStatusBadge($status) {
         'Closed' => ['class' => 'badge-neutral', 'label' => 'Closed'],
         'Scheduled' => ['class' => 'badge-info', 'label' => 'Scheduled'],
         'Ongoing' => ['class' => 'badge-warning', 'label' => 'Ongoing'],
+        'Ended' => ['class' => 'badge-warning', 'label' => 'Ended'],
+        'Finished' => ['class' => 'badge-warning', 'label' => 'Finished'],
         'Cancelled' => ['class' => 'badge-danger', 'label' => 'Cancelled'],
         'Available' => ['class' => 'badge-success', 'label' => 'Available'],
         'Responding' => ['class' => 'badge-warning', 'label' => 'Responding'],
@@ -539,20 +541,23 @@ function syncEventFinancialAidAllocation($db, $eventId = null, $barangayId = nul
             $targetBeneficiaries = max(1, (int)($evt['target_participants'] ?? 50));
         }
 
-        $amountPerBeneficiary = 5000.00;
-        $totalBudget = $targetBeneficiaries * $amountPerBeneficiary;
+        // Check if is_distributed column exists
+        try {
+            $colsDistFlag = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'is_distributed'")->fetchAll();
+            if (empty($colsDistFlag)) {
+                $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN is_distributed TINYINT(1) NOT NULL DEFAULT 0 AFTER target_beneficiaries");
+            }
+        } catch (Throwable $e) {}
+
         $status = ($evt['status'] === 'Completed') ? 'Completed' : 'Active';
 
         if ($existingAlloc) {
-            // Update allocation metadata
+            // Update allocation metadata without touching budget (budget is set only when user initiates Distribute Aid)
             $upStmt = $db->prepare("
                 UPDATE financial_aid_allocations
                 SET program_name = ?,
                     target_purok = ?,
                     target_beneficiaries = ?,
-                    total_budget = ?,
-                    amount_per_beneficiary = ?,
-                    remaining_budget = GREATEST(0, ? - disbursed_budget),
                     status = ?
                 WHERE id = ?
             ");
@@ -560,14 +565,11 @@ function syncEventFinancialAidAllocation($db, $eventId = null, $barangayId = nul
                 $evt['title'],
                 $targetPuroks,
                 $targetBeneficiaries,
-                $totalBudget,
-                $amountPerBeneficiary,
-                $totalBudget,
                 $status,
                 $existingAlloc['id']
             ]);
         } else {
-            // Create allocation code
+            // Create allocation code with 0.00 budget until user initiates Distribute Aid
             $allocCode = 'AID-EVT-' . str_pad($evt['id'], 4, '0', STR_PAD_LEFT);
             $cStmt = $db->prepare("SELECT id FROM financial_aid_allocations WHERE allocation_code = ?");
             $cStmt->execute([$allocCode]);
@@ -580,24 +582,201 @@ function syncEventFinancialAidAllocation($db, $eventId = null, $barangayId = nul
                     event_id, allocation_code, program_name, disaster_type,
                     barangay_id, target_purok, total_budget, amount_per_beneficiary,
                     disbursed_budget, remaining_budget, funding_source,
-                    target_beneficiaries, status, added_type, notes, allocated_by, created_at
+                    target_beneficiaries, is_distributed, status, added_type, notes, allocated_by, created_at
                 ) VALUES (
                     ?, ?, ?, 'Disaster Relief & Social Welfare',
-                    ?, ?, ?, ?,
-                    0.00, ?, 'LGU Calamity Fund',
-                    ?, ?, 'added_by_admin', ?, ?, NOW()
+                    ?, ?, 0.00, 0.00,
+                    0.00, 0.00, 'LGU Calamity Fund',
+                    ?, 0, ?, 'added_by_admin', ?, ?, NOW()
                 )
             ");
-            $notes = 'Auto-synced from Scheduled Event: ' . $evt['title'];
+            $notes = 'Awaiting distribution plan setup by Barangay Head.';
             $insStmt->execute([
                 $evt['id'], $allocCode, $evt['title'],
-                $bId, $targetPuroks, $totalBudget, $amountPerBeneficiary,
-                $totalBudget,
-                $targetBeneficiaries, $status, $notes, $evt['created_by']
+                $bId, $targetPuroks,
+                $targetBeneficiaries, $status, $notes, $evt['created_by'] ?? null
             ]);
         }
     }
 }
 }
 
+/**
+ * Auto-sync event statuses:
+ * 1. Transitions past events (end_datetime <= current datetime) that are not Completed or Cancelled to 'Ended'.
+ * 2. Transitions 'Scheduled' events to 'Ongoing' when start_datetime <= current datetime and end_datetime > current datetime.
+ */
+if (!function_exists('syncEventStatuses')) {
+function syncEventStatuses($db = null) {
+    if (!$db) {
+        $db = getDBConnection();
+    }
+    $nowStr = date('Y-m-d H:i:s');
+
+    // 1. Scheduled or Ongoing events whose end time has been reached transition to 'Ended'
+    $endedStmt = $db->prepare("
+        UPDATE events 
+        SET status = 'Ended' 
+        WHERE status IN ('Scheduled', 'Ongoing') 
+          AND end_datetime <= ?
+          AND (is_archived = 0 OR is_archived IS NULL)
+    ");
+    $endedStmt->execute([$nowStr]);
+
+    // 2. Scheduled events whose start time has arrived transition to 'Ongoing'
+    $ongoingStmt = $db->prepare("
+        UPDATE events 
+        SET status = 'Ongoing' 
+        WHERE status = 'Scheduled' 
+          AND start_datetime <= ?
+          AND end_datetime > ?
+          AND (is_archived = 0 OR is_archived IS NULL)
+    ");
+    $ongoingStmt->execute([$nowStr, $nowStr]);
+
+    return $endedStmt->rowCount() + $ongoingStmt->rowCount();
+}
+}
+
+/**
+ * Permanently purge all notifications associated with a deleted event,
+ * including related modules ('events', 'event', 'preparedness'),
+ * matching event titles, linked financial aid distribution notifications,
+ * and associated notification read status records.
+ */
+if (!function_exists('purgeEventNotifications')) {
+function purgeEventNotifications($db, int $eventId, string $eventTitle = ''): int {
+    if (!$db || $eventId <= 0) return 0;
+    try {
+        $params = [$eventId];
+        $sql = "SELECT id FROM notifications WHERE (related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') AND related_id = ?)";
+        
+        if (!empty($eventTitle)) {
+            $sql .= " OR (related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') AND (title LIKE ? OR message LIKE ?))";
+            $params[] = '%' . $eventTitle . '%';
+            $params[] = '%' . $eventTitle . '%';
+        }
+        
+        // Also check linked financial aid allocations/distributions
+        $allocStmt = $db->prepare("SELECT id FROM financial_aid_allocations WHERE event_id = ?");
+        $allocStmt->execute([$eventId]);
+        $allocIds = $allocStmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!empty($allocIds)) {
+            $inAllocs = implode(',', array_fill(0, count($allocIds), '?'));
+            $distStmt = $db->prepare("SELECT id FROM financial_aid_distributions WHERE allocation_id IN ($inAllocs) OR event_id = ?");
+            $distStmt->execute(array_merge($allocIds, [$eventId]));
+            $distIds = $distStmt->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($distIds)) {
+                $inDists = implode(',', array_fill(0, count($distIds), '?'));
+                $distNotifs = $db->prepare("SELECT id FROM notifications WHERE related_module = 'financial_aid' AND related_id IN ($inDists)");
+                $distNotifs->execute($distIds);
+                $dNotifIds = $distNotifs->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($dNotifIds)) {
+                    $inDn = implode(',', array_fill(0, count($dNotifIds), '?'));
+                    $db->prepare("DELETE FROM notification_reads WHERE notification_id IN ($inDn)")->execute($dNotifIds);
+                    $db->prepare("DELETE FROM notifications WHERE id IN ($inDn)")->execute($dNotifIds);
+                }
+            }
+        }
+        
+        $notifStmt = $db->prepare($sql);
+        $notifStmt->execute($params);
+        $notifIds = $notifStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        if (!empty($notifIds)) {
+            $inN = implode(',', array_fill(0, count($notifIds), '?'));
+            $db->prepare("DELETE FROM notification_reads WHERE notification_id IN ($inN)")->execute($notifIds);
+            $db->prepare("DELETE FROM notifications WHERE id IN ($inN)")->execute($notifIds);
+        }
+        
+        // Also purge any orphaned event notifications whose event no longer exists
+        $orphanStmt = $db->query("
+            SELECT id FROM notifications 
+            WHERE related_module IN ('events', 'event', 'preparedness') 
+              AND (related_id NOT IN (SELECT id FROM events) OR related_id IS NULL)
+        ");
+        $orphanIds = $orphanStmt ? $orphanStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+        if (!empty($orphanIds)) {
+            $inO = implode(',', array_fill(0, count($orphanIds), '?'));
+            $db->prepare("DELETE FROM notification_reads WHERE notification_id IN ($inO)")->execute($orphanIds);
+            $db->prepare("DELETE FROM notifications WHERE id IN ($inO)")->execute($orphanIds);
+        }
+        
+        return count($notifIds) + count($orphanIds);
+    } catch (Throwable $e) {
+        error_log("Failed to purge event notifications: " . $e->getMessage());
+        return 0;
+    }
+}
+}
+
+/**
+ * Determine Notification Category (strictly 3 categories: 'resources', 'financial_aid', or 'events')
+ *
+ * Rules:
+ * 1. resources: Barangay Head selected "Social Welfare and Assistance" (or Resources) AND selected
+ *    either "Relief Goods Distribution" or "Food Assistance Distribution".
+ * 2. financial_aid: Barangay Head selected "Social Welfare and Assistance" AND selected
+ *    either "Financial Aid Distribution" or "Financial Assistance Distribution".
+ * 3. events: Literally event (all other community activities, drills, medical missions, seminars).
+ */
+if (!function_exists('determineEventNotificationCategory')) {
+function determineEventNotificationCategory(string $activityType, $expectedActivities = []): string {
+    $items = [];
+    if (is_string($expectedActivities)) {
+        $decoded = json_decode($expectedActivities, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $items = $decoded;
+        } else {
+            $items = [$expectedActivities];
+        }
+    } elseif (is_array($expectedActivities)) {
+        $items = $expectedActivities;
+    }
+
+    $typeLower = strtolower(trim((string)$activityType));
+    $itemsStr = strtolower(implode(' ', array_map('strval', $items)));
+
+    $isWelfareOrRes = (
+        strpos($typeLower, 'social welfare') !== false || 
+        strpos($typeLower, 'resource') !== false ||
+        strpos($typeLower, 'relief') !== false
+    );
+
+    $hasFinancialAid = (
+        strpos($itemsStr, 'financial aid distribution') !== false || 
+        strpos($itemsStr, 'financial assistance distribution') !== false ||
+        strpos($itemsStr, 'financial aid') !== false ||
+        strpos($itemsStr, 'financial assistance') !== false ||
+        strpos($typeLower, 'financial aid') !== false ||
+        strpos($typeLower, 'financial assistance') !== false
+    );
+
+    $hasResources = (
+        strpos($itemsStr, 'relief goods distribution') !== false || 
+        strpos($itemsStr, 'food assistance distribution') !== false ||
+        strpos($itemsStr, 'relief goods') !== false ||
+        strpos($itemsStr, 'food assistance') !== false ||
+        strpos($typeLower, 'relief goods') !== false ||
+        strpos($typeLower, 'food assistance') !== false
+    );
+
+    if ($isWelfareOrRes || $hasFinancialAid || $hasResources) {
+        if ($hasFinancialAid && !$hasResources) {
+            return 'financial_aid';
+        }
+        if ($hasResources && !$hasFinancialAid) {
+            return 'resources';
+        }
+        if ($hasFinancialAid) {
+            return 'financial_aid';
+        }
+        if ($hasResources) {
+            return 'resources';
+        }
+    }
+
+    return 'events';
+}
+}
 

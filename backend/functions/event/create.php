@@ -121,31 +121,48 @@ try {
         }
     }
 
+    $initialStatus = (strtotime($startDate) <= time()) ? 'Ongoing' : 'Scheduled';
+
     $stmt = $db->prepare("
         INSERT INTO events (
             title, activity_type, barangay_id, venue, target_puroks, target_type, latitude, longitude, start_datetime, end_datetime,
             assigned_personnel, target_participants, actual_participants, description,
             status, content_execution, expected_activities, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'Scheduled', ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, NOW())
     ");
     $stmt->execute([
         $title, $type, $barangayId, $venue, $targetPuroks, $targetType, $eventLat, $eventLng, $startDate, $endDate,
-        $personnel, $target, $description, $contentExecutionJson, $contentExecutionJson, $user['id']
+        $personnel, $target, $description, $initialStatus, $contentExecutionJson, $contentExecutionJson, $user['id']
     ]);
     $actId = $db->lastInsertId();
 
     // Auto-sync into financial_aid_allocations if it's a Social Welfare / Financial Aid event
     syncEventFinancialAidAllocation($db, $actId, $barangayId);
 
-    // Broadcast in-app notification for this activity to barangay residents and responders
+    // Broadcast in-app notification for this activity to barangay residents and responders (strictly scoped by target puroks)
+    $colsTpNotif = $db->query("SHOW COLUMNS FROM notifications LIKE 'target_puroks'")->fetchAll();
+    if (empty($colsTpNotif)) {
+        $db->exec("ALTER TABLE notifications ADD COLUMN target_puroks VARCHAR(255) NULL AFTER target_barangay_id");
+    }
+    $notifCategory = determineEventNotificationCategory($type, $contentExecutionInput);
+    if ($notifCategory === 'financial_aid') {
+        $notifTitle = "Financial Aid: $title";
+        $catLabel = "Financial Aid";
+    } elseif ($notifCategory === 'resources') {
+        $notifTitle = "Resources: $title";
+        $catLabel = "Relief & Resources";
+    } else {
+        $notifTitle = "Community Event: $title";
+        $catLabel = "Community Event";
+    }
+
     $notif = $db->prepare("
-        INSERT INTO notifications (target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at)
-        VALUES ('all', ?, ?, ?, 'informational', 'events', ?, ?, NOW())
+        INSERT INTO notifications (target_role, target_barangay_id, target_puroks, title, message, alert_level, related_module, related_id, created_by, created_at)
+        VALUES ('all', ?, ?, ?, ?, 'informational', ?, ?, ?, NOW())
     ");
-    $notifTitle = "Community Event: $title";
     $scopeDesc = ($targetPuroks === 'All Puroks') ? "Barangay-wide" : "Target Puroks: $targetPuroks";
-    $notifMsg = "Barangay event scheduled: $title ($type) at $venue on " . date('M d, Y h:i A', strtotime($startDate)) . " ($scopeDesc). Residents and responders are invited to participate.";
-    $notif->execute([$barangayId, $notifTitle, $notifMsg, $actId, $user['id']]);
+    $notifMsg = "Barangay notice: $title ($type) scheduled at $venue on " . date('M d, Y h:i A', strtotime($startDate)) . " ($scopeDesc).";
+    $notif->execute([$barangayId, $targetPuroks, $notifTitle, $notifMsg, $notifCategory, $actId, $user['id']]);
 
     // Send SMS alerts to residents of this barangay (filtered by target puroks if specified)
     $smsSentCount = 0;

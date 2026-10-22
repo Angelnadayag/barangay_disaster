@@ -89,36 +89,53 @@ foreach ($allEvacAreas as $ea) {
     }
 }
 
-// Latest Public Advisories (strictly scoped to resident's barangay and created by Barangay Head)
+// Latest Public Advisories (strictly scoped to resident's barangay & target puroks, created by Barangay Head)
+$userPurok = trim($user['purok'] ?? '');
 $notifStmt = $db->prepare("
     SELECT n.*, b.name AS barangay_name, u.full_name AS sender_name 
     FROM notifications n
     LEFT JOIN barangays b ON n.target_barangay_id = b.id
     LEFT JOIN users u ON n.created_by = u.id
-    WHERE (n.target_barangay_id = ? OR n.target_user_id = ?)
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
-      AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    LEFT JOIN events e ON (n.related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') AND n.related_id = e.id)
+    WHERE (
+        (n.target_user_id IS NOT NULL AND n.target_user_id = ?)
+        OR
+        (n.target_user_id IS NULL AND (n.target_barangay_id = ? OR n.target_barangay_id IS NULL) AND n.target_role IN ('all', 'resident'))
+    )
+    AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    AND (
+        (n.related_module NOT IN ('events', 'event', 'preparedness', 'financial_aid', 'resources'))
+        OR (e.id IS NOT NULL AND (e.is_archived = 0 OR e.is_archived IS NULL))
+        OR (n.related_module = 'financial_aid' AND n.target_user_id IS NOT NULL)
+    )
+    AND (
+        n.target_user_id IS NOT NULL
+        OR COALESCE(n.target_puroks, e.target_puroks) IS NULL
+        OR TRIM(COALESCE(n.target_puroks, e.target_puroks)) = ''
+        OR COALESCE(n.target_puroks, e.target_puroks) IN ('All Puroks', 'All')
+        OR FIND_IN_SET(?, REPLACE(COALESCE(n.target_puroks, e.target_puroks), ', ', ',')) > 0
+    )
     ORDER BY n.alert_level = 'urgent' DESC, n.alert_level = 'warning' DESC, n.created_at DESC
     LIMIT 4
 ");
-$notifStmt->execute([$barangayId, $user['id'], $user['id'], $barangayId]);
+$notifStmt->execute([(int)$user['id'], $barangayId, $barangayId, $userPurok]);
 $recentAdvisories = $notifStmt->fetchAll();
 
 // Fetch Preparedness Schedule Drills / Events for Resident (created by Barangay Head)
-$userPurok = trim($user['purok'] ?? '');
+// Strictly scoped by target puroks: if All Puroks -> all residents; if specific puroks -> only matching residents
 $actWhere = "
     e.barangay_id = ?
     AND (e.is_archived = 0 OR e.is_archived IS NULL)
     AND e.status != 'Cancelled'
     AND (u.role = 'barangay_head' OR e.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    AND (
+        e.target_puroks IS NULL
+        OR TRIM(e.target_puroks) = ''
+        OR e.target_puroks IN ('All Puroks', 'All')
+        OR FIND_IN_SET(?, REPLACE(e.target_puroks, ', ', ',')) > 0
+    )
 ";
-$actParams = [$barangayId, $barangayId];
-if (!empty($userPurok)) {
-    $purokLike = "%{$userPurok}%";
-    $actWhere .= " AND (e.title LIKE ? OR e.venue LIKE ? OR e.title NOT LIKE 'Purok %')";
-    $actParams[] = $purokLike;
-    $actParams[] = $purokLike;
-}
+$actParams = [$barangayId, $barangayId, $userPurok];
 
 $actStmt = $db->prepare("
     SELECT e.*, b.name AS barangay_name, u.full_name AS organizer_name 

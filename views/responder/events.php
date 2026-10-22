@@ -10,6 +10,8 @@ require_once __DIR__ . '/../../backend/services/Auth.php';
 require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireRole('responder');
+header("Location: " . BASE_URL . "/views/responder/active-incidents.php");
+exit;
 $user = getCurrentUser();
 $userId = (int)$user['id'];
 $db = getDBConnection();

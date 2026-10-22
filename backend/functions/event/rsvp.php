@@ -25,7 +25,7 @@ if (!$eventId) {
 }
 
 // Check event exists
-$stmt = $db->prepare("SELECT id, title, status, actual_participants, target_participants FROM events WHERE id = ?");
+$stmt = $db->prepare("SELECT id, title, status, actual_participants, target_participants, target_puroks FROM events WHERE id = ?");
 $stmt->execute([$eventId]);
 $event = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -42,6 +42,16 @@ if ($event['status'] === 'Cancelled' || $event['status'] === 'Archived') {
 $userId = (int)$user['id'];
 $fullName = trim($user['full_name'] ?? 'Participant');
 $phone = trim($user['phone'] ?? '');
+$userPurok = trim($user['purok'] ?? '');
+
+// Verify Purok eligibility for joining new registration
+if (!empty($event['target_puroks']) && $event['target_puroks'] !== 'All Puroks' && $event['target_puroks'] !== 'All') {
+    $purokList = array_map('trim', explode(',', $event['target_puroks']));
+    if (!empty($userPurok) && !in_array($userPurok, $purokList, true)) {
+        if ($isAjax) jsonResponse(['success' => false, 'message' => 'This event is designated specifically for ' . $event['target_puroks'] . '.'], 403);
+        redirectWithFlash($returnUrl, 'error', 'This event is designated specifically for ' . $event['target_puroks'] . '.');
+    }
+}
 
 // Check if already registered
 $checkStmt = $db->prepare("SELECT id FROM event_attendees WHERE activity_id = ? AND (user_id = ? OR (phone != '' AND phone = ?)) LIMIT 1");

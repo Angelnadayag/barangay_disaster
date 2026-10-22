@@ -2324,6 +2324,18 @@ body.citizen-responder-shell .main-content {
 }
 
 @media (max-width: 900px) {
+  /* Hide top navbar completely on mobile view for resident and responder */
+  body.citizen-responder-shell .topbar {
+    display: none !important;
+  }
+
+  body.citizen-responder-shell .app-container {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
   .mobile-bottom-nav {
     display: flex;
     position: fixed;
@@ -2341,6 +2353,7 @@ body.citizen-responder-shell .main-content {
   }
 
   body.citizen-responder-shell .main-content {
+    padding-top: 14px !important;
     padding-bottom: 74px !important;
   }
 

@@ -57,9 +57,8 @@ try {
     $delAtt = $db->prepare("DELETE FROM event_attendees WHERE activity_id = ?");
     $delAtt->execute([$id]);
 
-    // 3. Delete related event notifications
-    $delNotif = $db->prepare("DELETE FROM notifications WHERE related_module = 'events' AND related_id = ?");
-    $delNotif->execute([$id]);
+    // 3. Delete all related event notifications, linked distributions, and read status records
+    purgeEventNotifications($db, $id, $act['title'] ?? '');
 
     // 4. Clean up any linked financial aid allocations, distributions, and audits
     $allocsStmt = $db->prepare("SELECT id FROM financial_aid_allocations WHERE event_id = ?");

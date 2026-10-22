@@ -188,6 +188,12 @@ try {
         ]);
     }
 
+    // Dynamically sync status between Scheduled and Ongoing if event is not completed or cancelled
+    if (!in_array($act['status'], ['Completed', 'Cancelled'], true)) {
+        $updatedStatus = (strtotime($startDate) <= time()) ? 'Ongoing' : 'Scheduled';
+        $db->prepare("UPDATE events SET status = ? WHERE id = ?")->execute([$updatedStatus, $id]);
+    }
+
     // Sync coordinates if venue is an evacuation area
     if ($venue !== $act['venue']) {
         $evacCoordStmt = $db->prepare("SELECT coordinates_lat, coordinates_lng FROM evacuation_areas WHERE (barangay_id = ? OR barangay_id IS NULL) AND name = ? LIMIT 1");
@@ -201,6 +207,24 @@ try {
 
     // Sync financial aid allocation if this event is Social Welfare / Financial Aid
     syncEventFinancialAidAllocation($db, $id, $act['barangay_id']);
+
+    // Sync notifications target_puroks, category, and title for this event
+    try {
+        $notifCategory = determineEventNotificationCategory($type, $contentExecutionInput);
+        if ($notifCategory === 'financial_aid') {
+            $notifTitle = "Financial Aid: $title";
+        } elseif ($notifCategory === 'resources') {
+            $notifTitle = "Resources: $title";
+        } else {
+            $notifTitle = "Community Event: $title";
+        }
+        $db->prepare("
+            UPDATE notifications 
+            SET target_puroks = ?, related_module = ?, title = ? 
+            WHERE related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') 
+              AND related_id = ?
+        ")->execute([$targetPuroks, $notifCategory, $notifTitle, $id]);
+    } catch (Throwable $ignore) {}
 
     logSystemEvent('UPDATE_ACTIVITY', 'Preparedness', "Updated event #$id: $title ($type)");
 

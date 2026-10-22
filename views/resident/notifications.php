@@ -17,27 +17,69 @@ $filterTab = trim($_GET['tab'] ?? 'all');
 $filterUnread = !empty($_GET['unread']);
 $searchQuery = trim($_GET['q'] ?? '');
 
-// Base query strictly scoped to resident's barangay and created by their Barangay Head ONLY
+$userPurok = trim($user['purok'] ?? '');
+
+// Base query strictly scoped to resident's barangay jurisdiction, created by Barangay Head ONLY,
+// and dynamically filtered by target puroks (if all puroks selected -> all residents; if specific puroks -> only residents in those puroks)
+$baseWhere = "
+    WHERE (
+        (n.target_user_id IS NOT NULL AND n.target_user_id = ?)
+        OR
+        (n.target_user_id IS NULL AND (n.target_barangay_id = ? OR n.target_barangay_id IS NULL) AND n.target_role IN ('all', 'resident'))
+    )
+    AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    AND (
+        (n.related_module NOT IN ('events', 'event', 'preparedness', 'financial_aid', 'resources'))
+        OR (e.id IS NOT NULL AND (e.is_archived = 0 OR e.is_archived IS NULL))
+        OR (n.related_module = 'financial_aid' AND n.target_user_id IS NOT NULL)
+    )
+    AND (
+        n.target_user_id IS NOT NULL
+        OR COALESCE(n.target_puroks, e.target_puroks) IS NULL
+        OR TRIM(COALESCE(n.target_puroks, e.target_puroks)) = ''
+        OR COALESCE(n.target_puroks, e.target_puroks) IN ('All Puroks', 'All')
+        OR FIND_IN_SET(?, REPLACE(COALESCE(n.target_puroks, e.target_puroks), ', ', ',')) > 0
+    )
+";
+$baseParams = [(int)$user['id'], $barangayId, $barangayId, $userPurok];
+
 $sql = "
     SELECT n.*, b.name AS barangay_name, u.full_name AS sender_name, nr.id AS is_read
     FROM notifications n
     LEFT JOIN barangays b ON n.target_barangay_id = b.id
     LEFT JOIN users u ON n.created_by = u.id
+    LEFT JOIN events e ON (n.related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') AND n.related_id = e.id)
     LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
-    WHERE (n.target_barangay_id = ? OR n.target_user_id = ?)
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = ?)
-      AND (u.role = 'barangay_head' OR n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = ?))
+    {$baseWhere}
 ";
-$params = [$user['id'], $barangayId, $user['id'], $user['id'], $barangayId];
+$params = array_merge([(int)$user['id']], $baseParams);
+
+// Strictly 3 categories only: 'financial_aid', 'resources', or 'events'
+// related_module is the definitive source of truth; title checks are fallback only when related_module is empty
+$condAid = "(
+    n.related_module = 'financial_aid' 
+    OR (
+        (n.related_module IS NULL OR n.related_module = '' OR n.related_module NOT IN ('events', 'event', 'preparedness', 'resources'))
+        AND (n.title LIKE '%Financial Aid%' OR n.title LIKE '%Financial Assistance%' OR n.title LIKE '%Cash Assistance%')
+    )
+)";
+
+$condRes = "(
+    n.related_module = 'resources'
+    OR (
+        (n.related_module IS NULL OR n.related_module = '' OR n.related_module NOT IN ('events', 'event', 'preparedness', 'financial_aid'))
+        AND (n.title LIKE '%Relief Goods%' OR n.title LIKE '%Food Assistance%')
+    )
+)";
+
+$condEvents = "(NOT ($condAid) AND NOT ($condRes))";
 
 if ($filterTab === 'financial_aid') {
-    $sql .= " AND (n.related_module = 'financial_aid' OR n.title LIKE '%Financial Aid%' OR n.title LIKE '%Ayuda%' OR n.title LIKE '%Cash Assistance%')";
+    $sql .= " AND {$condAid}";
 } elseif ($filterTab === 'resources') {
-    $sql .= " AND (n.related_module = 'resources' OR n.title LIKE '%Resource%' OR n.title LIKE '%Relief%' OR n.title LIKE '%Supplies%')";
+    $sql .= " AND {$condRes}";
 } elseif ($filterTab === 'events') {
-    $sql .= " AND (n.related_module IN ('events', 'preparedness') OR n.title LIKE '%Event%' OR n.title LIKE '%Drill%' OR n.title LIKE '%Seminar%')";
-} elseif ($filterTab === 'critical') {
-    $sql .= " AND n.alert_level IN ('urgent', 'Critical', 'critical')";
+    $sql .= " AND {$condEvents}";
 }
 
 if ($filterUnread) {
@@ -56,345 +98,446 @@ $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Counts per category (strictly scoped to this barangay and created by Barangay Head)
-$brgyHeadSubquery = "AND (n.created_by IN (SELECT id FROM users WHERE role = 'barangay_head' AND barangay_id = {$barangayId}))";
+// Counts per category (strictly matching the exact purok and barangay scope)
+$countHelper = function(string $extraClause = '') use ($db, $baseWhere, $baseParams): int {
+    $cSql = "
+        SELECT COUNT(*)
+        FROM notifications n
+        LEFT JOIN users u ON n.created_by = u.id
+        LEFT JOIN events e ON (n.related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') AND n.related_id = e.id)
+        {$baseWhere}
+        {$extraClause}
+    ";
+    $stmt = $db->prepare($cSql);
+    $stmt->execute($baseParams);
+    return (int)$stmt->fetchColumn();
+};
 
-$countAll = (int)$db->query("
-    SELECT COUNT(*) FROM notifications n 
-    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
-      {$brgyHeadSubquery}
-")->fetchColumn();
+$countAll = $countHelper();
+$countEvents = $countHelper("AND {$condEvents}");
+$countAid = $countHelper("AND {$condAid}");
+$countRes = $countHelper("AND {$condRes}");
 
-$countAid = (int)$db->query("
-    SELECT COUNT(*) FROM notifications n 
-    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
-      AND (n.related_module = 'financial_aid' OR n.title LIKE '%Financial Aid%' OR n.title LIKE '%Ayuda%' OR n.title LIKE '%Cash Assistance%')
-      {$brgyHeadSubquery}
-")->fetchColumn();
-
-$countRes = (int)$db->query("
-    SELECT COUNT(*) FROM notifications n 
-    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
-      AND (n.related_module = 'resources' OR n.title LIKE '%Resource%' OR n.title LIKE '%Relief%' OR n.title LIKE '%Supplies%')
-      {$brgyHeadSubquery}
-")->fetchColumn();
-
-$countEvents = (int)$db->query("
-    SELECT COUNT(*) FROM notifications n 
-    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
-      AND (n.related_module IN ('events', 'preparedness') OR n.title LIKE '%Event%' OR n.title LIKE '%Drill%' OR n.title LIKE '%Seminar%')
-      {$brgyHeadSubquery}
-")->fetchColumn();
-
-$countCritical = (int)$db->query("
-    SELECT COUNT(*) FROM notifications n 
-    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
-      AND n.alert_level IN ('urgent', 'Critical', 'critical')
-      {$brgyHeadSubquery}
-")->fetchColumn();
-
-$countUnread = (int)$db->query("
-    SELECT COUNT(*) FROM notifications n 
-    LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = {$user['id']}
-    WHERE (n.target_barangay_id = {$barangayId} OR n.target_user_id = {$user['id']})
-      AND (n.target_role IN ('all', 'resident') OR n.target_user_id = {$user['id']})
-      AND nr.id IS NULL
-      {$brgyHeadSubquery}
-")->fetchColumn();
+$unreadStmt = $db->prepare("
+    SELECT COUNT(*)
+    FROM notifications n
+    LEFT JOIN users u ON n.created_by = u.id
+    LEFT JOIN events e ON (n.related_module IN ('events', 'event', 'preparedness', 'financial_aid', 'resources') AND n.related_id = e.id)
+    LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
+    {$baseWhere}
+    AND nr.id IS NULL
+");
+$unreadStmt->execute(array_merge([(int)$user['id']], $baseParams));
+$countUnread = (int)$unreadStmt->fetchColumn();
 
 $pageTitle = "Notifications & Advisories";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
 <style>
-/* Resident Notifications: Anti-Slop, Strict 10px Radius, Project Palette (#17324D, #2F6F73, #D9E0E3, #F7F8F7) */
+/* Resident Notifications: Anti-Slop, Borderless Surface Design, Project Palette (#17324D, #2F6F73) */
 .res-notif-wrap {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3, 10px);
+  gap: 12px;
   width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
 }
 
-.res-filter-bar {
-  background: var(--color-surface, #FFFFFF);
-  border: 1px solid var(--color-border, #D9E0E3);
-  border-radius: var(--radius-primary, 10px);
-  padding: 8px 12px;
+/* Header */
+.res-header-bar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 2px;
 }
 
-.res-filter-pills {
+.res-header-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-primary, #17324D);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.res-header-sub {
+  font-size: 11px;
+  color: var(--color-text-muted, #8A96A0);
+  margin: 3px 0 0 0;
+}
+
+.res-mark-all-link {
+  background: transparent;
+  border: none;
+  color: var(--color-secondary, #2F6F73);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 0;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.res-mark-all-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* Search Bar (Borderless, Clean) */
+.res-search-box {
+  background: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-primary, 10px);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(16, 35, 54, 0.04);
+}
+
+.res-search-box svg {
+  color: var(--color-text-muted, #8A96A0);
+  flex-shrink: 0;
+}
+
+.res-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 11.5px;
+  color: var(--color-text, #24313A);
+  font-family: var(--font-primary);
+}
+
+.res-search-input::placeholder {
+  color: var(--color-text-muted, #8A96A0);
+}
+
+.res-search-clear {
+  color: var(--color-text-muted, #8A96A0);
+  text-decoration: none;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.res-search-clear:hover {
+  color: var(--color-primary, #17324D);
+}
+
+/* Horizontal Scrollable Filter Pills (Borderless) */
+.res-pills-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px 0 4px 0;
 }
 
-.res-filter-pill {
+.res-pills-row::-webkit-scrollbar {
+  display: none;
+}
+
+.res-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border, #D9E0E3);
-  background: var(--color-surface-subtle, #F7F8F7);
-  color: var(--color-text, #24313A);
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: none;
+  background: #FFFFFF;
+  color: var(--color-text-secondary, #66737D);
   text-decoration: none;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(16, 35, 54, 0.04);
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
 }
 
-.res-filter-pill:hover {
-  background: #EBF3F5;
+.res-pill:hover {
+  background: #F0F3F4;
   color: var(--color-primary, #17324D);
-  border-color: var(--color-secondary, #2F6F73);
 }
 
-.res-filter-pill.active {
+.res-pill.active {
   background: var(--color-primary, #17324D);
   color: #FFFFFF;
-  border-color: var(--color-primary, #17324D);
   font-weight: 600;
 }
 
-.res-pill-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1px 5px;
-  font-size: 9px;
+.res-pill-count {
+  font-size: 9.5px;
   font-weight: 700;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.08);
-  line-height: 1.2;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #F0F3F4;
+  color: var(--color-primary, #17324D);
 }
 
-.res-filter-pill.active .res-pill-badge {
-  background: rgba(255, 255, 255, 0.22);
+.res-pill.active .res-pill-count {
+  background: rgba(255, 255, 255, 0.2);
   color: #FFFFFF;
 }
 
-.res-notif-cards-stack {
+/* Notification Cards (Borderless, Elevated Surface) */
+.res-cards-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.res-notif-item {
-  background: var(--color-surface, #FFFFFF);
-  border: 1px solid var(--color-border, #D9E0E3);
+.res-card {
+  background: #FFFFFF;
+  border: none;
   border-radius: var(--radius-primary, 10px);
-  padding: 12px 16px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  position: relative;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(16, 35, 54, 0.05);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.res-notif-item:hover {
-  border-color: var(--color-secondary, #2F6F73);
-  box-shadow: 0 2px 8px rgba(23, 50, 77, 0.05);
+.res-card.is-unread {
+  background: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(47, 111, 115, 0.09);
 }
 
-.res-notif-item.is-unread {
-  background: #FCFDFD;
-  border-left: 3.5px solid var(--color-secondary, #2F6F73);
-}
-
-.res-notif-item.is-urgent {
-  border-left: 3.5px solid #ef4444;
-}
-
-.res-notif-header-row {
+.res-card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  margin-bottom: 7px;
   flex-wrap: wrap;
-  margin-bottom: 5px;
 }
 
-.res-notif-tags-group {
+.res-card-badges {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.res-module-badge {
+.res-tag {
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--color-secondary, #2F6F73);
   background: #EBF3F5;
-  padding: 2px 7px;
+  padding: 2.5px 8px;
   border-radius: 4px;
+  border: none;
 }
 
-.res-notif-title {
+.res-unread-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #FFFFFF;
+  background: var(--color-secondary, #2F6F73);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: none;
+}
+
+.res-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.res-date {
+  font-size: 10.5px;
+  color: var(--color-text-muted, #8A96A0);
+  font-family: var(--font-secondary);
+}
+
+.res-read-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-secondary, #2F6F73);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.res-read-btn:hover {
+  text-decoration: underline;
+}
+
+.res-title {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--color-primary, #17324D);
-  margin: 0 0 5px 0;
+  margin: 0 0 6px 0;
   line-height: 1.35;
 }
 
-.res-notif-body {
+.res-message {
+  font-size: 11.5px;
+  color: var(--color-text-secondary, #66737D);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.res-link-row {
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.res-link {
   font-size: 10.5px;
-  color: var(--color-text, #24313A);
-  line-height: 1.5;
-  margin-bottom: 8px;
+  color: var(--color-secondary, #2F6F73);
+  font-weight: 600;
+  text-decoration: none;
 }
 
-.res-notif-meta-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-top: 7px;
-  border-top: 1px solid var(--color-border-light, #E7EDF0);
-  font-size: 10px;
-  color: var(--color-text-muted, #66737D);
+.res-link:hover {
+  text-decoration: underline;
 }
 
-.res-meta-issuer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.res-empty-box {
+  background: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-primary, 10px);
+  padding: 40px 20px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(16, 35, 54, 0.05);
 }
 </style>
 
 <div class="res-notif-wrap">
 
-  <!-- Page Header -->
-  <div class="page-header" style="margin-bottom:0;padding-bottom:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-    <div class="page-header-title-wrap">
-      <h1 style="font-size:16px;font-weight:700;margin:0;color:var(--color-primary,#17324D);">Notifications &amp; Advisories</h1>
+  <!-- Clean Minimal Header -->
+  <div class="res-header-bar">
+    <div>
+      <h1 class="res-header-title">Notifications &amp; Advisories</h1>
+      <p class="res-header-sub"><?= $countUnread > 0 ? "{$countUnread} unread notifications" : "All notices are up to date" ?></p>
     </div>
-    <div class="page-header-actions" style="display:flex;gap:6px;">
-      <?php if ($countUnread > 0): ?>
-        <button class="btn btn-secondary btn-sm" onclick="markAllResidentRead()" style="font-size:11px;padding:5px 12px;display:inline-flex;align-items:center;gap:5px;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-          Mark All Read (<?= $countUnread ?>)
-        </button>
-      <?php endif; ?>
-    </div>
+    <?php if ($countUnread > 0): ?>
+      <button type="button" class="res-mark-all-link" onclick="markAllResidentRead()">
+        Mark all read
+      </button>
+    <?php endif; ?>
   </div>
 
-  <!-- Filter Strip -->
-  <div class="res-filter-bar">
-    <div class="res-filter-pills">
-      <a href="notifications.php" class="res-filter-pill <?= $filterTab === 'all' && !$filterUnread ? 'active' : '' ?>">
-        <span>All</span>
-        <span class="res-pill-badge"><?= $countAll ?></span>
-      </a>
-      <a href="notifications.php?tab=financial_aid" class="res-filter-pill <?= $filterTab === 'financial_aid' ? 'active' : '' ?>">
-        <span>Financial Aid</span>
-        <span class="res-pill-badge"><?= $countAid ?></span>
-      </a>
-      <a href="notifications.php?tab=resources" class="res-filter-pill <?= $filterTab === 'resources' ? 'active' : '' ?>">
-        <span>Relief Resources</span>
-        <span class="res-pill-badge"><?= $countRes ?></span>
-      </a>
-      <a href="notifications.php?tab=events" class="res-filter-pill <?= $filterTab === 'events' ? 'active' : '' ?>">
-        <span>Events &amp; Drills</span>
-        <span class="res-pill-badge"><?= $countEvents ?></span>
-      </a>
-      <a href="notifications.php?tab=critical" class="res-filter-pill <?= $filterTab === 'critical' ? 'active' : '' ?>">
-        <span>Critical</span>
-        <span class="res-pill-badge"><?= $countCritical ?></span>
-      </a>
-      <?php if ($countUnread > 0): ?>
-        <a href="notifications.php?unread=1" class="res-filter-pill <?= $filterUnread ? 'active' : '' ?>" style="color:#C62828;">
-          <span>Unread</span>
-          <span class="res-pill-badge" style="background:#FDE8E8;color:#C62828;"><?= $countUnread ?></span>
-        </a>
-      <?php endif; ?>
-    </div>
+  <!-- Borderless Search Field -->
+  <form method="GET" action="notifications.php" class="res-search-box">
+    <input type="hidden" name="tab" value="<?= clean($filterTab) ?>">
+    <?php if ($filterUnread): ?><input type="hidden" name="unread" value="1"><?php endif; ?>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input type="text" name="q" value="<?= clean($searchQuery) ?>" placeholder="Search notices..." class="res-search-input">
+    <?php if (!empty($searchQuery)): ?>
+      <a href="notifications.php?tab=<?= clean($filterTab) ?><?= $filterUnread ? '&unread=1' : '' ?>" class="res-search-clear">&times;</a>
+    <?php endif; ?>
+  </form>
 
-    <!-- Search input -->
-    <form method="GET" action="notifications.php" style="margin:0;display:flex;gap:4px;align-items:center;">
-      <input type="hidden" name="tab" value="<?= clean($filterTab) ?>">
-      <?php if ($filterUnread): ?><input type="hidden" name="unread" value="1"><?php endif; ?>
-      <input type="text" name="q" value="<?= clean($searchQuery) ?>" placeholder="Search notices..." class="form-control" style="font-size:10.5px;padding:4px 8px;width:140px;height:28px;border-radius:6px;">
-      <button type="submit" class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 8px;height:28px;">Filter</button>
-      <?php if (!empty($searchQuery)): ?>
-        <a href="notifications.php?tab=<?= clean($filterTab) ?><?= $filterUnread ? '&unread=1' : '' ?>" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 7px;height:28px;">Reset</a>
-      <?php endif; ?>
-    </form>
+  <!-- Smooth Horizontal Filter Pills (Borderless, Project Palette: Strictly 3 Categories) -->
+  <div class="res-pills-row">
+    <a href="notifications.php" class="res-pill <?= $filterTab === 'all' && !$filterUnread ? 'active' : '' ?>">
+      <span>All</span>
+      <span class="res-pill-count"><?= $countAll ?></span>
+    </a>
+    <a href="notifications.php?tab=events" class="res-pill <?= $filterTab === 'events' ? 'active' : '' ?>">
+      <span>Events</span>
+      <span class="res-pill-count"><?= $countEvents ?></span>
+    </a>
+    <a href="notifications.php?tab=financial_aid" class="res-pill <?= $filterTab === 'financial_aid' ? 'active' : '' ?>">
+      <span>Financial Aid</span>
+      <span class="res-pill-count"><?= $countAid ?></span>
+    </a>
+    <a href="notifications.php?tab=resources" class="res-pill <?= $filterTab === 'resources' ? 'active' : '' ?>">
+      <span>Resources</span>
+      <span class="res-pill-count"><?= $countRes ?></span>
+    </a>
+    <?php if ($countUnread > 0): ?>
+      <a href="notifications.php?unread=1" class="res-pill <?= $filterUnread ? 'active' : '' ?>">
+        <span>Unread</span>
+        <span class="res-pill-count"><?= $countUnread ?></span>
+      </a>
+    <?php endif; ?>
   </div>
 
-  <!-- Notifications List -->
-  <div class="res-notif-cards-stack">
+  <!-- Notification Cards (Anti-Slop, Borderless Surface) -->
+  <div class="res-cards-list">
     <?php if (empty($alerts)): ?>
-      <div style="background:#FFF;border:1px dashed var(--color-border,#D9E0E3);border-radius:10px;padding:36px 20px;text-align:center;color:var(--color-text-muted);">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 8px;display:block;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <div style="font-weight:600;font-size:13px;color:var(--color-primary,#17324D);">No Notifications Found</div>
-        <div style="font-size:10.5px;margin-top:3px;">No active notices found for your barangay sector.</div>
+      <div class="res-empty-box">
+        <div style="font-weight: 600; font-size: 13px; color: var(--color-primary, #17324D); margin-bottom: 4px;">
+          No Notifications
+        </div>
+        <div style="font-size: 11px; color: var(--color-text-muted, #8A96A0);">
+          No active notices found matching your selection.
+        </div>
       </div>
     <?php else: ?>
       <?php foreach ($alerts as $a): 
         $isRead = !empty($a['is_read']);
-        $isCrit = in_array(strtolower($a['alert_level'] ?? ''), ['critical', 'urgent', 'danger']);
         $mod = $a['related_module'] ?? '';
-        $tLower = strtolower($a['title']);
+        $tLower = strtolower($a['title'] . ' ' . ($a['message'] ?? ''));
 
-        if ($mod === 'financial_aid' || strpos($tLower, 'financial aid') !== false || strpos($tLower, 'ayuda') !== false) {
+        // Strictly 3 category badges: Financial Aid, Resources, Event
+        if ($mod === 'financial_aid') {
             $tagLabel = 'Financial Aid';
-        } elseif ($mod === 'resources' || strpos($tLower, 'resource') !== false || strpos($tLower, 'relief') !== false) {
-            $tagLabel = 'Relief Resources';
-        } elseif ($mod === 'events' || $mod === 'preparedness' || strpos($tLower, 'event') !== false || strpos($tLower, 'drill') !== false) {
-            $tagLabel = 'Barangay Event';
+        } elseif ($mod === 'resources') {
+            $tagLabel = 'Resources';
+        } elseif (in_array($mod, ['events', 'event', 'preparedness'], true)) {
+            $tagLabel = 'Event';
         } else {
-            $tagLabel = clean($a['alert_type'] ?? 'Advisory');
+            // Fallback for unclassified modules
+            if (strpos($tLower, 'financial aid') !== false || strpos($tLower, 'financial assistance') !== false || strpos($tLower, 'cash assistance') !== false) {
+                $tagLabel = 'Financial Aid';
+            } elseif (strpos($tLower, 'relief goods') !== false || strpos($tLower, 'food assistance') !== false || strpos($tLower, 'resource') !== false) {
+                $tagLabel = 'Resources';
+            } else {
+                $tagLabel = 'Event';
+            }
         }
+
+        $formattedDate = date('M d, Y • g:i A', strtotime($a['created_at']));
       ?>
-        <div class="res-notif-item <?= !$isRead ? 'is-unread' : '' ?> <?= $isCrit ? 'is-urgent' : '' ?>" id="resNotifItem<?= (int)$a['id'] ?>">
-          <div class="res-notif-header-row">
-            <div class="res-notif-tags-group">
-              <span class="res-module-badge"><?= $tagLabel ?></span>
-              <?= renderStatusBadge($a['alert_level']) ?>
+        <div class="res-card <?= !$isRead ? 'is-unread' : '' ?>" id="resNotifItem<?= (int)$a['id'] ?>">
+          <div class="res-card-top">
+            <div class="res-card-badges">
+              <span class="res-tag"><?= $tagLabel ?></span>
               <?php if (!$isRead): ?>
-                <span class="badge badge-info" style="font-size:9px;padding:1px 5px;">NEW</span>
+                <span class="res-unread-badge">New</span>
               <?php endif; ?>
             </div>
-            <div style="font-size:10px;color:var(--color-text-muted);display:flex;align-items:center;gap:10px;">
-              <span><?= timeAgo($a['created_at']) ?> (<?= formatDate($a['created_at']) ?>)</span>
+            <div class="res-card-meta">
+              <span class="res-date"><?= $formattedDate ?></span>
               <?php if (!$isRead): ?>
-                <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 7px;font-size:10px;" onclick="markResidentRead(<?= (int)$a['id'] ?>, this)">
-                  Mark Read
+                <button type="button" class="res-read-btn" onclick="markResidentRead(<?= (int)$a['id'] ?>, this)">
+                  Mark read
                 </button>
               <?php endif; ?>
             </div>
           </div>
 
-          <h2 class="res-notif-title"><?= clean($a['title']) ?></h2>
+          <h2 class="res-title"><?= clean($a['title']) ?></h2>
 
-          <div class="res-notif-body">
+          <p class="res-message">
             <?= nl2br(clean($a['message'])) ?>
-          </div>
+          </p>
 
-          <div class="res-notif-meta-footer">
-            <div class="res-meta-issuer">
-              <span><strong>Issued by:</strong> <?= clean($a['sender_name'] ?: 'Barangay Head Hon. Rodrigo Almonte') ?></span>
-              <span style="color:var(--color-border);">&bull;</span>
-              <span><strong>Barangay:</strong> Brgy. <?= clean($a['barangay_name'] ?? $user['barangay_name'] ?? 'Local') ?></span>
+          <?php if (in_array($mod, ['events', 'preparedness', 'financial_aid', 'resources'], true) || !empty($a['related_id'])): ?>
+            <div class="res-link-row">
+              <a href="events.php" class="res-link">View Event Schedule &rarr;</a>
             </div>
-            <?php if ($mod === 'events' || $mod === 'preparedness'): ?>
-              <div>
-                <a href="events.php" style="font-size:10px;color:var(--color-secondary);font-weight:600;text-decoration:none;">View Drill Schedule &rarr;</a>
-              </div>
-            <?php endif; ?>
-          </div>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     <?php endif; ?>
@@ -410,10 +553,12 @@ async function markResidentRead(id, btn) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'id=' + encodeURIComponent(id)
     });
-    btn.outerHTML = '<span style="color:var(--color-success);font-weight:600;font-size:10px;">✓ Read</span>';
+    btn.outerHTML = '<span style="color:var(--color-secondary);font-weight:600;font-size:10.5px;">Read</span>';
     const card = document.getElementById('resNotifItem' + id);
     if (card) {
       card.classList.remove('is-unread');
+      const badge = card.querySelector('.res-unread-badge');
+      if (badge) badge.remove();
     }
   } catch (err) {
     console.error(err);
