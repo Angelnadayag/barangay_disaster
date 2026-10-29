@@ -71,7 +71,10 @@ try {
         $nextNum = ((int)$cntStmt->fetchColumn()) + 1;
         $allocationCode = 'AID-' . $year . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
-        $targetBeneficiaries = (int)floor($totalBudget / $amountPerBeneficiary);
+        $targetBeneficiaries = (int)($_POST['target_beneficiaries'] ?? 0);
+        if ($targetBeneficiaries <= 0) {
+            $targetBeneficiaries = ($amountPerBeneficiary > 0) ? (int)floor($totalBudget / $amountPerBeneficiary) : 0;
+        }
         $remainingBudget = $totalBudget;
         $disbursedBudget = 0.00;
 
@@ -84,11 +87,11 @@ try {
             INSERT INTO financial_aid_allocations (
                 allocation_code, program_name, disaster_type, barangay_id, target_purok,
                 total_budget, amount_per_beneficiary, disbursed_budget, remaining_budget,
-                funding_source, target_beneficiaries, status, added_type, notes, allocated_by
+                funding_source, target_beneficiaries, is_distributed, status, received_status, added_type, notes, allocated_by
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
-                ?, ?, 'Active', ?, ?, ?
+                ?, ?, 1, 'Active', 'Pending', ?, ?, ?
             )
         ");
         $insertStmt->execute([
@@ -135,14 +138,14 @@ try {
 
         logSystemEvent('CREATE_RESOURCE_ALLOCATION', 'Manage Resources', "ICDRRMO created resource allocation {$allocationCode}: ₱" . number_format($totalBudget, 2) . " for Barangay {$barangayName} ({$programName}, {$targetBeneficiaries} target families)");
 
-        // Notify residents of the targeted barangay
+        // Notify barangay head of the incoming allocated aid awaiting confirmation
         try {
-            $notifTitle = "Financial Aid Program: {$programName}";
-            $notifMsg = "Barangay {$barangayName} has announced emergency financial assistance under {$programName} (Purok: {$targetPurok}). Total Program Fund: ₱" . number_format($totalBudget, 2) . " (₱" . number_format($amountPerBeneficiary, 2) . " per qualified family). Ref: {$allocationCode}.";
+            $notifTitle = "Incoming Resource Allocation: {$programName}";
+            $notifMsg = "ICDRRMO has allocated emergency financial aid under {$programName} (Purok: {$targetPurok}). Total Program Fund: ₱" . number_format($totalBudget, 2) . ". Please inspect and confirm reception under Manage Resources.";
             $notifStmt = $db->prepare("
                 INSERT INTO notifications (
                     target_role, target_barangay_id, title, message, alert_level, related_module, related_id, created_by, created_at
-                ) VALUES ('resident', ?, ?, ?, 'informational', 'financial_aid', ?, ?, NOW())
+                ) VALUES ('barangay_head', ?, ?, ?, 'warning', 'financial_aid', ?, ?, NOW())
             ");
             $notifStmt->execute([$barangayId, $notifTitle, $notifMsg, $allocationId, $user['id']]);
         } catch (Throwable $e) {

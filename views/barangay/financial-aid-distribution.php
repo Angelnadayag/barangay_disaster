@@ -31,7 +31,20 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 // Auto-sync any existing or newly scheduled Social Welfare & Financial Aid events for this barangay
 syncEventFinancialAidAllocation($db, null, $barangayId);
 
-// Fetch all active/completed allocations received for this barangay (prioritizing event-linked programs)
+// Fetch pending incoming allocations from ICDRRMO awaiting Barangay Head confirmation
+$pendingAllocStmt = $db->prepare("
+    SELECT a.*, u.full_name AS allocator_name
+    FROM financial_aid_allocations a
+    LEFT JOIN users u ON a.allocated_by = u.id
+    WHERE a.barangay_id = ? 
+      AND a.received_status = 'Pending' 
+      AND a.status != 'Archived'
+    ORDER BY a.created_at DESC
+");
+$pendingAllocStmt->execute([$barangayId]);
+$pendingAllocations = $pendingAllocStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all confirmed received allocations for this barangay (prioritizing event-linked programs)
 $allocStmt = $db->prepare("
     SELECT a.*,
            e.title AS event_title, e.activity_type AS event_activity_type, e.status AS event_status,
@@ -41,7 +54,9 @@ $allocStmt = $db->prepare("
            (SELECT COUNT(*) FROM financial_aid_distributions d WHERE d.allocation_id = a.id AND d.claim_status = 'Pending') AS pending_recipients
     FROM financial_aid_allocations a
     LEFT JOIN events e ON a.event_id = e.id
-    WHERE a.barangay_id = ? AND a.status != 'Archived'
+    WHERE a.barangay_id = ? 
+      AND (a.received_status = 'Received' OR (a.event_id IS NOT NULL AND a.received_status != 'Not Received'))
+      AND a.status != 'Archived'
     ORDER BY (a.event_id IS NOT NULL) DESC, a.created_at DESC
 ");
 $allocStmt->execute([$barangayId]);
@@ -471,6 +486,124 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
   </div>
 
+  <!-- Section 2: Incoming Resource Allocations from ICDRRMO (Pending Reception) -->
+  <div class="card" style="margin-bottom: var(--space-4); border: 1.5px solid <?= !empty($pendingAllocations) ? '#F59E0B' : '#E2E8F0' ?>; background: #FFFFFF; border-radius: var(--radius-primary); overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+    <div style="padding: 12px 18px; background: <?= !empty($pendingAllocations) ? 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)' : '#FAFCFC' ?>; border-bottom: 1px solid <?= !empty($pendingAllocations) ? '#FDE68A' : '#E2E8F0' ?>; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: <?= !empty($pendingAllocations) ? '#F59E0B' : '#17324D' ?>; color: #FFFFFF; font-size: 15px;">
+          📥
+        </span>
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h2 style="margin: 0; font-size: 13.5px; font-weight: 700; color: var(--color-primary);">Incoming Resource Allocations from ICDRRMO</h2>
+            <?php if (!empty($pendingAllocations)): ?>
+              <span class="badge" style="background: #F59E0B; color: #FFFFFF; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">
+                <?= count($pendingAllocations) ?> Pending Confirmation
+              </span>
+            <?php else: ?>
+              <span class="badge" style="background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; font-size: 10px; font-weight: 600; padding: 2px 7px;">
+                ✓ All Allocations Received
+              </span>
+            <?php endif; ?>
+          </div>
+          <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--color-text-secondary);">
+            Review incoming calamity aid allocations dispatched by ICDRRMO. Click <strong>Receive</strong> to accept and store in your Financial Aid Programs ledger below, or <strong>Not Received</strong> if aid was not delivered.
+          </p>
+        </div>
+      </div>
+      
+      <?php if (!empty($pendingAllocations)): ?>
+        <span style="font-size: 11px; font-weight: 700; color: #B45309; background: #FFFFFF; padding: 4px 10px; border-radius: 6px; border: 1px solid #FDE68A; display: inline-flex; align-items: center; gap: 5px;">
+          <span>⚠️</span> Awaiting Action: Receive or Not Received
+        </span>
+      <?php endif; ?>
+    </div>
+
+    <?php if (empty($pendingAllocations)): ?>
+      <div style="padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--color-text-muted);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>No pending incoming allocations awaiting confirmation. All aid allocations from ICDRRMO are confirmed and stored in the <strong>Financial Aid Programs</strong> below.</span>
+        </div>
+        <span style="font-size: 10.5px; color: var(--color-primary); font-weight: 600;"><?= count($allocations) ?> Active Programs</span>
+      </div>
+    <?php else: ?>
+      <!-- Incoming Pending Allocations Table -->
+      <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: #FAFCFC; border-bottom: 1px solid var(--color-border); font-size: 10px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.3px;">
+              <th style="padding: 9px 14px; text-align: left;">Program & Calamity</th>
+              <th style="padding: 9px 14px; text-align: left;">Target Scope & Families</th>
+              <th style="padding: 9px 14px; text-align: right;">Total Program Fund</th>
+              <th style="padding: 9px 14px; text-align: right;">Amount / Family</th>
+              <th style="padding: 9px 14px; text-align: center;">Source Type</th>
+              <th style="padding: 9px 14px; text-align: center; width: 230px;">Action / Confirmation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($pendingAllocations as $pa): ?>
+              <tr style="border-bottom: 1px solid var(--color-border-light); font-size: 11.5px; transition: background 0.15s ease;">
+                <td style="padding: 10px 14px;">
+                  <div style="font-weight: 700; color: var(--color-primary); font-size: 12px;"><?= htmlspecialchars($pa['program_name']) ?></div>
+                  <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap;">
+                    <span class="badge" style="background: #EFF6FF; color: #1D4ED8; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border: 1px solid #BFDBFE;"><?= htmlspecialchars($pa['allocation_code']) ?></span>
+                    <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 9.5px; font-weight: 600; padding: 1px 6px;"><?= htmlspecialchars($pa['disaster_type'] ?? 'General Calamity') ?></span>
+                    <span style="font-size: 10px; color: var(--color-text-muted);"><?= date('M d, Y', strtotime($pa['created_at'])) ?></span>
+                  </div>
+                </td>
+                <td style="padding: 10px 14px;">
+                  <div style="font-weight: 600; color: var(--color-text);"><?= htmlspecialchars($pa['target_purok'] ?? 'All Puroks') ?></div>
+                  <div style="font-size: 10.5px; color: var(--color-text-muted); margin-top: 2px;">
+                    👨‍👩‍👧‍👦 <strong><?= number_format((int)$pa['target_beneficiaries']) ?></strong> qualified families
+                  </div>
+                </td>
+                <td style="padding: 10px 14px; text-align: right;">
+                  <div style="font-weight: 700; color: #0F766E; font-size: 13px; font-family: var(--font-secondary);">
+                    ₱<?= number_format((float)$pa['total_budget'], 2) ?>
+                  </div>
+                  <div style="font-size: 9.5px; color: var(--color-text-muted);"><?= htmlspecialchars($pa['funding_source']) ?></div>
+                </td>
+                <td style="padding: 10px 14px; text-align: right;">
+                  <div style="font-weight: 700; color: var(--color-primary); font-size: 12px; font-family: var(--font-secondary);">
+                    ₱<?= number_format((float)$pa['amount_per_beneficiary'], 2) ?>
+                  </div>
+                  <div style="font-size: 9.5px; color: var(--color-text-muted);">per family</div>
+                </td>
+                <td style="padding: 10px 14px; text-align: center;">
+                  <?php if (($pa['added_type'] ?? '') === 'ai_recommended'): ?>
+                    <span class="badge" style="background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; font-size: 9.5px; font-weight: 600; padding: 2px 7px;">🤖 AI Recommended</span>
+                  <?php else: ?>
+                    <span class="badge" style="background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; font-size: 9.5px; font-weight: 600; padding: 2px 7px;">👤 Added by Admin</span>
+                  <?php endif; ?>
+                </td>
+                <td style="padding: 10px 14px; text-align: center;">
+                  <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                    <!-- Receive Button -->
+                    <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/confirm_receipt.php" style="margin: 0;" onsubmit="return confirm('Confirm receipt of allocation <?= htmlspecialchars($pa['allocation_code']) ?> (₱<?= number_format((float)$pa['total_budget'], 2) ?>)?\n\nIt will be automatically stored in your Financial Aid Programs section below.');">
+                      <input type="hidden" name="allocation_id" value="<?= $pa['id'] ?>">
+                      <input type="hidden" name="receipt_status" value="Received">
+                      <button type="submit" class="btn btn-sm" style="background: #059669; color: #FFFFFF; border: 1px solid #047857; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; box-shadow: 0 1px 3px rgba(5,150,105,0.25);">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <span>Receive</span>
+                      </button>
+                    </form>
+
+                    <!-- Not Received Button -->
+                    <button type="button" class="btn btn-sm btn-outline" onclick="openNotReceivedAidModal(<?= $pa['id'] ?>, '<?= htmlspecialchars(addslashes($pa['allocation_code'])) ?>', '<?= htmlspecialchars(addslashes($pa['program_name'])) ?>', '<?= number_format((float)$pa['total_budget'], 2) ?>')" style="font-size: 11px; font-weight: 600; padding: 5px 10px; color: #DC2626; border-color: #FCA5A5; display: inline-flex; align-items: center; gap: 4px; border-radius: 5px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                      <span>Not Received</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
+  </div>
+
   <?php if (empty($allocations)): ?>
     <div class="card"
       style="padding: 32px 24px; text-align: center; background: #FFFFFF; border: 1px solid var(--color-border); border-radius: var(--radius-primary); margin-bottom: var(--space-4);">
@@ -542,7 +675,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <tbody id="allocationsTableBody">
               <?php foreach ($allocations as $idx => $row):
                 $isSelected = ($row['id'] === $selectedAllocId);
-                $isInitiated = (!empty($row['is_distributed']) && (float) $row['total_budget'] > 0);
+                $isInitiated = ((float) $row['total_budget'] > 0 || !empty($row['is_distributed']));
                 ?>
                 <tr class="alloc-row <?= $isSelected ? 'active' : '' ?>" id="alloc_row_<?= $row['id'] ?>"
                   onclick="selectAllocation(<?= $row['id'] ?>)">
@@ -1153,6 +1286,43 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   </div>
 </div>
 
+<!-- Modal: Report Aid Allocation Not Received -->
+<div class="modal" id="notReceivedAidModal">
+  <div class="modal-dialog" style="max-width: 480px;">
+    <div class="modal-header" style="padding: 12px 18px; border-bottom: 1px solid var(--color-border-light); display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; background: #FEF2F2; color: #DC2626; font-size: 14px;">⚠️</span>
+        <h3 style="font-size: 14px; font-weight: 700; color: #DC2626; margin: 0;">Report Aid Not Received</h3>
+      </div>
+      <button type="button" class="modal-close" onclick="closeNotReceivedAidModal()">&times;</button>
+    </div>
+    <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/confirm_receipt.php">
+      <input type="hidden" name="allocation_id" id="not_received_alloc_id" value="">
+      <input type="hidden" name="receipt_status" value="Not Received">
+      <div class="modal-body" style="padding: 16px 18px;">
+        <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 11px; color: #991B1B; line-height: 1.5;">
+          You are confirming that this financial aid allocation from ICDRRMO was <strong>NOT RECEIVED</strong> by the Barangay. This will log a central audit record and alert ICDRRMO Central Depot.
+        </div>
+
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 11.5px; display: flex; flex-direction: column; gap: 4px;">
+          <div><strong style="color: var(--color-text-secondary);">Program:</strong> <span id="not_received_program_name" style="color: var(--color-primary); font-weight: 700;">—</span></div>
+          <div><strong style="color: var(--color-text-secondary);">Ref Code:</strong> <span id="not_received_alloc_code" style="font-family: var(--font-secondary); font-weight: 600;">—</span></div>
+          <div><strong style="color: var(--color-text-secondary);">Total Fund:</strong> <span id="not_received_budget" style="color: #0F766E; font-weight: 700;">—</span></div>
+        </div>
+
+        <div>
+          <label class="form-label form-label-required" style="font-size: 11px; font-weight: 700; margin-bottom: 4px; display: block; color: var(--color-primary);">Reason / Remarks for Non-Delivery</label>
+          <textarea name="receipt_remarks" class="form-control" rows="3" placeholder="Please specify reason (e.g. Funds not received in barangay treasury, discrepancy in transfer, incorrect barangay allocation)..." required style="font-size: 11.5px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 10px 18px; border-top: 1px solid var(--color-border-light); display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeNotReceivedAidModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm" style="background: #DC2626; border-color: #DC2626; font-weight: 700;">Confirm Not Received</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   // Data payloads for zero-lag instant dynamic switching
   const rawAllocations = <?= json_encode($allocations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
@@ -1215,7 +1385,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     const totalFamilies = scopedFamilies.length;
     const releasedFamiliesCount = scopedFamilies.filter(f => distByHhId[f.id]).length;
 
-    const isInitiated = Boolean(alloc.is_distributed == 1 || alloc.is_distributed === '1' || alloc.is_distributed === true) && Number(alloc.total_budget || 0) > 0;
+    const isInitiated = Number(alloc.total_budget || 0) > 0 || Boolean(alloc.is_distributed == 1 || alloc.is_distributed === '1' || alloc.is_distributed === true);
 
     const totalBudget = isInitiated ? Number(alloc.total_budget || 0) : 0;
     const totalDisbursed = isInitiated ? allocDistributions
@@ -1376,7 +1546,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     filtered.forEach(fam => {
       const dist = distByHhId[Number(fam.id)] || distByName[(fam.head_full_name || '').toLowerCase()];
       const isClaimed = (dist && dist.claim_status === 'Claimed');
-      const isInitiated = Boolean(alloc.is_distributed == 1 || alloc.is_distributed === '1' || alloc.is_distributed === true) && Number(alloc.total_budget || 0) > 0;
+      const isInitiated = Number(alloc.total_budget || 0) > 0 || Boolean(alloc.is_distributed == 1 || alloc.is_distributed === '1' || alloc.is_distributed === true);
       const rateAmount = isInitiated ? Number(alloc.amount_per_beneficiary || 0) : 0;
       const amount = dist ? Number(dist.amount || rateAmount) : rateAmount;
 
@@ -1941,7 +2111,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     const rateInput = document.getElementById('dist_rate_budget');
     const budgetInput = document.getElementById('dist_total_budget');
 
-    const isInitiated = Boolean(alloc.is_distributed == 1 || alloc.is_distributed === '1' || alloc.is_distributed === true) && Number(alloc.total_budget || 0) > 0;
+    const isInitiated = Number(alloc.total_budget || 0) > 0 || Boolean(alloc.is_distributed == 1 || alloc.is_distributed === '1' || alloc.is_distributed === true);
 
     if (isInitiated) {
       if (budgetInput) budgetInput.value = parseFloat(alloc.total_budget).toFixed(2);
@@ -2399,6 +2569,18 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 
   function closeHouseholdMembersModal() {
     document.getElementById('householdMembersModal').classList.remove('show');
+  }
+
+  function openNotReceivedAidModal(id, code, program, budget) {
+    document.getElementById('not_received_alloc_id').value = id;
+    document.getElementById('not_received_alloc_code').textContent = code;
+    document.getElementById('not_received_program_name').textContent = program;
+    document.getElementById('not_received_budget').textContent = '₱' + budget;
+    document.getElementById('notReceivedAidModal').classList.add('show');
+  }
+
+  function closeNotReceivedAidModal() {
+    document.getElementById('notReceivedAidModal').classList.remove('show');
   }
 
   // Initialize on page load with selected allocation
