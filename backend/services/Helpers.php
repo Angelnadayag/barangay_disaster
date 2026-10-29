@@ -612,29 +612,116 @@ function syncEventStatuses($db = null) {
         $db = getDBConnection();
     }
     $nowStr = date('Y-m-d H:i:s');
+    $rowsAffected = 0;
 
     // 1. Scheduled or Ongoing events whose end time has been reached transition to 'Ended'
-    $endedStmt = $db->prepare("
-        UPDATE events 
-        SET status = 'Ended' 
-        WHERE status IN ('Scheduled', 'Ongoing') 
-          AND end_datetime <= ?
-          AND (is_archived = 0 OR is_archived IS NULL)
-    ");
-    $endedStmt->execute([$nowStr]);
+    try {
+        $endedStmt = $db->prepare("
+            UPDATE events 
+            SET status = 'Ended' 
+            WHERE status IN ('Scheduled', 'Ongoing') 
+              AND end_datetime <= ?
+              AND (is_archived = 0 OR is_archived IS NULL)
+        ");
+        $endedStmt->execute([$nowStr]);
+        $rowsAffected += $endedStmt->rowCount();
+    } catch (Throwable $e) {
+        // Warning 1265 / data truncation indicates 'Ended' is missing from events.status enum
+        try {
+            $db->exec("ALTER TABLE `events` MODIFY COLUMN `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived','Ended') DEFAULT 'Scheduled'");
+            $endedStmt = $db->prepare("
+                UPDATE events 
+                SET status = 'Ended' 
+                WHERE status IN ('Scheduled', 'Ongoing') 
+                  AND end_datetime <= ?
+                  AND (is_archived = 0 OR is_archived IS NULL)
+            ");
+            $endedStmt->execute([$nowStr]);
+            $rowsAffected += $endedStmt->rowCount();
+        } catch (Throwable $alterErr) {
+            // If ALTER TABLE is restricted, fall back cleanly to 'Completed' so page never crashes
+            try {
+                $fallbackStmt = $db->prepare("
+                    UPDATE events 
+                    SET status = 'Completed' 
+                    WHERE status IN ('Scheduled', 'Ongoing') 
+                      AND end_datetime <= ?
+                      AND (is_archived = 0 OR is_archived IS NULL)
+                ");
+                $fallbackStmt->execute([$nowStr]);
+                $rowsAffected += $fallbackStmt->rowCount();
+            } catch (Throwable $fallbackErr) {}
+        }
+    }
 
     // 2. Scheduled events whose start time has arrived transition to 'Ongoing'
-    $ongoingStmt = $db->prepare("
-        UPDATE events 
-        SET status = 'Ongoing' 
-        WHERE status = 'Scheduled' 
-          AND start_datetime <= ?
-          AND end_datetime > ?
-          AND (is_archived = 0 OR is_archived IS NULL)
-    ");
-    $ongoingStmt->execute([$nowStr, $nowStr]);
+    try {
+        $ongoingStmt = $db->prepare("
+            UPDATE events 
+            SET status = 'Ongoing' 
+            WHERE status = 'Scheduled' 
+              AND start_datetime <= ?
+              AND end_datetime > ?
+              AND (is_archived = 0 OR is_archived IS NULL)
+        ");
+        $ongoingStmt->execute([$nowStr, $nowStr]);
+        $rowsAffected += $ongoingStmt->rowCount();
+    } catch (Throwable $e) {}
 
-    return $endedStmt->rowCount() + $ongoingStmt->rowCount();
+    return $rowsAffected;
+}
+}
+
+/**
+ * Ensure barangay_resource_requests delivery receipt columns exist in the database.
+ * Auto-migrates receipt_status, received_at, received_by, and receipt_remarks if missing.
+ */
+if (!function_exists('ensureResourceRequestColumns')) {
+function ensureResourceRequestColumns($db = null): bool {
+    static $columnsReady = null;
+    if ($columnsReady !== null) {
+        return $columnsReady;
+    }
+
+    if (!$db) {
+        $db = getDBConnection();
+    }
+
+    try {
+        $chk = $db->query("SHOW COLUMNS FROM `barangay_resource_requests` LIKE 'received_by'");
+        if ($chk && $chk->rowCount() > 0) {
+            $columnsReady = true;
+            return true;
+        }
+
+        // Attempt on-the-fly column migration
+        try {
+            $db->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `receipt_status` enum('Pending','Received','Not Received') NOT NULL DEFAULT 'Pending' AFTER `status`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `received_at` datetime DEFAULT NULL AFTER `receipt_status`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `received_by` int(11) DEFAULT NULL AFTER `received_at`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `receipt_remarks` text DEFAULT NULL AFTER `received_by`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `barangay_resource_requests` ADD KEY `received_by` (`received_by`)");
+        } catch (Throwable $e) {}
+
+        $chk2 = $db->query("SHOW COLUMNS FROM `barangay_resource_requests` LIKE 'received_by'");
+        $columnsReady = ($chk2 && $chk2->rowCount() > 0);
+        return $columnsReady;
+    } catch (Throwable $e) {
+        $columnsReady = false;
+        return false;
+    }
 }
 }
 

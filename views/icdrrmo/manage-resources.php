@@ -126,10 +126,16 @@ $allocStmt = $db->query("
 ");
 $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Ensure barangay_resource_requests delivery receipt columns exist
+$hasReceivedByCol = function_exists('ensureResourceRequestColumns') ? ensureResourceRequestColumns($db) : false;
+$receivedBySelect = $hasReceivedByCol ? "rec_u.full_name AS received_by_name," : "NULL AS received_by_name,";
+$receivedByJoin = $hasReceivedByCol ? "LEFT JOIN users rec_u ON brr.received_by = rec_u.id" : "";
+$reqAllocOrderBy = $hasReceivedByCol ? "(brr.receipt_status = 'Pending') DESC, brr.reviewed_at DESC, brr.id DESC" : "brr.reviewed_at DESC, brr.id DESC";
+
 // Approved Requisition Allocations to Barangays (Hinaplanon)
 $reqAllocStmt = $db->query("
     SELECT brr.*, b.name AS barangay_name, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name,
-           rec_u.full_name AS received_by_name,
+           {$receivedBySelect}
            COALESCE(res.name, brr.item_name) AS resource_name,
            COALESCE(res.code, '') AS code,
            COALESCE(res.available_quantity, 0) AS depot_available_quantity,
@@ -139,10 +145,10 @@ $reqAllocStmt = $db->query("
     JOIN barangays b ON brr.barangay_id = b.id
     LEFT JOIN users u ON brr.requested_by = u.id
     LEFT JOIN users rev ON brr.reviewed_by = rev.id
-    LEFT JOIN users rec_u ON brr.received_by = rec_u.id
+    {$receivedByJoin}
     LEFT JOIN resources res ON brr.resource_id = res.id
     WHERE brr.barangay_id = 12 AND brr.status = 'Approved'
-    ORDER BY (brr.receipt_status = 'Pending') DESC, brr.reviewed_at DESC, brr.id DESC
+    ORDER BY {$reqAllocOrderBy}
 ");
 $requisitionAllocations = $reqAllocStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -155,8 +161,9 @@ $notReceivedReqCount = 0;
 $pendingReceiptReqCount = 0;
 foreach ($requisitionAllocations as $ra) {
     $totalReqAllocQty += (int)($ra['approved_quantity'] ?: $ra['requested_quantity']);
-    if ($ra['receipt_status'] === 'Received') $receivedReqCount++;
-    elseif ($ra['receipt_status'] === 'Not Received') $notReceivedReqCount++;
+    $rStatus = $ra['receipt_status'] ?? 'Pending';
+    if ($rStatus === 'Received') $receivedReqCount++;
+    elseif ($rStatus === 'Not Received') $notReceivedReqCount++;
     else $pendingReceiptReqCount++;
 }
 $grandTotalAllocatedUnits = $totalAllocatedQty + $totalReqAllocQty;
@@ -189,7 +196,7 @@ $transactions = $trxStmt->fetchAll(PDO::FETCH_ASSOC);
 $pendingRequestsCount = (int) $db->query("SELECT COUNT(*) FROM barangay_resource_requests WHERE status = 'Pending' AND barangay_id = 12")->fetchColumn();
 $reqStmt = $db->query("
     SELECT brr.*, b.name AS barangay_name, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name,
-           rec_u.full_name AS received_by_name,
+           {$receivedBySelect}
            COALESCE(res.name, res_name.name, brr.item_name) AS central_res_name,
            COALESCE(res.code, res_name.code, '') AS central_res_code,
            COALESCE(res.available_quantity, res_name.available_quantity, 0) AS central_res_avail,
@@ -201,7 +208,7 @@ $reqStmt = $db->query("
     JOIN barangays b ON brr.barangay_id = b.id
     LEFT JOIN users u ON brr.requested_by = u.id
     LEFT JOIN users rev ON brr.reviewed_by = rev.id
-    LEFT JOIN users rec_u ON brr.received_by = rec_u.id
+    {$receivedByJoin}
     LEFT JOIN resources res ON (brr.resource_id IS NOT NULL AND brr.resource_id = res.id)
     LEFT JOIN resources res_name ON (brr.resource_id IS NULL AND LOWER(TRIM(brr.item_name)) = LOWER(TRIM(res_name.name)) AND (res_name.status = 'active' OR res_name.status IS NULL) AND (res_name.barangay_id IS NULL OR res_name.barangay_id = 0))
     WHERE brr.barangay_id = 12
