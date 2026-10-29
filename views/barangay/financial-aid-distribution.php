@@ -790,12 +790,6 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               Loading selected allocation...
             </div>
           </div>
-          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-primary" onclick="openDistributeModalForCurrent()"
-              style="padding: 5px 12px; font-size: 10.5px;">
-              Distribute Aid
-            </button>
-          </div>
         </div>
 
         <!-- Telemetry Sub-bar -->

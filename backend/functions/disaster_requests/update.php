@@ -19,7 +19,7 @@ $db = getDBConnection();
 
 $returnUrl = $_POST['return_url'] ?? ($_SERVER['HTTP_REFERER'] ?? (BASE_URL . '/views/barangay/disaster-reports.php'));
 
-if (!in_array($role, ['barangay_head', 'icdrrmo'], true)) {
+if (!in_array($role, ['barangay_head', 'icdrrmo', 'responder'], true)) {
     if ($isAjax) jsonResponse(['success' => false, 'message' => 'Unauthorized.'], 403);
     redirectWithFlash($returnUrl, 'error', 'Unauthorized.');
 }
@@ -40,10 +40,23 @@ if (!$req) {
     redirectWithFlash($returnUrl, 'error', 'Incident report not found.');
 }
 
-// Verify Barangay Head jurisdiction
-if ($role === 'barangay_head' && (int)$req['barangay_id'] !== (int)$user['barangay_id']) {
+// Verify Barangay jurisdiction for Barangay Head & Responder
+$userBarangayId = (int)($user['barangay_id'] ?? 0);
+if ($userBarangayId === 0) {
+    $bStmt = $db->prepare("SELECT barangay_id FROM users WHERE id = ?");
+    $bStmt->execute([(int)$user['id']]);
+    $userBarangayId = (int)$bStmt->fetchColumn();
+}
+
+if (($role === 'barangay_head' || $role === 'responder') && (int)$req['barangay_id'] !== $userBarangayId) {
     if ($isAjax) jsonResponse(['success' => false, 'message' => 'Unauthorized: This report belongs to another barangay.'], 403);
     redirectWithFlash($returnUrl, 'error', 'Unauthorized to modify reports outside your barangay.');
+}
+
+// Strictly enforce: Responders can only update reports if status is Ongoing, NOT Completed
+if ($role === 'responder' && $req['status'] === 'Completed') {
+    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Responders cannot update completed incident reports. Only ongoing reports can be updated.'], 403);
+    redirectWithFlash($returnUrl, 'error', 'Cannot update incident report: This report is already Completed.');
 }
 
 $barangayId = ($role === 'icdrrmo' && !empty($_POST['barangay_id'])) ? (int)$_POST['barangay_id'] : (int)$req['barangay_id'];
@@ -76,7 +89,9 @@ if (!in_array($aidSupport, ['resources', 'financial_aid', 'both'], true)) {
 // Optional status transition (only Ongoing or Completed) - Concluding an incident is restricted to Barangay Head
 $newStatus = trim($_POST['status'] ?? '');
 $allowedStatuses = ['Ongoing', 'Completed'];
-if ($newStatus === 'Completed' && $role !== 'barangay_head') {
+if ($role === 'responder') {
+    $status = 'Ongoing'; // Responders update field data for ongoing incidents
+} elseif ($newStatus === 'Completed' && $role !== 'barangay_head') {
     $status = $req['status']; // Non-barangay head cannot conclude incident
 } else {
     $status = (in_array($newStatus, $allowedStatuses, true)) ? $newStatus : (in_array($req['status'], $allowedStatuses, true) ? $req['status'] : 'Ongoing');

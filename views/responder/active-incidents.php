@@ -35,18 +35,23 @@ if (empty($responderBrgyName) && $responderBarangayId > 0) {
 }
 
 $filterSeverity = $_GET['severity'] ?? '';
+$filterStatus = $_GET['status'] ?? '';
 $search = trim($_GET['search'] ?? '');
 
-// Strictly Completed Disaster Reports for this Barangay
+// Disaster Reports for this Barangay (Ongoing & Completed)
 $sql = "
     SELECT dr.*, b.name AS barangay_name, u.full_name AS submitted_by_name
     FROM disaster_reports dr
     JOIN barangays b ON dr.barangay_id = b.id
     LEFT JOIN users u ON dr.submitted_by = u.id
-    WHERE dr.status = 'Completed'
-      AND dr.barangay_id = ?
+    WHERE dr.barangay_id = ?
 ";
 $params = [$responderBarangayId];
+
+if (!empty($filterStatus)) {
+    $sql .= " AND dr.status = ?";
+    $params[] = $filterStatus;
+}
 
 if (!empty($filterSeverity)) {
     $sql .= " AND dr.severity = ?";
@@ -62,12 +67,12 @@ if (!empty($search)) {
     $params[] = $like;
 }
 
-$sql .= " ORDER BY COALESCE(dr.completed_at, dr.updated_at, dr.created_at) DESC";
+$sql .= " ORDER BY FIELD(dr.status, 'Ongoing', 'Completed'), COALESCE(dr.completed_at, dr.updated_at, dr.created_at) DESC";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $incidents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$pageTitle = "Completed Disaster Reports";
+$pageTitle = "Disaster Reports — Responders";
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
@@ -132,7 +137,13 @@ require_once __DIR__ . '/../layouts/header.php';
           <input type="text" name="search" class="form-control" placeholder="Search tracking #, purok, or location..." value="<?= clean($search) ?>">
         </div>
 
-        <select name="severity" class="form-control" style="width: 140px;">
+        <select name="status" class="form-control" style="width: 130px;">
+          <option value="">All Statuses</option>
+          <option value="Ongoing" <?= $filterStatus === 'Ongoing' ? 'selected' : '' ?>>Ongoing</option>
+          <option value="Completed" <?= $filterStatus === 'Completed' ? 'selected' : '' ?>>Completed</option>
+        </select>
+
+        <select name="severity" class="form-control" style="width: 130px;">
           <option value="">All Severities</option>
           <option value="Critical" <?= $filterSeverity === 'Critical' ? 'selected' : '' ?>>Critical</option>
           <option value="High" <?= $filterSeverity === 'High' ? 'selected' : '' ?>>High</option>
@@ -141,13 +152,13 @@ require_once __DIR__ . '/../layouts/header.php';
         </select>
 
         <button type="submit" class="btn btn-outline" style="border: none; background: #EEF2F4; color: #17324D; font-weight: 600;">Filter</button>
-        <?php if (!empty($search) || !empty($filterSeverity)): ?>
+        <?php if (!empty($search) || !empty($filterSeverity) || !empty($filterStatus)): ?>
           <a href="<?= BASE_URL ?>/views/responder/active-incidents.php" class="btn btn-outline" style="border: none; background: transparent; color: #8A96A0;">Reset</a>
         <?php endif; ?>
       </div>
       <div>
         <span style="font-size: 11px; font-weight: 600; color: #2F6F73;">
-          Completed Reports: <?= count($incidents) ?>
+          Total Reports: <?= count($incidents) ?>
         </span>
       </div>
     </form>
@@ -214,10 +225,10 @@ require_once __DIR__ . '/../layouts/header.php';
               </div>
             </div>
 
-            <!-- Badges -->
+            <!-- Badges & Actions -->
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <span style="font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 6px; background: #EEF2F4; color: #17324D; border: none;">
-                Completed
+              <span style="font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 6px; <?= ($inc['status'] ?? 'Ongoing') === 'Completed' ? 'background: #EEF2F4; color: #17324D;' : 'background: #EBF3F5; color: #2F6F73;' ?>">
+                <?= clean($inc['status'] ?? 'Ongoing') ?>
               </span>
               <span style="font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 6px; background: #EBF3F5; color: #2F6F73; border: none;">
                 <?= clean($inc['severity'] ?: 'Normal') ?> Severity
@@ -226,6 +237,39 @@ require_once __DIR__ . '/../layouts/header.php';
                 <span style="font-size: 10.5px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #F8FAFB; color: #8A96A0; border: none;">
                   <?= clean($inc['urgency']) ?> Urgency
                 </span>
+              <?php endif; ?>
+              <?php if (($inc['status'] ?? 'Ongoing') === 'Ongoing'): ?>
+                <?php
+                  $incCardJson = json_encode([
+                    "id" => (int) $inc["id"],
+                    "tracking_code" => $inc["tracking_code"],
+                    "disaster_type" => $inc["disaster_type"],
+                    "status" => $inc["status"] ?? "Ongoing",
+                    "severity" => $inc["severity"],
+                    "urgency" => $inc["urgency"] ?? "Immediate",
+                    "purok_name" => $inc["purok_name"],
+                    "incident_location" => $inc["incident_location"] ?? "",
+                    "barangay_name" => $inc["barangay_name"],
+                    "affected_families" => (int) $inc["affected_families"],
+                    "affected_individuals" => (int) ($inc["affected_individuals"] ?? $inc["affected_families"]),
+                    "displaced_families" => (int) $inc["displaced_families"],
+                    "casualties_count" => (int) ($inc["casualties_count"] ?? 0),
+                    "injuries_count" => (int) ($inc["injuries_count"] ?? 0),
+                    "missing_count" => (int) ($inc["missing_count"] ?? 0),
+                    "situation_overview" => $inc["situation_overview"] ?? "",
+                    "requested_assistance" => $inc["requested_assistance"] ?? ""
+                  ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+                ?>
+                <button type="button" class="btn btn-outline btn-sm"
+                  onclick='openUpdateIncidentModal(<?= $incCardJson ?>)'
+                  style="font-size: 10.5px; padding: 4px 10px; border-color: #2F6F73; color: #2F6F73; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                  title="Update Ongoing Incident Report">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                  Update Report
+                </button>
               <?php endif; ?>
             </div>
           </div>
@@ -332,14 +376,16 @@ require_once __DIR__ . '/../layouts/header.php';
               </div>
             </div>
 
-            <div style="background: #EBF3F5; padding: 10px 12px; border-radius: 6px;">
-              <div style="font-size: 10px; font-weight: 700; color: #2F6F73; text-transform: uppercase; margin-bottom: 3px;">
-                Final Resolution Summary & Concluding Actions
+            <?php if (!empty($inc['resolution_notes']) || ($inc['status'] ?? 'Ongoing') === 'Completed'): ?>
+              <div style="background: #EBF3F5; padding: 10px 12px; border-radius: 6px;">
+                <div style="font-size: 10px; font-weight: 700; color: #2F6F73; text-transform: uppercase; margin-bottom: 3px;">
+                  Final Resolution Summary & Concluding Actions
+                </div>
+                <div style="font-size: 11.5px; color: #17324D; line-height: 1.45;">
+                  <?= nl2br(clean($inc['resolution_notes'] ?: 'Incident completed. All response operations concluded and area verified secure by barangay disaster authority.')) ?>
+                </div>
               </div>
-              <div style="font-size: 11.5px; color: #17324D; line-height: 1.45;">
-                <?= nl2br(clean($inc['resolution_notes'] ?: 'Incident completed. All response operations concluded and area verified secure by barangay disaster authority.')) ?>
-              </div>
-            </div>
+            <?php endif; ?>
           </div>
 
           <!-- Submitter Footer -->
@@ -348,7 +394,7 @@ require_once __DIR__ . '/../layouts/header.php';
               Submitted By: <strong style="color: #17324D;"><?= clean($inc['submitted_by_name'] ?: 'Barangay Staff') ?></strong>
             </div>
             <div>
-              Status: <span style="font-weight: 600; color: #2F6F73;">Archived & Resolved</span>
+              Status: <span style="font-weight: 600; color: <?= ($inc['status'] ?? 'Ongoing') === 'Completed' ? '#556270' : '#2F6F73' ?>;"><?= ($inc['status'] ?? 'Ongoing') === 'Completed' ? 'Archived & Resolved' : 'Active & Ongoing' ?></span>
             </div>
           </div>
 
@@ -437,4 +483,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php require_once __DIR__ . '/partials/update-incident-modal.php'; ?>
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

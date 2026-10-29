@@ -96,18 +96,20 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
         </li>
         <?php 
           $resTab = $_GET['tab'] ?? '';
-          $isManageResourcesActive = in_array($currentPage, [
+          $isManageSuppliesActive = in_array($currentPage, [
             'manage-resources.php', 
             'active-resources.php', 
-            'resource-allocated.php', 
+            'resource-allocated.php'
+          ], true);
+          $isManageResourcesActive = in_array($currentPage, [
+            'financial-aid-allocation.php',
             'resources-requested.php'
           ], true);
         ?>
-        <li class="nav-item nav-item-dropdown <?= $isManageResourcesActive ? 'active-dropdown' : '' ?>" id="sidebarManageResourcesDropdown">
-          <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=active" class="nav-link <?= $isManageResourcesActive ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
+        <li class="nav-item nav-item-dropdown <?= $isManageSuppliesActive ? 'active-dropdown' : '' ?>" id="sidebarManageSuppliesDropdown">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=active" class="nav-link <?= $isManageSuppliesActive ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
             <span style="flex:1;">Manage Supplies</span>
-            <?php if (!empty($pendingResourceReqs) && $pendingResourceReqs > 0): ?><span class="nav-badge nav-badge-danger" style="margin-right:4px; font-size:9px; padding:1px 5px;"><?= $pendingResourceReqs ?> New</span><?php endif; ?>
             <svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </a>
           <ul class="nav-submenu">
@@ -141,11 +143,30 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
             <?php if ($lowStockCount > 0): ?><span class="nav-badge nav-badge-warning"><?= $lowStockCount ?> Low</span><?php endif; ?>
           </a>
         </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/icdrrmo/financial-aid-allocation.php" class="nav-link <?= $currentPage === 'financial-aid-allocation.php' ? 'active' : '' ?>">
+        <li class="nav-item nav-item-dropdown <?= ($currentPage === 'financial-aid-allocation.php') ? 'active-dropdown' : '' ?>" id="sidebarManageResourcesDropdown">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/financial-aid-allocation.php" class="nav-link <?= ($currentPage === 'financial-aid-allocation.php') ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>
-            Manage Resources
+            <span style="flex:1;">Manage Resources</span>
+            <?php if (!empty($pendingResourceReqs) && $pendingResourceReqs > 0): ?><span class="nav-badge nav-badge-danger" style="margin-right:4px; font-size:9px; padding:1px 5px;"><?= $pendingResourceReqs ?> New</span><?php endif; ?>
+            <svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </a>
+          <ul class="nav-submenu">
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/resources-requested.php" class="nav-submenu-link <?= ($currentPage === 'resources-requested.php' || ($currentPage === 'manage-resources.php' && $resTab === 'requests')) ? 'active' : '' ?>" title="View Resources Requests">
+                <span class="nav-submenu-bullet"></span>
+                <span style="flex:1;">Resources Requests</span>
+                <?php if (!empty($pendingResourceReqs) && $pendingResourceReqs > 0): ?>
+                  <span class="nav-badge nav-badge-danger" style="font-size:8.5px; padding:1px 4px;"><?= $pendingResourceReqs ?></span>
+                <?php endif; ?>
+              </a>
+            </li>
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/financial-aid-allocation.php" class="nav-submenu-link <?= ($currentPage === 'financial-aid-allocation.php') ? 'active' : '' ?>" title="View Resources Allocated">
+                <span class="nav-submenu-bullet"></span>
+                <span>Resources Allocated</span>
+              </a>
+            </li>
+          </ul>
         </li>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/events.php" class="nav-link <?= in_array($currentPage, ['events.php', 'event-details.php'], true) ? 'active' : '' ?>">
