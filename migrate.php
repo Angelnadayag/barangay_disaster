@@ -296,11 +296,40 @@ try {
             }
         }
 
-        // Table: financial_aid_allocations (Track whether program was AI or admin defined)
+        // Table: financial_aid_allocations (Track whether program was AI or admin defined, delivery receipt & event linking)
         if (in_array('financial_aid_allocations', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'financial_aid_allocations', 'event_id')) {
+                echo "  [+] Adding column `event_id` to `financial_aid_allocations`...\n";
+                $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `event_id` int(11) DEFAULT NULL AFTER `id`;");
+                $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD KEY `idx_alloc_event` (`event_id`);");
+            }
             if (!$hasColumn($pdo, 'financial_aid_allocations', 'added_type')) {
                 echo "  [+] Adding column `added_type` to `financial_aid_allocations`...\n";
                 $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `added_type` enum('ai_recommended','added_by_admin') NOT NULL DEFAULT 'ai_recommended' AFTER `status`;");
+            }
+            if (!$hasColumn($pdo, 'financial_aid_allocations', 'received_status')) {
+                echo "  [+] Adding column `received_status` to `financial_aid_allocations`...\n";
+                $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `received_status` enum('Pending','Received','Not Received') NOT NULL DEFAULT 'Received' AFTER `status`;");
+            }
+            if (!$hasColumn($pdo, 'financial_aid_allocations', 'is_distributed')) {
+                echo "  [+] Adding column `is_distributed` to `financial_aid_allocations`...\n";
+                $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `is_distributed` tinyint(1) NOT NULL DEFAULT 0 AFTER `received_status`;");
+            }
+            if (!$hasColumn($pdo, 'financial_aid_allocations', 'received_at')) {
+                echo "  [+] Adding column `received_at` to `financial_aid_allocations`...\n";
+                $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `received_at` datetime DEFAULT NULL AFTER `is_distributed`;");
+            }
+            if (!$hasColumn($pdo, 'financial_aid_allocations', 'received_by')) {
+                echo "  [+] Adding column `received_by` to `financial_aid_allocations`...\n";
+                $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `received_by` int(11) DEFAULT NULL AFTER `received_at`;");
+                try {
+                    $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD KEY `received_by` (`received_by`);");
+                    $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD CONSTRAINT `financial_aid_allocations_ibfk_received_by` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;");
+                } catch (Throwable $e) {}
+            }
+            if (!$hasColumn($pdo, 'financial_aid_allocations', 'receipt_remarks')) {
+                echo "  [+] Adding column `receipt_remarks` to `financial_aid_allocations`...\n";
+                $pdo->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `receipt_remarks` text DEFAULT NULL AFTER `received_by`;");
             }
         }
 
