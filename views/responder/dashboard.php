@@ -243,12 +243,20 @@ require_once __DIR__ . '/../layouts/header.php';
             "disaster_type" => $inc["disaster_type"],
             "status" => $inc["status"] ?? "Ongoing",
             "severity" => $inc["severity"],
+            "urgency" => $inc["urgency"] ?? "Immediate",
             "purok_name" => $inc["purok_name"],
+            "incident_location" => $inc["incident_location"] ?? "",
             "barangay_name" => $inc["barangay_name"],
             "lat" => !empty($inc["coordinates_lat"]) ? (float) $inc["coordinates_lat"] : 8.246596,
             "lng" => !empty($inc["coordinates_lng"]) ? (float) $inc["coordinates_lng"] : 124.259474,
             "affected_families" => (int) $inc["affected_families"],
-            "displaced_families" => (int) $inc["displaced_families"]
+            "affected_individuals" => (int) ($inc["affected_individuals"] ?? $inc["affected_families"]),
+            "displaced_families" => (int) $inc["displaced_families"],
+            "casualties_count" => (int) ($inc["casualties_count"] ?? 0),
+            "injuries_count" => (int) ($inc["injuries_count"] ?? 0),
+            "missing_count" => (int) ($inc["missing_count"] ?? 0),
+            "situation_overview" => $inc["situation_overview"] ?? "",
+            "requested_assistance" => $inc["requested_assistance"] ?? ""
           ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
           ?>
           <div
@@ -294,8 +302,8 @@ require_once __DIR__ . '/../layouts/header.php';
               </div>
             <?php endif; ?>
 
-            <!-- Route Buttons: Route to Incident Site + Evacuation Routes -->
-            <div style="display:flex;justify-content:flex-start;align-items:center;gap:6px;padding-top:4px;">
+            <!-- Route & Action Buttons: Route to Incident Site + Evacuation Routes + Update Report -->
+            <div style="display:flex;justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:6px;padding-top:4px;">
               <button type="button" class="btn btn-primary btn-sm"
                 onclick='openTacticalRouteModal(<?= $cardJson ?>, "incident")'
                 style="font-size:10px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px;"
@@ -316,6 +324,19 @@ require_once __DIR__ . '/../layouts/header.php';
                 </svg>
                 Evacuation Routes
               </button>
+
+              <?php if (($inc['status'] ?? 'Ongoing') === 'Ongoing'): ?>
+                <button type="button" class="btn btn-outline btn-sm"
+                  onclick='openUpdateIncidentModal(<?= $cardJson ?>)'
+                  style="font-size:10px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px;color:#17324D;border-color:#CBD5E1;font-weight:600;"
+                  title="Update ongoing incident report details">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                  Update Report
+                </button>
+              <?php endif; ?>
             </div>
 
             <!-- Single Response Action Button (Respond / Cancel Respond / Finish Respond) -->
@@ -834,5 +855,6 @@ require_once __DIR__ . '/../layouts/header.php';
   });
 </script>
 
+<?php require_once __DIR__ . '/partials/update-incident-modal.php'; ?>
 <?php require_once __DIR__ . '/partials/route-modal.php'; ?>
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

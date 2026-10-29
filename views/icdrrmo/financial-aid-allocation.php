@@ -344,65 +344,6 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
   </div>
 
-  <!-- Navigation Tabs -->
-  <div class="nav-tabs">
-    <a href="?tab=allocations<?= !empty($filterPurok) ? '&purok='.urlencode($filterPurok) : '' ?>" class="nav-tab-item <?= $activeTab === 'allocations' ? 'active' : '' ?>">
-      Hinaplanon Purok Allocations
-      <span class="nav-tab-badge"><?= count($allocations) ?></span>
-    </a>
-    <a href="?tab=audits<?= !empty($filterPurok) ? '&purok='.urlencode($filterPurok) : '' ?>" class="nav-tab-item <?= $activeTab === 'audits' ? 'active' : '' ?>">
-      Distribution Audit Records
-      <span class="nav-tab-badge"><?= count($audits) ?></span>
-    </a>
-  </div>
-
-  <!-- Filter Toolbar -->
-  <div class="card" style="margin-bottom: var(--space-4); padding: 12px 16px;">
-    <form method="GET" action="" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-      <input type="hidden" name="tab" value="<?= htmlspecialchars($activeTab) ?>">
-      
-      <div style="flex: 1; min-width: 220px;">
-        <input type="text" name="search" class="form-control" placeholder="Search by program, code, or purok..." value="<?= htmlspecialchars($search) ?>" style="font-size: 11px;">
-      </div>
-
-      <div style="min-width: 190px;">
-        <select name="purok" class="form-control" style="font-size: 11px;">
-          <option value="">All Puroks (Hinaplanon)</option>
-          <?php foreach ($hinaplanonPuroks as $p): ?>
-            <option value="<?= htmlspecialchars($p['name']) ?>" <?= $filterPurok === $p['name'] ? 'selected' : '' ?>><?= htmlspecialchars($p['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-
-      <?php if ($activeTab === 'allocations'): ?>
-        <div style="min-width: 130px;">
-          <select name="status" class="form-control" style="font-size: 11px;">
-            <option value="">All Statuses</option>
-            <option value="Active" <?= $filterStatus === 'Active' ? 'selected' : '' ?>>Active</option>
-            <option value="Completed" <?= $filterStatus === 'Completed' ? 'selected' : '' ?>>Completed</option>
-            <option value="Archived" <?= $filterStatus === 'Archived' ? 'selected' : '' ?>>Archived</option>
-          </select>
-        </div>
-      <?php else: ?>
-        <div style="min-width: 140px;">
-          <select name="action_type" class="form-control" style="font-size: 11px;">
-            <option value="">All Actions</option>
-            <option value="Allocated" <?= $filterAction === 'Allocated' ? 'selected' : '' ?>>Allocated</option>
-            <option value="Disbursed" <?= $filterAction === 'Disbursed' ? 'selected' : '' ?>>Disbursed</option>
-            <option value="Status Change" <?= $filterAction === 'Status Change' ? 'selected' : '' ?>>Status Change</option>
-            <option value="Voided" <?= $filterAction === 'Voided' ? 'selected' : '' ?>>Voided</option>
-          </select>
-        </div>
-      <?php endif; ?>
-
-      <button type="submit" class="btn btn-outline" style="font-size: 11px; padding: 7px 12px;">Filter</button>
-      <?php if (!empty($search) || !empty($filterPurok) || !empty($filterStatus) || !empty($filterAction)): ?>
-        <a href="?tab=<?= $activeTab ?>" class="btn btn-outline" style="font-size: 11px; padding: 7px 12px; color: var(--color-text-muted);">Reset</a>
-      <?php endif; ?>
-    </form>
-  </div>
-
-  <?php if ($activeTab === 'allocations'): ?>
     <!-- Allocations Table -->
     <div class="card" style="padding: 0; overflow: hidden;">
       <div class="table-responsive">
@@ -501,70 +442,8 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               <?php endforeach; ?>
             <?php endif; ?>
           </tbody>
-        </table>
       </div>
     </div>
-
-  <?php else: ?>
-    <!-- Distribution Audit Records Tab -->
-    <div class="card" style="padding: 0; overflow: hidden;">
-      <div style="padding: 12px 16px; border-bottom: 1px solid var(--color-border-light); background: #FAFCFC; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 11px; font-weight: 600; color: var(--color-primary);">City-Wide Financial Aid Disbursement Audit Ledger</span>
-        <span style="font-size: 10px; color: var(--color-text-muted);">Immutable chronological log</span>
-      </div>
-      <div class="table-responsive">
-        <table class="data-table" style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr style="border-bottom: 1px solid var(--color-border); background: #FAFCFC;">
-              <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary); width: 130px;">Date & Time</th>
-              <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary); width: 120px;">Barangay</th>
-              <th style="padding: 10px 14px; text-align: center; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary); width: 100px;">Action</th>
-              <th style="padding: 10px 14px; text-align: right; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary); width: 100px;">Amount</th>
-              <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary);">Audit Details</th>
-              <th style="padding: 10px 14px; text-align: left; font-size: 10.5px; font-weight: 600; color: var(--color-text-secondary); width: 140px;">Recorded By</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php if (empty($audits)): ?>
-              <tr>
-                <td colspan="6" style="padding: 30px; text-align: center; color: var(--color-text-muted); font-size: 11px;">
-                  No financial aid audit events recorded.
-                </td>
-              </tr>
-            <?php else: ?>
-              <?php foreach ($audits as $aud): 
-                $actClass = 'action-' . strtolower(str_replace(' ', '', $aud['action']));
-              ?>
-                <tr style="border-bottom: 1px solid var(--color-border-light);">
-                  <td style="padding: 10px 14px; font-size: 10.5px; color: var(--color-text-muted); font-family: var(--font-secondary); white-space: nowrap;">
-                    <?= date('Y-m-d H:i', strtotime($aud['created_at'])) ?>
-                  </td>
-                  <td style="padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--color-primary);">
-                    <?= htmlspecialchars($aud['barangay_name']) ?>
-                  </td>
-                  <td style="padding: 10px 14px; text-align: center;">
-                    <span class="action-badge <?= $actClass ?>">
-                      <?= htmlspecialchars($aud['action']) ?>
-                    </span>
-                  </td>
-                  <td style="padding: 10px 14px; text-align: right; font-family: var(--font-secondary); font-weight: 600; font-size: 11px; color: var(--color-text);">
-                    <?= ($aud['amount'] > 0) ? '&#8369;' . number_format($aud['amount'], 2) : '&mdash;' ?>
-                  </td>
-                  <td style="padding: 10px 14px; font-size: 11px; color: var(--color-text); line-height: 1.4;">
-                    <?= htmlspecialchars($aud['details']) ?>
-                  </td>
-                  <td style="padding: 10px 14px; font-size: 10.5px;">
-                    <div style="font-weight: 500; color: var(--color-text);"><?= htmlspecialchars($aud['actor_name']) ?></div>
-                    <div style="color: var(--color-text-muted); font-size: 9.5px;"><?= strtoupper(htmlspecialchars($aud['actor_role'])) ?></div>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  <?php endif; ?>
 </main>
 
 <!-- Modal: Create New Allocation -->
