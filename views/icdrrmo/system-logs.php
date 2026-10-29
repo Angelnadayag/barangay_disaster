@@ -59,6 +59,10 @@ if ($filterAction === 'received') {
     $sql .= " AND (action LIKE '%RECEIVED%' AND action NOT LIKE '%NOT_RECEIVED%')";
 } elseif ($filterAction === 'not_received') {
     $sql .= " AND (action LIKE '%NOT_RECEIVED%' OR action LIKE '%REJECT%' OR action LIKE '%VOID%')";
+} elseif ($filterAction === 'ayuda_release') {
+    $sql .= " AND ((action LIKE '%AYUDA%' AND action NOT LIKE '%VOID%' AND action NOT LIKE '%NOT_RECEIVED%') OR action = 'RECEIVED_RESOURCE_AID')";
+} elseif ($filterAction === 'voided_ayuda') {
+    $sql .= " AND ((action LIKE '%AYUDA%' AND (action LIKE '%VOID%' OR action LIKE '%NOT_RECEIVED%')) OR action = 'NOT_RECEIVED_RESOURCE_AID' OR (action LIKE '%VOID%' AND module = 'Manage Resources'))";
 } elseif ($filterAction === 'request') {
     $sql .= " AND action LIKE '%REQUEST%'";
 } elseif ($filterAction === 'create') {
@@ -256,33 +260,87 @@ $modules = $db->query("SELECT DISTINCT module FROM system_logs ORDER BY module A
     <a href="<?= $baseUrlWithParams('') ?>" class="btn btn-sm <?= empty($filterAction) ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
       All Actions
     </a>
-    <a href="<?= $baseUrlWithParams('create') ?>" class="btn btn-sm <?= $filterAction === 'create' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
-      Creation
-    </a>
-    <a href="<?= $baseUrlWithParams('request') ?>" class="btn btn-sm <?= $filterAction === 'request' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
-      Requests
-    </a>
-    <a href="<?= $baseUrlWithParams('approved') ?>" class="btn btn-sm <?= $filterAction === 'approved' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
-      Approved
-    </a>
-    <a href="<?= $baseUrlWithParams('received') ?>" class="btn btn-sm <?= $filterAction === 'received' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#86EFAC; color:<?= $filterAction === 'received' ? '#fff' : '#15803D' ?>;">
-      Received
-    </a>
-    <a href="<?= $baseUrlWithParams('not_received') ?>" class="btn btn-sm <?= $filterAction === 'not_received' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FCA5A5; color:<?= $filterAction === 'not_received' ? '#fff' : '#B91C1C' ?>;">
-      Not Received
-    </a>
-    <a href="<?= $baseUrlWithParams('allocation') ?>" class="btn btn-sm <?= $filterAction === 'allocation' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
-      Allocations
-    </a>
-    <a href="<?= $baseUrlWithParams('edited') ?>" class="btn btn-sm <?= $filterAction === 'edited' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#BAE6FD; color:<?= $filterAction === 'edited' ? '#fff' : '#0369A1' ?>;">
-      Edited
-    </a>
-    <a href="<?= $baseUrlWithParams('archived') ?>" class="btn btn-sm <?= $filterAction === 'archived' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#CBD5E1; color:<?= $filterAction === 'archived' ? '#fff' : '#475569' ?>;">
-      Archived
-    </a>
-    <a href="<?= $baseUrlWithParams('deleted') ?>" class="btn btn-sm <?= $filterAction === 'deleted' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FDA4AF; color:<?= $filterAction === 'deleted' ? '#fff' : '#BE123C' ?>;">
-      Deleted
-    </a>
+    <?php if ($currentPage === 'resources-logs.php' || $filterModule === 'Manage Resources'): ?>
+      <a href="<?= $baseUrlWithParams('ayuda_release') ?>" class="btn btn-sm <?= $filterAction === 'ayuda_release' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#86EFAC; color:<?= $filterAction === 'ayuda_release' ? '#fff' : '#15803D' ?>;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px; margin-right:2px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        Ayuda Released
+      </a>
+      <a href="<?= $baseUrlWithParams('voided_ayuda') ?>" class="btn btn-sm <?= $filterAction === 'voided_ayuda' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FCA5A5; color:<?= $filterAction === 'voided_ayuda' ? '#fff' : '#B91C1C' ?>;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-1px; margin-right:2px;"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+        Voided Ayuda
+      </a>
+      <a href="<?= $baseUrlWithParams('allocation') ?>" class="btn btn-sm <?= $filterAction === 'allocation' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Allocations
+      </a>
+      <a href="<?= $baseUrlWithParams('create') ?>" class="btn btn-sm <?= $filterAction === 'create' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Creation / Plans
+      </a>
+      <a href="<?= $baseUrlWithParams('request') ?>" class="btn btn-sm <?= $filterAction === 'request' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Beneficiaries
+      </a>
+      <a href="<?= $baseUrlWithParams('edited') ?>" class="btn btn-sm <?= $filterAction === 'edited' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#BAE6FD; color:<?= $filterAction === 'edited' ? '#fff' : '#0369A1' ?>;">
+        Edited
+      </a>
+      <a href="<?= $baseUrlWithParams('archived') ?>" class="btn btn-sm <?= $filterAction === 'archived' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#CBD5E1; color:<?= $filterAction === 'archived' ? '#fff' : '#475569' ?>;">
+        Archived
+      </a>
+      <a href="<?= $baseUrlWithParams('deleted') ?>" class="btn btn-sm <?= $filterAction === 'deleted' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FDA4AF; color:<?= $filterAction === 'deleted' ? '#fff' : '#BE123C' ?>;">
+        Deleted
+      </a>
+    <?php elseif ($currentPage === 'supplies-logs.php' || $filterModule === 'Supplies'): ?>
+      <a href="<?= $baseUrlWithParams('create') ?>" class="btn btn-sm <?= $filterAction === 'create' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Commodity Catalog
+      </a>
+      <a href="<?= $baseUrlWithParams('request') ?>" class="btn btn-sm <?= $filterAction === 'request' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Requisitions
+      </a>
+      <a href="<?= $baseUrlWithParams('approved') ?>" class="btn btn-sm <?= $filterAction === 'approved' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Approved
+      </a>
+      <a href="<?= $baseUrlWithParams('received') ?>" class="btn btn-sm <?= $filterAction === 'received' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#86EFAC; color:<?= $filterAction === 'received' ? '#fff' : '#15803D' ?>;">
+        Delivery Received
+      </a>
+      <a href="<?= $baseUrlWithParams('not_received') ?>" class="btn btn-sm <?= $filterAction === 'not_received' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FCA5A5; color:<?= $filterAction === 'not_received' ? '#fff' : '#B91C1C' ?>;">
+        Not Received
+      </a>
+      <a href="<?= $baseUrlWithParams('edited') ?>" class="btn btn-sm <?= $filterAction === 'edited' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#BAE6FD; color:<?= $filterAction === 'edited' ? '#fff' : '#0369A1' ?>;">
+        Stock Adjustments
+      </a>
+      <a href="<?= $baseUrlWithParams('archived') ?>" class="btn btn-sm <?= $filterAction === 'archived' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#CBD5E1; color:<?= $filterAction === 'archived' ? '#fff' : '#475569' ?>;">
+        Archived
+      </a>
+      <a href="<?= $baseUrlWithParams('deleted') ?>" class="btn btn-sm <?= $filterAction === 'deleted' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FDA4AF; color:<?= $filterAction === 'deleted' ? '#fff' : '#BE123C' ?>;">
+        Deleted
+      </a>
+    <?php else: ?>
+      <a href="<?= $baseUrlWithParams('create') ?>" class="btn btn-sm <?= $filterAction === 'create' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Creation
+      </a>
+      <a href="<?= $baseUrlWithParams('request') ?>" class="btn btn-sm <?= $filterAction === 'request' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Requests
+      </a>
+      <a href="<?= $baseUrlWithParams('approved') ?>" class="btn btn-sm <?= $filterAction === 'approved' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Approved
+      </a>
+      <a href="<?= $baseUrlWithParams('received') ?>" class="btn btn-sm <?= $filterAction === 'received' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#86EFAC; color:<?= $filterAction === 'received' ? '#fff' : '#15803D' ?>;">
+        Received / Ayuda
+      </a>
+      <a href="<?= $baseUrlWithParams('not_received') ?>" class="btn btn-sm <?= $filterAction === 'not_received' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FCA5A5; color:<?= $filterAction === 'not_received' ? '#fff' : '#B91C1C' ?>;">
+        Not Received / Voided
+      </a>
+      <a href="<?= $baseUrlWithParams('allocation') ?>" class="btn btn-sm <?= $filterAction === 'allocation' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px;">
+        Allocations
+      </a>
+      <a href="<?= $baseUrlWithParams('edited') ?>" class="btn btn-sm <?= $filterAction === 'edited' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#BAE6FD; color:<?= $filterAction === 'edited' ? '#fff' : '#0369A1' ?>;">
+        Edited
+      </a>
+      <a href="<?= $baseUrlWithParams('archived') ?>" class="btn btn-sm <?= $filterAction === 'archived' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#CBD5E1; color:<?= $filterAction === 'archived' ? '#fff' : '#475569' ?>;">
+        Archived
+      </a>
+      <a href="<?= $baseUrlWithParams('deleted') ?>" class="btn btn-sm <?= $filterAction === 'deleted' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:10px; padding:3px 9px; border-color:#FDA4AF; color:<?= $filterAction === 'deleted' ? '#fff' : '#BE123C' ?>;">
+        Deleted
+      </a>
+    <?php endif; ?>
   </div>
 
   <!-- Logs Table -->
@@ -340,7 +398,17 @@ $modules = $db->query("SELECT DISTINCT module FROM system_logs ORDER BY module A
                 <td style="font-family:'Roboto',sans-serif; font-weight:600; font-size:10px; white-space:nowrap;">
                   <?php
                     $act = strtoupper($log['action']);
-                    if (strpos($act, 'RECEIVED') !== false && strpos($act, 'NOT_RECEIVED') === false) {
+                    if (strpos($act, 'AYUDA') !== false && (strpos($act, 'VOID') !== false || strpos($act, 'NOT_RECEIVED') !== false)) {
+                        echo '<span class="badge" style="background:#FEE2E2; color:#B91C1C; border:1px solid #FCA5A5; font-weight:700; font-size:9.5px; padding:2px 7px; display:inline-flex; align-items:center; gap:3px;">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                                VOIDED AYUDA
+                              </span>';
+                    } elseif (strpos($act, 'AYUDA') !== false || $act === 'RECEIVED_RESOURCE_AID') {
+                        echo '<span class="badge" style="background:#ECFDF5; color:#047857; border:1px solid #6EE7B7; font-weight:700; font-size:9.5px; padding:2px 7px; display:inline-flex; align-items:center; gap:3px;">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                RELEASE AYUDA
+                              </span>';
+                    } elseif (strpos($act, 'RECEIVED') !== false && strpos($act, 'NOT_RECEIVED') === false) {
                         echo '<span class="badge" style="background:#DCFCE7; color:#15803D; border:1px solid #86EFAC; font-weight:700; font-size:9.5px; padding:2px 7px; display:inline-flex; align-items:center; gap:3px;">
                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                 RECEIVED

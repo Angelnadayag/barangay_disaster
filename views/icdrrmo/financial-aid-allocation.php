@@ -31,9 +31,20 @@ if (empty($allBarangays)) {
     $allBarangays = [['id' => 12, 'name' => 'Hinaplanon']];
 }
 
-// Fetch Hinaplanon Puroks
-$purokStmt = $db->query("SELECT id, name FROM puroks WHERE barangay_id = 12 ORDER BY name ASC");
+// Fetch Hinaplanon Puroks with household/family counts
+$purokStmt = $db->query("
+    SELECT p.id, p.name, p.population,
+           (SELECT COUNT(*) FROM purok_households h WHERE (h.purok_id = p.id OR h.purok_name = p.name) AND h.barangay_id = 12 AND h.status = 'active') AS household_count
+    FROM puroks p 
+    WHERE p.barangay_id = 12 
+    ORDER BY p.name ASC
+");
 $hinaplanonPuroks = $purokStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$totalHinaplanonFamilies = 0;
+foreach ($hinaplanonPuroks as $p) {
+    $totalHinaplanonFamilies += (int)$p['household_count'];
+}
 
 // Metrics (Strictly Hinaplanon)
 $totalAllocationsCount = (int)$db->query("SELECT COUNT(*) FROM financial_aid_allocations WHERE barangay_id = 12")->fetchColumn();
@@ -462,6 +473,19 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
                     <span class="status-badge <?= strtolower($row['status']) ?>">
                       <?= htmlspecialchars($row['status']) ?>
                     </span>
+                    <?php if (($row['received_status'] ?? 'Received') === 'Pending'): ?>
+                      <div style="margin-top: 3px;">
+                        <span class="badge" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;font-size:9px;padding:1px 5px;font-weight:600;">⏳ Pending Receipt</span>
+                      </div>
+                    <?php elseif (($row['received_status'] ?? 'Received') === 'Received'): ?>
+                      <div style="margin-top: 3px;">
+                        <span class="badge" style="background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;font-size:9px;padding:1px 5px;font-weight:600;">✓ Received by Brgy</span>
+                      </div>
+                    <?php elseif (($row['received_status'] ?? '') === 'Not Received'): ?>
+                      <div style="margin-top: 3px;">
+                        <span class="badge" style="background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA;font-size:9px;padding:1px 5px;font-weight:600;" title="<?= htmlspecialchars($row['receipt_remarks'] ?? 'Reported not received by barangay') ?>">✗ Not Received</span>
+                      </div>
+                    <?php endif; ?>
                   </td>
                   <td style="padding: 10px 14px; text-align: center;">
                     <div style="display: inline-flex; gap: 4px;">
@@ -545,88 +569,207 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 
 <!-- Modal: Create New Allocation -->
 <div class="modal" id="createAllocationModal">
-  <div class="modal-dialog">
-    <div class="modal-header">
-      <h3>Create Financial Aid Allocation</h3>
+  <div class="modal-dialog" style="max-width: 680px; max-height: 92vh; display: flex; flex-direction: column;">
+    <div class="modal-header" style="flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: rgba(23, 50, 77, 0.08); color: var(--color-primary); font-size: 14px;">💰</span>
+        <div>
+          <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--color-primary);">Create Financial Aid Allocation</h3>
+          <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--color-text-muted);">Allocate emergency funds to target puroks in Hinaplanon with automated family count and AI budget recommendation</p>
+        </div>
+      </div>
       <button type="button" class="modal-close" onclick="closeCreateAllocationModal()">&times;</button>
     </div>
-    <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/allocate.php">
+    
+    <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/allocate.php" onsubmit="return validateAllocationForm()" style="display: flex; flex-direction: column; overflow: hidden; margin: 0;">
       <input type="hidden" name="action" value="create">
       <input type="hidden" name="recommendation_id" id="alloc_recommendation_id" value="">
-      <div class="modal-body">
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          
+      <input type="hidden" name="barangay_id" id="alloc_barangay_id" value="12">
+      <input type="hidden" name="target_purok" id="alloc_target_purok_hidden" value="All Puroks">
+      <input type="hidden" name="target_beneficiaries" id="alloc_target_beneficiaries" value="<?= $totalHinaplanonFamilies ?>">
+      <input type="hidden" name="added_type" id="alloc_added_type" value="added_by_admin">
+
+      <div class="modal-body" style="overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px;">
+        
+        <!-- Program Name -->
+        <div>
+          <label class="form-label form-label-required" style="font-size: 11px; font-weight: 700; margin-bottom: 4px; display: block; color: var(--color-primary);">Program Name</label>
+          <input type="text" name="program_name" id="alloc_program_name" class="form-control" placeholder="e.g. Typhoon Kristine Emergency Cash Relief" required style="font-size: 11.5px; height: 34px;">
+        </div>
+
+        <!-- Target Purok Scope (Multi-Select, Select All, Disabled Total Family Button) -->
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+            <label class="form-label form-label-required" style="font-size: 11.5px; font-weight: 700; color: var(--color-primary); margin: 0; display: flex; align-items: center; gap: 6px;">
+              <span>Target Purok Selection (Hinaplanon)</span>
+            </label>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <!-- Disabled button: Automated total families based on selected puroks -->
+              <button type="button" class="btn" id="btn_automated_total_families" disabled title="Automated total families in selected puroks"
+                style="font-size: 11px; padding: 4px 10px; background: #FFFFFF; color: #1E293B; border: 1.5px solid #CBD5E1; border-radius: 6px; font-weight: 600; cursor: not-allowed; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <span style="color: #64748B;">👨‍👩‍👧‍👦 Total Families:</span>
+                <span id="lbl_automated_total_families" style="color: var(--color-primary); font-size: 12.5px; font-weight: 700; font-family: var(--font-secondary);"><?= number_format($totalHinaplanonFamilies) ?></span>
+              </button>
+
+              <div style="display: flex; gap: 4px;">
+                <button type="button" class="btn btn-outline btn-xs" onclick="setAllocAllPuroksScope(true)" style="font-size: 9.5px; padding: 3px 8px; font-weight: 600;">Select All</button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="setAllocAllPuroksScope(false)" style="font-size: 9.5px; padding: 3px 8px; font-weight: 600;">Clear</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Master Checkbox Toggle for All Puroks -->
+          <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px 10px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+            <label style="display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--color-primary);">
+              <input type="checkbox" id="alloc_all_puroks_toggle" onchange="onAllocAllPuroksToggleChange(this.checked)" checked style="cursor: pointer; width: 15px; height: 15px; accent-color: var(--color-primary);">
+              <span>All Puroks (Barangay-Wide Hinaplanon)</span>
+            </label>
+            <span class="badge" id="alloc_all_puroks_badge" style="font-size: 10px; padding: 2px 7px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; font-weight: 600;">
+              <?= count($hinaplanonPuroks) ?> Puroks (<?= number_format($totalHinaplanonFamilies) ?> Families)
+            </span>
+          </div>
+
+          <!-- Quick Search Filter for Puroks -->
+          <div style="position: relative; margin-bottom: 8px;">
+            <input type="text" id="alloc_purok_search" class="form-control" placeholder="Search / filter puroks (e.g. Purok 1, 2a, Maharlika)..." oninput="filterAllocPurokCheckboxes(this.value)" style="font-size: 11px; padding: 4px 8px 4px 28px; height: 28px; border-radius: 5px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 9px; top: 8px; color: #94A3B8; pointer-events: none;">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+
+          <!-- Purok Checkbox Grid -->
+          <div id="alloc_purok_checkbox_list" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 6px; max-height: 140px; overflow-y: auto;">
+            <?php foreach ($hinaplanonPuroks as $p): ?>
+              <?php 
+                $hhCount = (int)($p['household_count'] ?? 0);
+                $pName = clean($p['name']);
+              ?>
+              <label class="alloc-purok-item" data-purok="<?= $pName ?>" data-families="<?= $hhCount ?>"
+                style="display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11px; color: var(--color-text); background: #ECFDF5; padding: 5px 8px; border-radius: 4px; border: 1px solid var(--color-primary, #17324D); margin: 0; cursor: pointer; transition: all 0.15s ease;">
+                <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                  <input type="checkbox" class="alloc-purok-cb" value="<?= $pName ?>" data-families="<?= $hhCount ?>" checked onchange="onAllocSinglePurokChange()" style="cursor: pointer; accent-color: var(--color-primary); margin: 0; flex-shrink: 0;">
+                  <span style="user-select: none; line-height: 1.2; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?= $pName ?></span>
+                </div>
+                <span class="alloc-purok-pill" data-families="<?= $hhCount ?>" style="flex-shrink: 0; font-size: 9.5px; color: var(--color-primary); font-weight: 700; background: rgba(23,50,77,0.08); padding: 1px 5px; border-radius: 3px;" title="<?= number_format($hhCount) ?> Registered Household Families">
+                  <?= number_format($hhCount) ?> fam
+                </span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+
+          <!-- Selection Summary Row -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 10.5px;">
+            <div id="alloc_purok_selection_summary" style="font-weight: 600; color: var(--color-primary);">
+              Selected: All Puroks (Hinaplanon) • <?= number_format($totalHinaplanonFamilies) ?> Families
+            </div>
+            <div style="color: var(--color-text-muted); font-size: 10px;">
+              Multi-purok or all coverage
+            </div>
+          </div>
+        </div>
+
+        <!-- Disaster Type & Funding Source Row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div>
-            <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Program Name</label>
-            <input type="text" name="program_name" id="alloc_program_name" class="form-control" placeholder="e.g. Typhoon Kristine Emergency Cash Relief" required style="font-size: 11px;">
+            <label class="form-label form-label-required" style="font-size: 11px; font-weight: 700; margin-bottom: 4px; display: block; color: var(--color-primary);">Disaster / Calamity Type</label>
+            <select name="disaster_type" id="alloc_disaster_type" class="form-control" style="font-size: 11px; height: 34px;" onchange="onDisasterTypeChange()">
+              <option value="Typhoon">Typhoon</option>
+              <option value="Flood">Flood</option>
+              <option value="Landslide">Landslide</option>
+              <option value="Fire">Fire</option>
+              <option value="Earthquake">Earthquake</option>
+              <option value="General Calamity">General Calamity</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label form-label-required" style="font-size: 11px; font-weight: 700; margin-bottom: 4px; display: block; color: var(--color-primary);">Funding Source</label>
+            <input type="text" name="funding_source" id="alloc_funding_source" class="form-control" value="LGU Calamity Fund" placeholder="e.g. Quick Response Fund (QRF)" required style="font-size: 11px; height: 34px;">
+          </div>
+        </div>
+
+        <!-- Total Budget & Amount per Family Row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 700; margin: 0; color: var(--color-primary);">Total Budget (PHP)</label>
+              <span id="alloc_budget_mode_label" style="font-size: 9.5px; color: var(--color-text-muted);">Manual or AI</span>
+            </div>
+            <input type="number" step="0.01" min="1" name="total_budget" id="alloc_total_budget" class="form-control" placeholder="e.g. 500000.00" required style="font-size: 11.5px; height: 34px; font-weight: 600;" oninput="onBudgetManualInput()">
+          </div>
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 700; margin: 0; color: var(--color-primary);">Amount per Family (PHP)</label>
+              <span id="alloc_rate_mode_label" style="font-size: 9.5px; color: var(--color-text-muted);">Auto / Per Beneficiary</span>
+            </div>
+            <input type="number" step="0.01" min="1" name="amount_per_beneficiary" id="alloc_rate_budget" class="form-control" placeholder="e.g. 3000.00" required style="font-size: 11.5px; height: 34px; font-weight: 600;" oninput="onRateManualInput()">
+          </div>
+        </div>
+
+        <!-- AI Recommendation Trigger Button Section (Replacing Budget Source Type) -->
+        <div style="background: linear-gradient(135deg, #F8FAFC 0%, #EEF2F6 100%); border: 1.5px dashed #93C5FD; border-radius: 8px; padding: 10px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 11.5px; font-weight: 700; color: var(--color-primary);">Smart Budget Allocation</span>
+                <span id="ai_calc_status_badge" class="badge" style="display: none; font-size: 9.5px; padding: 1px 7px; background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; font-weight: 700;">✨ AI Active</span>
+              </div>
+              <div style="font-size: 10.5px; color: var(--color-text-secondary); margin-top: 2px;">
+                Click to auto-calculate budget, or divide your entered Total Budget across selected families
+              </div>
+            </div>
+
+            <!-- Prominent AI RECOMMENDATION Button -->
+            <button type="button" class="btn" id="btn_ai_recommendation" onclick="triggerAiRecommendation()"
+              style="background: linear-gradient(135deg, #17324D 0%, #2563EB 100%); color: #FFFFFF; border: none; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; padding: 7px 14px; border-radius: 6px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25); transition: transform 0.15s ease, box-shadow 0.15s ease;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6v6l4 2"></path>
+              </svg>
+              <span>🤖 AI RECOMMENDATION</span>
+            </button>
           </div>
 
-          <input type="hidden" name="barangay_id" id="alloc_barangay_id" value="12">
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>
-              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Allocate to Purok (Hinaplanon)</label>
-              <select name="target_purok" id="alloc_target_purok" class="form-control" required style="font-size: 11px;">
-                <option value="All Puroks">All Puroks (Hinaplanon)</option>
-                <?php foreach ($hinaplanonPuroks as $p): ?>
-                  <option value="<?= htmlspecialchars($p['name']) ?>"><?= htmlspecialchars($p['name']) ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div>
-              <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Disaster / Calamity Type</label>
-              <select name="disaster_type" id="alloc_disaster_type" class="form-control" style="font-size: 11px;">
-                <option value="Typhoon">Typhoon</option>
-                <option value="Flood">Flood</option>
-                <option value="Landslide">Landslide</option>
-                <option value="Fire">Fire</option>
-                <option value="Earthquake">Earthquake</option>
-                <option value="General Calamity">General Calamity</option>
-              </select>
+          <!-- Dynamic AI Info / Result Alert Box -->
+          <div id="ai_recommendation_alert" style="display: none; margin-top: 8px; background: #FFFFFF; border-radius: 6px; padding: 8px 12px; border: 1px solid #CBD5E1; font-size: 11px;">
+            <div style="display: flex; align-items: flex-start; gap: 8px;">
+              <span id="ai_alert_icon" style="font-size: 14px; line-height: 1.2;">🤖</span>
+              <div style="flex: 1; line-height: 1.4;">
+                <div id="ai_alert_title" style="font-weight: 700; margin-bottom: 2px; color: var(--color-primary);">AI Recommendation Ready</div>
+                <div id="ai_alert_msg" style="color: var(--color-text-secondary); font-size: 10.5px;">Click AI Recommendation to compute amount per family.</div>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>
-              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Total Budget (PHP)</label>
-              <input type="number" step="0.01" min="1" name="total_budget" id="alloc_total_budget" class="form-control" placeholder="e.g. 500000.00" required style="font-size: 11px;" oninput="updateTargetCountPreview()">
-            </div>
-            <div>
-              <label class="form-label form-label-required" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Amount per Family (PHP)</label>
-              <input type="number" step="0.01" min="1" name="amount_per_beneficiary" id="alloc_rate_budget" class="form-control" placeholder="e.g. 3000.00" required style="font-size: 11px;" oninput="updateTargetCountPreview()">
-            </div>
-          </div>
-
-          <!-- Computed Preview Card -->
-          <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- Computed Beneficiary & Capacity Summary Card -->
+        <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 14px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 6px;">
             <span style="font-size: 10.5px; color: var(--color-text-secondary);">Calculated Beneficiary Capacity:</span>
             <span id="alloc_target_preview" style="font-size: 12px; font-weight: 700; color: var(--color-primary); font-family: var(--font-secondary);">0 families</span>
           </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <div>
-              <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Funding Source</label>
-              <input type="text" name="funding_source" id="alloc_funding_source" class="form-control" value="LGU Calamity Fund" placeholder="e.g. Quick Response Fund (QRF)" style="font-size: 11px;">
-            </div>
-            <div>
-              <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Budget Source Type</label>
-              <select name="added_type" id="alloc_added_type" class="form-control" style="font-size: 11px;">
-                <option value="ai_recommended">🤖 AI Recommended</option>
-                <option value="added_by_admin">👤 Added by Admin</option>
-              </select>
-            </div>
+          <div style="font-size: 10px; color: var(--color-text-muted);">
+            Target Families in Scope: <strong id="alloc_scope_families_count" style="color: var(--color-primary);"><?= number_format($totalHinaplanonFamilies) ?></strong>
           </div>
-
-          <div>
-            <label class="form-label" style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Administrative Notes</label>
-            <textarea name="notes" class="form-control" rows="2" placeholder="Eligibility conditions, allocation guidelines, or remarks..." style="font-size: 11px;"></textarea>
-          </div>
-
         </div>
+
+        <!-- Administrative Notes -->
+        <div>
+          <label class="form-label" style="font-size: 11px; font-weight: 700; margin-bottom: 4px; display: block; color: var(--color-primary);">Administrative Notes</label>
+          <textarea name="notes" class="form-control" rows="2" placeholder="Eligibility guidelines, distribution instructions, payout schedule, or administrative remarks..." style="font-size: 11px;"></textarea>
+        </div>
+
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline" onclick="closeCreateAllocationModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Allocate Fund</button>
+
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--color-border-light); display: flex; justify-content: space-between; align-items: center; background: #FAFBFD;">
+        <div style="font-size: 10.5px; color: var(--color-text-muted);">
+          All allocations are monitored under ICDRRMO Central Audit
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-outline" onclick="closeCreateAllocationModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="padding: 7px 18px; font-weight: 600;">Allocate Fund</button>
+        </div>
       </div>
     </form>
   </div>
@@ -692,6 +835,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <span style="font-size: 10px; color: var(--color-text-muted); display: block;">Status:</span>
             <span id="view_alloc_status" style="font-size: 11px; font-weight: 600;"></span>
           </div>
+          <div>
+            <span style="font-size: 10px; color: var(--color-text-muted); display: block;">Barangay Reception:</span>
+            <span id="view_alloc_received_status"></span>
+          </div>
         </div>
 
         <div>
@@ -740,6 +887,226 @@ function closeCreateAllocationModal() {
   document.getElementById('createAllocationModal').classList.remove('show');
 }
 
+// Purok Scope & Families Helpers
+function getSelectedAllocFamiliesCount() {
+  const checkboxes = document.querySelectorAll('.alloc-purok-cb:checked');
+  let sum = 0;
+  checkboxes.forEach(cb => {
+    sum += parseInt(cb.getAttribute('data-families') || '0', 10);
+  });
+  return sum;
+}
+
+function updateAllocPurokDisplay() {
+  const allCheckboxes = document.querySelectorAll('.alloc-purok-cb');
+  const checkedCheckboxes = document.querySelectorAll('.alloc-purok-cb:checked');
+  const totalCount = allCheckboxes.length;
+  const checkedCount = checkedCheckboxes.length;
+  const totalFamilies = getSelectedAllocFamiliesCount();
+
+  // Update disabled button display
+  const disabledBtnCount = document.getElementById('lbl_automated_total_families');
+  if (disabledBtnCount) {
+    disabledBtnCount.textContent = totalFamilies.toLocaleString();
+  }
+
+  // Update scope families count in summary card
+  const scopeFamilies = document.getElementById('alloc_scope_families_count');
+  if (scopeFamilies) {
+    scopeFamilies.textContent = totalFamilies.toLocaleString();
+  }
+
+  // Update hidden target beneficiaries input
+  const hiddenBeneficiaries = document.getElementById('alloc_target_beneficiaries');
+  if (hiddenBeneficiaries) {
+    hiddenBeneficiaries.value = totalFamilies;
+  }
+
+  // Update master toggle and hidden target_purok
+  const masterToggle = document.getElementById('alloc_all_puroks_toggle');
+  const hiddenPurok = document.getElementById('alloc_target_purok_hidden');
+  const summaryLabel = document.getElementById('alloc_purok_selection_summary');
+
+  // Style individual checkbox items
+  allCheckboxes.forEach(cb => {
+    const parent = cb.closest('.alloc-purok-item');
+    if (parent) {
+      if (cb.checked) {
+        parent.style.background = '#ECFDF5';
+        parent.style.borderColor = 'var(--color-primary, #17324D)';
+        parent.style.opacity = '1';
+      } else {
+        parent.style.background = '#F8FAFC';
+        parent.style.borderColor = '#E2E8F0';
+        parent.style.opacity = '0.7';
+      }
+    }
+  });
+
+  if (checkedCount === totalCount && totalCount > 0) {
+    if (masterToggle) masterToggle.checked = true;
+    if (hiddenPurok) hiddenPurok.value = 'All Puroks';
+    if (summaryLabel) {
+      summaryLabel.innerHTML = 'Selected: <strong>All Puroks (Hinaplanon)</strong> • ' + totalFamilies.toLocaleString() + ' Families';
+    }
+  } else if (checkedCount > 0) {
+    if (masterToggle) masterToggle.checked = false;
+    const selectedNames = Array.from(checkedCheckboxes).map(cb => cb.value.trim());
+    if (hiddenPurok) hiddenPurok.value = selectedNames.join(', ');
+    if (summaryLabel) {
+      summaryLabel.innerHTML = 'Selected: <strong>' + checkedCount + ' of ' + totalCount + ' Puroks</strong> • ' + totalFamilies.toLocaleString() + ' Families';
+    }
+  } else {
+    if (masterToggle) masterToggle.checked = false;
+    if (hiddenPurok) hiddenPurok.value = '';
+    if (summaryLabel) {
+      summaryLabel.innerHTML = '<span style="color:#DC2626;font-weight:700;">⚠️ No Purok selected (Please select at least 1 purok)</span>';
+    }
+  }
+
+  updateTargetCountPreview();
+}
+
+function setAllocAllPuroksScope(selectAll) {
+  const checkboxes = document.querySelectorAll('.alloc-purok-cb');
+  checkboxes.forEach(cb => {
+    cb.checked = selectAll;
+  });
+  updateAllocPurokDisplay();
+}
+
+function onAllocAllPuroksToggleChange(checked) {
+  setAllocAllPuroksScope(checked);
+}
+
+function onAllocSinglePurokChange() {
+  updateAllocPurokDisplay();
+}
+
+function filterAllocPurokCheckboxes(query) {
+  const q = (query || '').toLowerCase().trim();
+  const items = document.querySelectorAll('.alloc-purok-item');
+  items.forEach(item => {
+    const purokName = (item.getAttribute('data-purok') || '').toLowerCase();
+    if (!q || purokName.includes(q)) {
+      item.style.display = 'flex';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+function onDisasterTypeChange() {
+  const addedType = document.getElementById('alloc_added_type').value;
+  const budgetVal = parseFloat(document.getElementById('alloc_total_budget').value) || 0;
+  if (addedType === 'ai_recommended' && budgetVal > 0) {
+    triggerAiRecommendation();
+  }
+}
+
+function onBudgetManualInput() {
+  const budgetInput = document.getElementById('alloc_total_budget');
+  const typeHidden = document.getElementById('alloc_added_type');
+  const budgetModeLabel = document.getElementById('alloc_budget_mode_label');
+  const statusBadge = document.getElementById('ai_calc_status_badge');
+
+  if (typeHidden && typeHidden.value === 'ai_recommended') {
+    typeHidden.value = 'added_by_admin';
+    if (statusBadge) statusBadge.style.display = 'none';
+  }
+  if (budgetModeLabel) {
+    budgetModeLabel.textContent = budgetInput.value ? 'Manual Input' : 'Manual or AI';
+  }
+  updateTargetCountPreview();
+}
+
+function onRateManualInput() {
+  const typeHidden = document.getElementById('alloc_added_type');
+  const rateModeLabel = document.getElementById('alloc_rate_mode_label');
+  const statusBadge = document.getElementById('ai_calc_status_badge');
+
+  if (typeHidden && typeHidden.value === 'ai_recommended') {
+    typeHidden.value = 'added_by_admin';
+    if (statusBadge) statusBadge.style.display = 'none';
+  }
+  if (rateModeLabel) {
+    rateModeLabel.textContent = 'Manual Input';
+  }
+  updateTargetCountPreview();
+}
+
+function triggerAiRecommendation() {
+  const totalFamilies = getSelectedAllocFamiliesCount();
+  if (totalFamilies <= 0) {
+    alert('Please select at least one purok with registered families before running AI Recommendation.');
+    return;
+  }
+
+  const budgetInput = document.getElementById('alloc_total_budget');
+  const rateInput = document.getElementById('alloc_rate_budget');
+  const disasterSelect = document.getElementById('alloc_disaster_type');
+  const disasterType = disasterSelect ? disasterSelect.value : 'General Calamity';
+  const typeHidden = document.getElementById('alloc_added_type');
+  const statusBadge = document.getElementById('ai_calc_status_badge');
+  const alertBox = document.getElementById('ai_recommendation_alert');
+  const alertTitle = document.getElementById('ai_alert_title');
+  const alertMsg = document.getElementById('ai_alert_msg');
+  const budgetModeLabel = document.getElementById('alloc_budget_mode_label');
+  const rateModeLabel = document.getElementById('alloc_rate_mode_label');
+
+  const manualTotalBudget = parseFloat(budgetInput.value) || 0;
+
+  if (manualTotalBudget > 0) {
+    // Mode 1: User entered manual Total Budget -> Automatically divide Total Budget by Total Families
+    const amountPerFamily = Math.round((manualTotalBudget / totalFamilies) * 100) / 100;
+    rateInput.value = amountPerFamily.toFixed(2);
+    typeHidden.value = 'ai_recommended';
+
+    if (budgetModeLabel) budgetModeLabel.textContent = 'User Budget';
+    if (rateModeLabel) rateModeLabel.textContent = 'AI Calculated Rate';
+    if (statusBadge) statusBadge.style.display = 'inline-flex';
+
+    if (alertBox) {
+      alertBox.style.display = 'block';
+      alertBox.style.background = '#EFF6FF';
+      alertBox.style.borderColor = '#BFDBFE';
+      alertBox.style.color = '#1E40AF';
+      alertTitle.textContent = 'AI Calculation: Budget Divided Across Selected Families';
+      alertMsg.innerHTML = 'Total Budget <strong>₱' + manualTotalBudget.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</strong> automatically divided across <strong>' + totalFamilies.toLocaleString() + ' selected families</strong> = <strong>₱' + amountPerFamily.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</strong> per family.';
+    }
+  } else {
+    // Mode 2: User has NOT entered manual Total Budget -> Automated benchmark rate and total budget
+    let benchmarkRate = 3000;
+    if (disasterType === 'Fire' || disasterType === 'Earthquake') {
+      benchmarkRate = 5000;
+    } else if (disasterType === 'Typhoon' || disasterType === 'Landslide') {
+      benchmarkRate = 4000;
+    } else {
+      benchmarkRate = 3000;
+    }
+
+    const calculatedTotal = totalFamilies * benchmarkRate;
+    budgetInput.value = calculatedTotal.toFixed(2);
+    rateInput.value = benchmarkRate.toFixed(2);
+    typeHidden.value = 'ai_recommended';
+
+    if (budgetModeLabel) budgetModeLabel.textContent = 'AI Calculated Total';
+    if (rateModeLabel) rateModeLabel.textContent = 'AI Calamity Rate';
+    if (statusBadge) statusBadge.style.display = 'inline-flex';
+
+    if (alertBox) {
+      alertBox.style.display = 'block';
+      alertBox.style.background = '#F0FDF4';
+      alertBox.style.borderColor = '#BBF7D0';
+      alertBox.style.color = '#166534';
+      alertTitle.textContent = 'AI Calamity Relief Benchmark Applied';
+      alertMsg.innerHTML = 'Automated standard rate of <strong>₱' + benchmarkRate.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</strong> per family (' + disasterType + ') × <strong>' + totalFamilies.toLocaleString() + ' families</strong> = <strong>₱' + calculatedTotal.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</strong> total budget.';
+    }
+  }
+
+  updateTargetCountPreview();
+}
+
 function updateTargetCountPreview() {
   const total = parseFloat(document.getElementById('alloc_total_budget').value) || 0;
   const rate = parseFloat(document.getElementById('alloc_rate_budget').value) || 0;
@@ -750,6 +1117,37 @@ function updateTargetCountPreview() {
   } else {
     preview.textContent = '0 families';
   }
+}
+
+function validateAllocationForm() {
+  const targetPurok = (document.getElementById('alloc_target_purok_hidden').value || '').trim();
+  if (!targetPurok) {
+    alert('Please select at least one target purok before allocating funds.');
+    return false;
+  }
+
+  const total = parseFloat(document.getElementById('alloc_total_budget').value) || 0;
+  const rate = parseFloat(document.getElementById('alloc_rate_budget').value) || 0;
+
+  if (total <= 0) {
+    alert('Please enter a valid Total Budget or use the AI Recommendation button.');
+    document.getElementById('alloc_total_budget').focus();
+    return false;
+  }
+
+  if (rate <= 0) {
+    alert('Please specify a valid Amount per Family or click AI Recommendation.');
+    document.getElementById('alloc_rate_budget').focus();
+    return false;
+  }
+
+  if (rate > total) {
+    alert('Amount per family cannot exceed the total budget.');
+    document.getElementById('alloc_rate_budget').focus();
+    return false;
+  }
+
+  return true;
 }
 
 function viewAllocationDetails(data) {
@@ -768,6 +1166,16 @@ function viewAllocationDetails(data) {
     ? '<span class="badge" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;font-size:9.5px;padding:2px 7px;font-weight:600;">👤 Added by Admin</span>' 
     : '<span class="badge" style="background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;font-size:9.5px;padding:2px 7px;font-weight:600;">🤖 AI Recommended</span>';
   document.getElementById('view_alloc_status').textContent = data.status;
+  const recStatus = data.received_status || 'Received';
+  let recBadge = '';
+  if (recStatus === 'Pending') {
+    recBadge = '<span class="badge" style="background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;font-size:9.5px;padding:2px 7px;font-weight:600;">⏳ Pending Receipt</span>';
+  } else if (recStatus === 'Not Received') {
+    recBadge = '<span class="badge" style="background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA;font-size:9.5px;padding:2px 7px;font-weight:600;">✗ Not Received</span>' + (data.receipt_remarks ? '<div style="font-size:9.5px;color:#991B1B;margin-top:2px;">Reason: ' + data.receipt_remarks + '</div>' : '');
+  } else {
+    recBadge = '<span class="badge" style="background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;font-size:9.5px;padding:2px 7px;font-weight:600;">✓ Received by Barangay</span>';
+  }
+  document.getElementById('view_alloc_received_status').innerHTML = recBadge;
   document.getElementById('view_alloc_notes').textContent = data.notes || 'No administrative notes specified.';
   document.getElementById('viewAllocationModal').classList.add('show');
 }
@@ -793,6 +1201,9 @@ window.addEventListener('click', function(e) {
 
 // Auto-open and prefill if action=new is present from DSS Recommendation
 document.addEventListener('DOMContentLoaded', function() {
+  // Initialize purok selection display
+  updateAllocPurokDisplay();
+
   const params = new URLSearchParams(window.location.search);
   if (params.get('action') === 'new') {
     const progInput = document.querySelector('input[name="program_name"]');
@@ -801,29 +1212,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const budgetInput = document.getElementById('alloc_total_budget');
     const rateInput = document.getElementById('alloc_rate_budget');
     const fundingInput = document.querySelector('input[name="funding_source"]');
-    const typeSelect = document.getElementById('alloc_added_type');
+    const typeHidden = document.getElementById('alloc_added_type');
     const recInput = document.getElementById('alloc_recommendation_id');
-
-    const purokSelect = document.getElementById('alloc_target_purok');
 
     if (brgyInput) brgyInput.value = '12';
     if (params.get('program_name') && progInput) progInput.value = params.get('program_name');
-    if (params.get('target_purok') && purokSelect) purokSelect.value = params.get('target_purok');
     if (params.get('disaster_type') && disasterSelect) disasterSelect.value = params.get('disaster_type');
-    if (params.get('budget') && budgetInput) budgetInput.value = parseFloat(params.get('budget')).toFixed(2);
-    if (params.get('per_family') && rateInput) rateInput.value = parseFloat(params.get('per_family')).toFixed(2);
     if (params.get('funding_source') && fundingInput) fundingInput.value = params.get('funding_source');
-    if (params.get('added_type') && typeSelect) typeSelect.value = params.get('added_type');
     if (params.get('recommendation_id') && recInput) recInput.value = params.get('recommendation_id');
 
-    const origBudget = parseFloat(params.get('budget') || 0);
-    if (budgetInput) {
-      budgetInput.addEventListener('input', function() {
-        const currentVal = parseFloat(this.value || 0);
-        if (typeSelect && origBudget > 0 && Math.abs(currentVal - origBudget) > 0.01) {
-          typeSelect.value = 'added_by_admin';
-        }
-      });
+    // Handle target_purok parameter
+    const paramPurok = params.get('target_purok');
+    if (paramPurok) {
+      if (paramPurok === 'All Puroks' || paramPurok === 'All') {
+        setAllocAllPuroksScope(true);
+      } else {
+        const targetList = paramPurok.split(',').map(s => s.trim().toLowerCase());
+        const checkboxes = document.querySelectorAll('.alloc-purok-cb');
+        checkboxes.forEach(cb => {
+          cb.checked = targetList.includes(cb.value.trim().toLowerCase());
+        });
+        updateAllocPurokDisplay();
+      }
+    }
+
+    if (params.get('budget') && budgetInput) budgetInput.value = parseFloat(params.get('budget')).toFixed(2);
+    if (params.get('per_family') && rateInput) rateInput.value = parseFloat(params.get('per_family')).toFixed(2);
+    if (params.get('added_type') && typeHidden) typeHidden.value = params.get('added_type');
+
+    if (params.get('budget') || params.get('per_family')) {
+      if (typeHidden) typeHidden.value = 'ai_recommended';
+      const statusBadge = document.getElementById('ai_calc_status_badge');
+      if (statusBadge) statusBadge.style.display = 'inline-flex';
     }
 
     updateTargetCountPreview();

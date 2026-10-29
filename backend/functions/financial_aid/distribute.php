@@ -247,6 +247,21 @@ try {
             $disbursedBy = $user['id'];
         }
 
+        // Retrieve household info if available
+        $hhInfo = null;
+        if ($householdId > 0) {
+            $hhInfoStmt = $db->prepare("SELECT household_code, family_name, head_full_name, head_relation, total_members, purok_name FROM purok_households WHERE id = ?");
+            $hhInfoStmt->execute([$householdId]);
+            $hhInfo = $hhInfoStmt->fetch(PDO::FETCH_ASSOC);
+        } elseif ($residentId > 0) {
+            $hhInfoStmt = $db->prepare("SELECT id AS household_id, household_code, family_name, head_full_name, head_relation, total_members, purok_name FROM purok_households WHERE head_resident_id = ? LIMIT 1");
+            $hhInfoStmt->execute([$residentId]);
+            $hhInfo = $hhInfoStmt->fetch(PDO::FETCH_ASSOC);
+            if ($hhInfo && empty($householdId)) {
+                $householdId = (int)$hhInfo['household_id'];
+            }
+        }
+
         // Check if a distribution record already exists for this household in this allocation
         $existingDist = null;
         if ($householdId > 0) {
@@ -335,13 +350,69 @@ try {
             }
         }
 
-        // Audit Trail Entry
+        // Audit Trail Entry with Family and Household specifics
         $actionName = ($claimStatus === 'Claimed') ? 'Disbursed' : 'Status Change';
-        $auditText = ($claimStatus === 'Claimed')
-            ? sprintf("Disbursed ₱%s cash aid to %s (%s, %s) under %s. Ref: %s. Handled by %s.",
-                number_format($amount, 2), $beneficiaryName, $purok, $alloc['barangay_name'], $alloc['allocation_code'], $referenceNo, $user['full_name'])
-            : sprintf("Registered %s (%s, %s) as Pending beneficiary for ₱%s under %s.",
-                $beneficiaryName, $purok, $alloc['barangay_name'], number_format($amount, 2), $alloc['allocation_code']);
+        $famName = !empty($hhInfo['family_name']) ? (trim($hhInfo['family_name']) . (stripos($hhInfo['family_name'], 'Family') === false ? ' Family' : '')) : '';
+        $hhCode = !empty($hhInfo['household_code']) ? $hhInfo['household_code'] : ($householdId > 0 ? ('HH-' . $householdId) : '');
+        $repRel = !empty($hhInfo['head_relation']) ? " ({$hhInfo['head_relation']})" : "";
+        $memCount = (!empty($hhInfo['total_members']) && (int)$hhInfo['total_members'] > 0) ? (", " . (int)$hhInfo['total_members'] . " members") : "";
+
+        if ($claimStatus === 'Claimed') {
+            if (!empty($famName)) {
+                $auditText = sprintf(
+                    "Released Ayuda / Calamity Cash Aid of ₱%s to %s [Household: %s, Rep: %s%s%s] (%s, %s) under %s (%s). Ref: %s. Disbursed by %s.",
+                    number_format($amount, 2),
+                    $famName,
+                    $hhCode,
+                    $beneficiaryName,
+                    $repRel,
+                    $memCount,
+                    $purok,
+                    $alloc['barangay_name'],
+                    $alloc['program_name'],
+                    $alloc['allocation_code'],
+                    $referenceNo,
+                    $user['full_name']
+                );
+            } else {
+                $auditText = sprintf(
+                    "Released Ayuda / Calamity Cash Aid of ₱%s to %s (%s, %s) under %s (%s). Ref: %s. Disbursed by %s.",
+                    number_format($amount, 2),
+                    $beneficiaryName,
+                    $purok,
+                    $alloc['barangay_name'],
+                    $alloc['program_name'],
+                    $alloc['allocation_code'],
+                    $referenceNo,
+                    $user['full_name']
+                );
+            }
+        } else {
+            if (!empty($famName)) {
+                $auditText = sprintf(
+                    "Registered %s [Household: %s, Rep: %s%s] (%s, %s) as Pending beneficiary for ₱%s under %s (%s).",
+                    $famName,
+                    $hhCode,
+                    $beneficiaryName,
+                    $repRel,
+                    $purok,
+                    $alloc['barangay_name'],
+                    number_format($amount, 2),
+                    $alloc['program_name'],
+                    $alloc['allocation_code']
+                );
+            } else {
+                $auditText = sprintf(
+                    "Registered %s (%s, %s) as Pending beneficiary for ₱%s under %s (%s).",
+                    $beneficiaryName,
+                    $purok,
+                    $alloc['barangay_name'],
+                    number_format($amount, 2),
+                    $alloc['program_name'],
+                    $alloc['allocation_code']
+                );
+            }
+        }
 
         $auditStmt = $db->prepare("
             INSERT INTO financial_aid_audits (
@@ -357,7 +428,7 @@ try {
             $auditText, $amount, $user['id'], $user['full_name'], $role
         ]);
 
-        $aidAction = ($claimStatus === 'Claimed') ? 'RECEIVED_RESOURCE_AID' : 'REQUEST_RESOURCE_AID';
+        $aidAction = ($claimStatus === 'Claimed') ? 'RELEASE_AYUDA_RECEIVED' : 'REQUEST_RESOURCE_AID';
         logSystemEvent($aidAction, 'Manage Resources', $auditText);
 
         // In-app Notification for Resident (scoped to beneficiary or their purok)
@@ -434,10 +505,12 @@ try {
         $sendSms = !empty($_POST['send_sms']);
 
         $stmt = $db->prepare("
-            SELECT d.*, a.allocation_code, a.program_name, a.remaining_budget, a.status AS alloc_status, b.name AS barangay_name
+            SELECT d.*, a.allocation_code, a.program_name, a.remaining_budget, a.status AS alloc_status, b.name AS barangay_name,
+                   h.household_code, h.family_name, h.head_full_name, h.head_relation, h.total_members, h.purok_name AS household_purok
             FROM financial_aid_distributions d
             JOIN financial_aid_allocations a ON d.allocation_id = a.id
             JOIN barangays b ON d.barangay_id = b.id
+            LEFT JOIN purok_households h ON d.household_id = h.id
             WHERE d.id = ?
         ");
         $stmt->execute([$distId]);
@@ -445,6 +518,15 @@ try {
 
         if (!$dist) {
             throw new Exception("Distribution record not found.");
+        }
+
+        if (empty($dist['family_name']) && !empty($dist['resident_id'])) {
+            $hFallback = $db->prepare("SELECT household_code, family_name, head_full_name, head_relation, total_members, purok_name FROM purok_households WHERE head_resident_id = ? LIMIT 1");
+            $hFallback->execute([$dist['resident_id']]);
+            $hf = $hFallback->fetch(PDO::FETCH_ASSOC);
+            if ($hf) {
+                $dist = array_merge($dist, $hf);
+            }
         }
 
         if ($userBrgyId !== null && (int)$dist['barangay_id'] !== $userBrgyId) {
@@ -484,9 +566,40 @@ try {
         ");
         $upAlloc->execute([$amount, $amount, $dist['allocation_id']]);
 
-        // Audit Trail Entry
-        $auditText = sprintf("Completed claim payout of ₱%s to %s (%s, %s). Ref: %s. Disbursed by %s.",
-            number_format($amount, 2), $dist['beneficiary_name'], $dist['purok'], $dist['barangay_name'], $referenceNo, $user['full_name']);
+        // Audit Trail Entry with Family and Household specifics
+        if (!empty($dist['family_name'])) {
+            $famName = trim($dist['family_name']) . (stripos($dist['family_name'], 'Family') === false ? ' Family' : '');
+            $hhCode = !empty($dist['household_code']) ? $dist['household_code'] : ($dist['household_id'] ? ('HH-' . $dist['household_id']) : '');
+            $repRel = !empty($dist['head_relation']) ? " ({$dist['head_relation']})" : "";
+            $memCount = (!empty($dist['total_members']) && (int)$dist['total_members'] > 0) ? (", " . (int)$dist['total_members'] . " members") : "";
+            $auditText = sprintf(
+                "Released Ayuda / Calamity Cash Aid of ₱%s to %s [Household: %s, Rep: %s%s%s] (%s, %s) under %s (%s). Ref: %s. Disbursed by %s.",
+                number_format($amount, 2),
+                $famName,
+                $hhCode,
+                $dist['beneficiary_name'],
+                $repRel,
+                $memCount,
+                $dist['purok'] ?: ($dist['household_purok'] ?? 'Purok'),
+                $dist['barangay_name'],
+                $dist['program_name'],
+                $dist['allocation_code'],
+                $referenceNo,
+                $user['full_name']
+            );
+        } else {
+            $auditText = sprintf(
+                "Released Ayuda / Calamity Cash Aid of ₱%s to %s (%s, %s) under %s (%s). Ref: %s. Disbursed by %s.",
+                number_format($amount, 2),
+                $dist['beneficiary_name'],
+                $dist['purok'],
+                $dist['barangay_name'],
+                $dist['program_name'],
+                $dist['allocation_code'],
+                $referenceNo,
+                $user['full_name']
+            );
+        }
 
         $auditStmt = $db->prepare("
             INSERT INTO financial_aid_audits (
@@ -502,7 +615,7 @@ try {
             $auditText, $amount, $user['id'], $user['full_name'], $role
         ]);
 
-        logSystemEvent('RECEIVED_RESOURCE_AID', 'Manage Resources', $auditText);
+        logSystemEvent('RELEASE_AYUDA_RECEIVED', 'Manage Resources', $auditText);
 
         // In-app Notification for Resident (only for registered user accounts)
         try {
@@ -670,10 +783,12 @@ try {
     } elseif ($action === 'void') {
         $distId = (int)($_POST['distribution_id'] ?? 0);
         $stmt = $db->prepare("
-            SELECT d.*, a.allocation_code, a.program_name, b.name AS barangay_name 
+            SELECT d.*, a.allocation_code, a.program_name, b.name AS barangay_name,
+                   h.household_code, h.family_name, h.head_full_name, h.head_relation, h.total_members, h.purok_name AS household_purok
             FROM financial_aid_distributions d 
             JOIN financial_aid_allocations a ON d.allocation_id = a.id 
             JOIN barangays b ON d.barangay_id = b.id 
+            LEFT JOIN purok_households h ON d.household_id = h.id
             WHERE d.id = ?
         ");
         $stmt->execute([$distId]);
@@ -682,6 +797,15 @@ try {
         if (!$dist) throw new Exception("Distribution record not found.");
         if ($userBrgyId !== null && (int)$dist['barangay_id'] !== $userBrgyId) {
             throw new Exception("Unauthorized: Record belongs to another barangay.");
+        }
+
+        if (empty($dist['family_name']) && !empty($dist['resident_id'])) {
+            $hFallback = $db->prepare("SELECT household_code, family_name, head_full_name, head_relation, total_members, purok_name FROM purok_households WHERE head_resident_id = ? LIMIT 1");
+            $hFallback->execute([$dist['resident_id']]);
+            $hf = $hFallback->fetch(PDO::FETCH_ASSOC);
+            if ($hf) {
+                $dist = array_merge($dist, $hf);
+            }
         }
 
         $amount = (float)$dist['amount'];
@@ -701,8 +825,34 @@ try {
         $upDist = $db->prepare("UPDATE financial_aid_distributions SET claim_status = 'Unclaimed', remarks = CONCAT(COALESCE(remarks, ''), ' [Voided/Cancelled]') WHERE id = ?");
         $upDist->execute([$distId]);
 
-        $auditText = sprintf("Voided financial aid distribution for %s (₱%s) under %s. Funds reverted to allocation balance. Action by %s.",
-            $dist['beneficiary_name'], number_format($amount, 2), $dist['allocation_code'], $user['full_name']);
+        // Audit Trail Entry with Family and Household specifics
+        if (!empty($dist['family_name'])) {
+            $famName = trim($dist['family_name']) . (stripos($dist['family_name'], 'Family') === false ? ' Family' : '');
+            $hhCode = !empty($dist['household_code']) ? $dist['household_code'] : ($dist['household_id'] ? ('HH-' . $dist['household_id']) : '');
+            $repRel = !empty($dist['head_relation']) ? " ({$dist['head_relation']})" : "";
+            $auditText = sprintf(
+                "Voided Ayuda disbursement of ₱%s for %s [Household: %s, Rep: %s%s] (%s, %s) under %s (%s). Funds reverted to allocation balance. Action by %s.",
+                number_format($amount, 2),
+                $famName,
+                $hhCode,
+                $dist['beneficiary_name'],
+                $repRel,
+                $dist['purok'] ?: ($dist['household_purok'] ?? 'Purok'),
+                $dist['barangay_name'],
+                $dist['program_name'],
+                $dist['allocation_code'],
+                $user['full_name']
+            );
+        } else {
+            $auditText = sprintf(
+                "Voided financial aid distribution for %s (₱%s) under %s (%s). Funds reverted to allocation balance. Action by %s.",
+                $dist['beneficiary_name'],
+                number_format($amount, 2),
+                $dist['program_name'],
+                $dist['allocation_code'],
+                $user['full_name']
+            );
+        }
 
         $auditStmt = $db->prepare("
             INSERT INTO financial_aid_audits (
@@ -712,7 +862,7 @@ try {
         ");
         $auditStmt->execute([$dist['allocation_id'], $distId, $dist['barangay_id'], $auditText, $amount, $user['id'], $user['full_name'], $role]);
 
-        logSystemEvent('NOT_RECEIVED_RESOURCE_AID', 'Manage Resources', $auditText);
+        logSystemEvent('VOID_AYUDA_NOT_RECEIVED', 'Manage Resources', $auditText);
 
         if ($isAjax) {
             jsonResponse([
