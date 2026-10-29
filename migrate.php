@@ -540,6 +540,14 @@ try {
             }
         }
 
+        // Table: notifications (Support target purok scoping)
+        if (in_array('notifications', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'notifications', 'target_puroks')) {
+                echo "  [+] Adding column `target_puroks` to `notifications`...\n";
+                $pdo->exec("ALTER TABLE `notifications` ADD COLUMN `target_puroks` varchar(255) DEFAULT NULL AFTER `target_barangay_id`;");
+            }
+        }
+
         if ($seedOnly) {
             if (file_exists($seedsFile)) {
                 echo "Step 3: Re-seeding database from seeds.sql (--seed)...\n";

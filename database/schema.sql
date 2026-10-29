@@ -375,6 +375,7 @@ CREATE TABLE `notifications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `target_role` enum('all','icdrrmo','barangay_head','responder','resident') NOT NULL DEFAULT 'all',
   `target_barangay_id` int(11) DEFAULT NULL,
+  `target_puroks` varchar(255) DEFAULT NULL,
   `target_user_id` int(11) DEFAULT NULL,
   `title` varchar(150) NOT NULL,
   `message` text NOT NULL,
