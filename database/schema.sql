@@ -410,7 +410,7 @@ CREATE TABLE `events` (
   `target_participants` int(11) NOT NULL DEFAULT 50,
   `actual_participants` int(11) NOT NULL DEFAULT 0,
   `description` text DEFAULT NULL,
-  `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived') DEFAULT 'Scheduled',
+  `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived','Ended') DEFAULT 'Scheduled',
   `is_archived` tinyint(1) NOT NULL DEFAULT 0,
   `evaluation_summary` text DEFAULT NULL,
   `evaluated_at` datetime DEFAULT NULL,

@@ -190,9 +190,10 @@ try {
                 echo "  [+] Adding column `cancellation_reason` to `events`...\n";
                 $pdo->exec("ALTER TABLE `events` ADD COLUMN `cancellation_reason` text DEFAULT NULL AFTER `expected_activities`;");
             }
-            // Update status enum if needed to support Archived
+            // Update status enum if needed to support Archived and Ended
             try {
-                $pdo->exec("ALTER TABLE `events` MODIFY COLUMN `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived') DEFAULT 'Scheduled';");
+                echo "  [+] Ensuring `events.status` enum includes 'Ended' and 'Archived'...\n";
+                $pdo->exec("ALTER TABLE `events` MODIFY COLUMN `status` enum('Scheduled','Ongoing','Completed','Cancelled','Archived','Ended') DEFAULT 'Scheduled';");
             } catch (Throwable $e) {}
             // Ensure activity_type is VARCHAR(100) to support all 13 activity categories
             try {
@@ -512,6 +513,30 @@ try {
             if (!$hasColumn($pdo, 'event_attendees', 'is_archived')) {
                 echo "  [+] Adding column `is_archived` to `event_attendees`...\n";
                 $pdo->exec("ALTER TABLE `event_attendees` ADD COLUMN `is_archived` TINYINT(1) NOT NULL DEFAULT 0 AFTER `phone`;");
+            }
+        }
+
+        // Table: barangay_resource_requests (Delivery receipt tracking)
+        if (in_array('barangay_resource_requests', $existingTables, true)) {
+            if (!$hasColumn($pdo, 'barangay_resource_requests', 'receipt_status')) {
+                echo "  [+] Adding column `receipt_status` to `barangay_resource_requests`...\n";
+                $pdo->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `receipt_status` enum('Pending','Received','Not Received') NOT NULL DEFAULT 'Pending' AFTER `status`;");
+            }
+            if (!$hasColumn($pdo, 'barangay_resource_requests', 'received_at')) {
+                echo "  [+] Adding column `received_at` to `barangay_resource_requests`...\n";
+                $pdo->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `received_at` datetime DEFAULT NULL AFTER `receipt_status`;");
+            }
+            if (!$hasColumn($pdo, 'barangay_resource_requests', 'received_by')) {
+                echo "  [+] Adding column `received_by` to `barangay_resource_requests`...\n";
+                $pdo->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `received_by` int(11) DEFAULT NULL AFTER `received_at`;");
+                try {
+                    $pdo->exec("ALTER TABLE `barangay_resource_requests` ADD KEY `received_by` (`received_by`);");
+                    $pdo->exec("ALTER TABLE `barangay_resource_requests` ADD CONSTRAINT `barangay_resource_requests_ibfk_received_by` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;");
+                } catch (Throwable $e) {}
+            }
+            if (!$hasColumn($pdo, 'barangay_resource_requests', 'receipt_remarks')) {
+                echo "  [+] Adding column `receipt_remarks` to `barangay_resource_requests`...\n";
+                $pdo->exec("ALTER TABLE `barangay_resource_requests` ADD COLUMN `receipt_remarks` text DEFAULT NULL AFTER `received_by`;");
             }
         }
 

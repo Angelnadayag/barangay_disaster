@@ -112,17 +112,22 @@ $invStmt->execute($invParams);
 $inventoryList = $invStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 2. Fetch Requisition Requests submitted by this Barangay
-// 2. Fetch Requisition Requests submitted by this Barangay
 // Display active supply requests only (Pending, Rejected, or Approved awaiting delivery receipt).
 // Once confirmed "Received", it transfers to Tab 3 (Received Relief Allocations).
+$hasReceivedByCol = function_exists('ensureResourceRequestColumns') ? ensureResourceRequestColumns($db) : false;
+$receivedBySelect = $hasReceivedByCol ? "rec_u.full_name AS received_by_name" : "NULL AS received_by_name";
+$receivedByJoin = $hasReceivedByCol ? "LEFT JOIN users rec_u ON r.received_by = rec_u.id" : "";
+$receiptFilter = $hasReceivedByCol ? "AND (r.receipt_status != 'Received' OR r.receipt_status IS NULL)" : "";
+$receiptOrderBy = $hasReceivedByCol ? ", (r.receipt_status = 'Pending') DESC" : "";
+
 $reqSql = "
     SELECT r.*, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name,
-           rec_u.full_name AS received_by_name
+           {$receivedBySelect}
     FROM barangay_resource_requests r
     LEFT JOIN users u ON r.requested_by = u.id
     LEFT JOIN users rev ON r.reviewed_by = rev.id
-    LEFT JOIN users rec_u ON r.received_by = rec_u.id
-    WHERE r.barangay_id = ? AND (r.receipt_status != 'Received' OR r.receipt_status IS NULL)
+    {$receivedByJoin}
+    WHERE r.barangay_id = ? {$receiptFilter}
 ";
 $reqParams = [$barangayId];
 
@@ -135,7 +140,7 @@ if (!empty($search) && $activeTab === 'requests') {
   $reqParams[] = $like;
 }
 
-$reqSql .= " ORDER BY (r.status = 'Pending') DESC, (r.receipt_status = 'Pending') DESC, r.created_at DESC";
+$reqSql .= " ORDER BY (r.status = 'Pending') DESC {$receiptOrderBy}, r.created_at DESC";
 $reqStmt = $db->prepare($reqSql);
 $reqStmt->execute($reqParams);
 $requestsList = $reqStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -155,18 +160,22 @@ $allocStmt->execute([$barangayId]);
 $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 3b. Fetch Confirmed Received Requisition Relief Dispatches
-$reqAllocStmt = $db->prepare("
-    SELECT brr.*, brr.item_name AS resource_name,
-           COALESCE(brr.approved_quantity, brr.requested_quantity) AS allocated_quantity,
-           res.code, rev.full_name AS approved_by_name
-    FROM barangay_resource_requests brr
-    LEFT JOIN resources res ON brr.resource_id = res.id
-    LEFT JOIN users rev ON brr.reviewed_by = rev.id
-    WHERE brr.barangay_id = ? AND brr.status = 'Approved' AND brr.receipt_status = 'Received'
-    ORDER BY brr.received_at DESC, brr.updated_at DESC
-");
-$reqAllocStmt->execute([$barangayId]);
-$receivedReqAllocations = $reqAllocStmt->fetchAll(PDO::FETCH_ASSOC);
+if ($hasReceivedByCol) {
+    $reqAllocStmt = $db->prepare("
+        SELECT brr.*, brr.item_name AS resource_name,
+               COALESCE(brr.approved_quantity, brr.requested_quantity) AS allocated_quantity,
+               res.code, rev.full_name AS approved_by_name
+        FROM barangay_resource_requests brr
+        LEFT JOIN resources res ON brr.resource_id = res.id
+        LEFT JOIN users rev ON brr.reviewed_by = rev.id
+        WHERE brr.barangay_id = ? AND brr.status = 'Approved' AND brr.receipt_status = 'Received'
+        ORDER BY brr.received_at DESC, brr.updated_at DESC
+    ");
+    $reqAllocStmt->execute([$barangayId]);
+    $receivedReqAllocations = $reqAllocStmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $receivedReqAllocations = [];
+}
 $totalAllocationsCount = count($allocations) + count($receivedReqAllocations);
 
 // 4. Central Depot Catalog (for requisition items dropdown)
