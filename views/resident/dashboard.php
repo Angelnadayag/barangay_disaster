@@ -114,6 +114,9 @@ foreach ($allEvacAreas as $ea) {
 
 // Latest Public Advisories (strictly scoped to resident's barangay & target puroks, created by Barangay Head)
 $userPurok = trim($user['purok'] ?? '');
+$hasNotifPuroks = function_exists('ensureNotificationColumns') ? ensureNotificationColumns($db) : false;
+$purokExpr = $hasNotifPuroks ? "COALESCE(n.target_puroks, e.target_puroks)" : "e.target_puroks";
+
 $notifStmt = $db->prepare("
     SELECT n.*, b.name AS barangay_name, u.full_name AS sender_name 
     FROM notifications n
@@ -133,10 +136,10 @@ $notifStmt = $db->prepare("
     )
     AND (
         n.target_user_id IS NOT NULL
-        OR COALESCE(n.target_puroks, e.target_puroks) IS NULL
-        OR TRIM(COALESCE(n.target_puroks, e.target_puroks)) = ''
-        OR COALESCE(n.target_puroks, e.target_puroks) IN ('All Puroks', 'All')
-        OR FIND_IN_SET(?, REPLACE(COALESCE(n.target_puroks, e.target_puroks), ', ', ',')) > 0
+        OR {$purokExpr} IS NULL
+        OR TRIM({$purokExpr}) = ''
+        OR {$purokExpr} IN ('All Puroks', 'All')
+        OR FIND_IN_SET(?, REPLACE({$purokExpr}, ', ', ',')) > 0
     )
     ORDER BY n.alert_level = 'urgent' DESC, n.alert_level = 'warning' DESC, n.created_at DESC
     LIMIT 4

@@ -18,6 +18,8 @@ $filterUnread = !empty($_GET['unread']);
 $searchQuery = trim($_GET['q'] ?? '');
 
 $userPurok = trim($user['purok'] ?? '');
+$hasNotifPuroks = function_exists('ensureNotificationColumns') ? ensureNotificationColumns($db) : false;
+$purokExpr = $hasNotifPuroks ? "COALESCE(n.target_puroks, e.target_puroks)" : "e.target_puroks";
 
 // Base query strictly scoped to resident's barangay jurisdiction, created by Barangay Head ONLY,
 // and dynamically filtered by target puroks (if all puroks selected -> all residents; if specific puroks -> only residents in those puroks)
@@ -35,10 +37,10 @@ $baseWhere = "
     )
     AND (
         n.target_user_id IS NOT NULL
-        OR COALESCE(n.target_puroks, e.target_puroks) IS NULL
-        OR TRIM(COALESCE(n.target_puroks, e.target_puroks)) = ''
-        OR COALESCE(n.target_puroks, e.target_puroks) IN ('All Puroks', 'All')
-        OR FIND_IN_SET(?, REPLACE(COALESCE(n.target_puroks, e.target_puroks), ', ', ',')) > 0
+        OR {$purokExpr} IS NULL
+        OR TRIM({$purokExpr}) = ''
+        OR {$purokExpr} IN ('All Puroks', 'All')
+        OR FIND_IN_SET(?, REPLACE({$purokExpr}, ', ', ',')) > 0
     )
 ";
 $baseParams = [(int)$user['id'], $barangayId, $barangayId, $userPurok];

@@ -19,6 +19,9 @@ $db = getDBConnection();
 // Fetch unread notifications count for this user
 if (($currentUser['role'] ?? '') === 'resident') {
     $userPurok = trim($currentUser['purok'] ?? '');
+    $hasNotifPuroks = function_exists('ensureNotificationColumns') ? ensureNotificationColumns($db) : false;
+    $purokExpr = $hasNotifPuroks ? "COALESCE(n.target_puroks, e.target_puroks)" : "e.target_puroks";
+
     $notifCountStmt = $db->prepare("
         SELECT COUNT(*) FROM notifications n
         LEFT JOIN notification_reads nr ON n.id = nr.notification_id AND nr.user_id = ?
@@ -38,10 +41,10 @@ if (($currentUser['role'] ?? '') === 'resident') {
           )
           AND (
               n.target_user_id IS NOT NULL
-              OR COALESCE(n.target_puroks, e.target_puroks) IS NULL
-              OR TRIM(COALESCE(n.target_puroks, e.target_puroks)) = ''
-              OR COALESCE(n.target_puroks, e.target_puroks) IN ('All Puroks', 'All')
-              OR FIND_IN_SET(?, REPLACE(COALESCE(n.target_puroks, e.target_puroks), ', ', ',')) > 0
+              OR {$purokExpr} IS NULL
+              OR TRIM({$purokExpr}) = ''
+              OR {$purokExpr} IN ('All Puroks', 'All')
+              OR FIND_IN_SET(?, REPLACE({$purokExpr}, ', ', ',')) > 0
           )
     ");
     $notifCountStmt->execute([

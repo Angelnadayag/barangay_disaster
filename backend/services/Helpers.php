@@ -726,6 +726,43 @@ function ensureResourceRequestColumns($db = null): bool {
 }
 
 /**
+ * Ensure notifications target_puroks column exists in the database.
+ * Auto-migrates target_puroks if missing.
+ */
+if (!function_exists('ensureNotificationColumns')) {
+function ensureNotificationColumns($db = null): bool {
+    static $columnsReady = null;
+    if ($columnsReady !== null) {
+        return $columnsReady;
+    }
+
+    if (!$db) {
+        $db = getDBConnection();
+    }
+
+    try {
+        $chk = $db->query("SHOW COLUMNS FROM `notifications` LIKE 'target_puroks'");
+        if ($chk && $chk->rowCount() > 0) {
+            $columnsReady = true;
+            return true;
+        }
+
+        // Attempt on-the-fly column migration
+        try {
+            $db->exec("ALTER TABLE `notifications` ADD COLUMN `target_puroks` varchar(255) DEFAULT NULL AFTER `target_barangay_id`");
+        } catch (Throwable $e) {}
+
+        $chk2 = $db->query("SHOW COLUMNS FROM `notifications` LIKE 'target_puroks'");
+        $columnsReady = ($chk2 && $chk2->rowCount() > 0);
+        return $columnsReady;
+    } catch (Throwable $e) {
+        $columnsReady = false;
+        return false;
+    }
+}
+}
+
+/**
  * Permanently purge all notifications associated with a deleted event,
  * including related modules ('events', 'event', 'preparedness'),
  * matching event titles, linked financial aid distribution notifications,
