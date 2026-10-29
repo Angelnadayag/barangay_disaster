@@ -296,7 +296,7 @@ class DecisionTreeRecommender {
         $totalAidBudget = 0.00;
         $aidSource = !empty($options['financial_aid_sponsor']) 
             ? trim($options['financial_aid_sponsor']) 
-            : (!empty($options['financial_aid_source']) ? trim($options['financial_aid_source']) : 'LGU Calamity Fund (QRF)');
+            : (!empty($options['financial_aid_source']) ? trim($options['financial_aid_source']) : null);
 
         if ($modality === 'resources') {
             $decisionSteps[] = "Ayuda Evaluation [Deferred: Physical Relief Resources prioritization selected]";
@@ -328,7 +328,8 @@ class DecisionTreeRecommender {
             }
             $totalAidBudget = round($targetAidFamilies * $aidRatePerFamily, 2);
 
-            $decisionSteps[] = "Ayuda Feasibility [Emergency Cash Aid: ₱" . number_format($aidRatePerFamily, 2) . "/fam for " . number_format($targetAidFamilies) . " families = ₱" . number_format($totalAidBudget, 2) . " from " . clean($aidSource) . "]";
+            $sponsorNote = !empty($aidSource) ? " from " . clean($aidSource) : "";
+            $decisionSteps[] = "Ayuda Feasibility [Emergency Cash Aid: ₱" . number_format($aidRatePerFamily, 2) . "/fam for " . number_format($targetAidFamilies) . " families = ₱" . number_format($totalAidBudget, 2) . $sponsorNote . "]";
         }
 
         // --- TREE LEVEL 7: Confidence Score Synthesis ---
@@ -352,19 +353,21 @@ class DecisionTreeRecommender {
 
         // Explanatory Reason with Selected Modality (Resources, Ayuda, or Both)
         if ($modality === 'resources') {
-            $reason = "Recommendation generated using Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
+            $reason = "Recommendation generated using AI Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
                     . "Assessment parameters: $severity severity, $urgency urgency, $families affected families ($displaced displaced). "
-                    . "Intervention Plan: Physical Relief Allocation prioritized (NDRRMC relief supply matrix and depot stock analysis). "
+                    . "Intervention Plan: Physical Relief Allocation prioritized (relief supply matrix and depot stock analysis). "
                     . ($stockDeficit ? "Notice: Central inventory has partial stock constraints for one or more physical items; human review may adjust quantities or request mutual aid." : "Central inventory possesses adequate stock for physical resource dispatch.");
         } elseif ($modality === 'financial_aid') {
-            $reason = "Recommendation generated using Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
+            $sponsorReason = !empty($aidSource) ? " under $aidSource." : ".";
+            $reason = "Recommendation generated using AI Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
                     . "Assessment parameters: $severity severity, $urgency urgency, $families affected families ($displaced displaced). "
-                    . "Intervention Plan: Emergency Financial Aid (Ayuda) Cash Grant prioritized: Recommended budget of ₱" . number_format($totalAidBudget, 2) . " (₱" . number_format($aidRatePerFamily, 2) . " per family for $targetAidFamilies families) under $aidSource.";
+                    . "Intervention Plan: Emergency Financial Aid (Ayuda) Cash Grant prioritized: Recommended budget of ₱" . number_format($totalAidBudget, 2) . " (₱" . number_format($aidRatePerFamily, 2) . " per family for $targetAidFamilies families)$sponsorReason";
         } else {
-            $reason = "Recommendation generated using Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
+            $sponsorReason = !empty($aidSource) ? " under $aidSource. " : ". ";
+            $reason = "Recommendation generated using AI Decision Support System for $disaster in {$request['barangay_name']} ({$request['purok_name']}). "
                     . "Assessment parameters: $severity severity, $urgency urgency, $families affected families ($displaced displaced). "
-                    . "Dual Intervention Plan: 1) Physical Relief Allocation (NDRRMC relief supply matrix and depot stock analysis); "
-                    . "2) Emergency Financial Aid (Ayuda): Recommended budget of ₱" . number_format($totalAidBudget, 2) . " (₱" . number_format($aidRatePerFamily, 2) . " per family for $targetAidFamilies families) under $aidSource. "
+                    . "Dual Intervention Plan: 1) Physical Relief Allocation (relief supply matrix and depot stock analysis); "
+                    . "2) Emergency Financial Aid (Ayuda): Recommended budget of ₱" . number_format($totalAidBudget, 2) . " (₱" . number_format($aidRatePerFamily, 2) . " per family for $targetAidFamilies families)$sponsorReason"
                     . ($stockDeficit ? "Notice: Central inventory has partial stock constraints for one or more physical items; human review may adjust quantities or request mutual aid." : "Central inventory possesses adequate stock for physical resource dispatch.");
         }
 

@@ -23,6 +23,10 @@ $colsAct = $db->query("SHOW COLUMNS FROM events LIKE 'is_archived'")->fetchAll()
 if (empty($colsAct)) {
   $db->exec("ALTER TABLE events ADD COLUMN is_archived TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
 }
+$colsEvalAt = $db->query("SHOW COLUMNS FROM events LIKE 'evaluated_at'")->fetchAll();
+if (empty($colsEvalAt)) {
+  $db->exec("ALTER TABLE events ADD COLUMN evaluated_at DATETIME NULL AFTER evaluation_summary");
+}
 $colsCe = $db->query("SHOW COLUMNS FROM events LIKE 'content_execution'")->fetchAll();
 if (empty($colsCe)) {
   $db->exec("ALTER TABLE events ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
@@ -924,9 +928,11 @@ require_once __DIR__ . '/../layouts/header.php';
               </div>
             </td>
             <td>
-              <div style="font-weight:600;color:var(--color-primary);">
-                <?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?>
-              </div>
+              <a href="<?= BASE_URL ?>/views/barangay/event-details.php?id=<?= $act['id'] ?>" style="text-decoration:none;" title="View Event Details">
+                <div style="font-weight:600;color:var(--color-primary);">
+                  <?= clean(preg_replace('/^Purok\s*[\w\d-]+\s*[-–—:]*\s*/i', '', $act['title'])) ?>
+                </div>
+              </a>
               <?php $scopePuroks = clean($act['target_puroks'] ?? 'All Puroks'); ?>
               <div
                 style="font-size:9.5px;color:<?= ($scopePuroks === 'All Puroks') ? 'var(--color-teal, #2F6F73)' : '#0284C7' ?>;margin-top:3px;display:flex;align-items:center;gap:3px;font-weight:600;"
@@ -980,28 +986,16 @@ require_once __DIR__ . '/../layouts/header.php';
             </td>
             <td>
               <div style="display:flex;gap:4px;align-items:center;">
-                <button type="button" class="btn btn-primary btn-sm"
-                  onclick='openAccomplishedEventModal(<?= json_encode($act) ?>, <?= json_encode($actAttendees) ?>)'
-                  style="font-size:11px;padding:4px 10px;display:inline-flex;align-items:center;gap:4px;"
-                  title="View Event Overview">
+                <a href="<?= BASE_URL ?>/views/barangay/event-details.php?id=<?= $act['id'] ?>" class="btn btn-primary btn-sm"
+                  style="font-size:11px;padding:4px 10px;display:inline-flex;align-items:center;gap:4px;text-decoration:none;"
+                  title="View Event Details">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                     <circle cx="12" cy="12" r="3"></circle>
                   </svg>
                   View
-                </button>
-                <?php if (($isEnded || $act['status'] === 'Ended' || $act['status'] === 'Finished') && !$isCompleted && !$isCancelled && !$isArchived): ?>
-                  <button type="button" class="btn btn-success btn-sm"
-                    onclick='openEvaluateModal(<?= json_encode($act) ?>, <?= json_encode($actAttendees) ?>)'
-                    style="font-size:11px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;background:var(--color-success,#16A34A);border-color:var(--color-success,#16A34A);color:#fff;"
-                    title="Evaluate Event Execution & Attendance">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M9 11l3 3L22 4"></path>
-                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                    </svg>
-                    Evaluate
-                  </button>
-                <?php endif; ?>
+                </a>
+
                 <?php if ($isArchived): ?>
                   <button type="button" class="btn btn-outline btn-sm"
                     onclick='confirmDeleteActivity(<?= json_encode($act) ?>, <?= count($actAttendees) ?>)'

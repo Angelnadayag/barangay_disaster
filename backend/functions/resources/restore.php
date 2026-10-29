@@ -28,10 +28,21 @@ if (!$resItem) {
 }
 
 try {
-    $up = $db->prepare("UPDATE resources SET status = 'active' WHERE id = ?");
+    $up = $db->prepare("UPDATE resources SET status = 'active', updated_at = NOW() WHERE id = ?");
     $up->execute([$id]);
 
-    logSystemEvent('RESTORE_RESOURCE', 'Inventory', "Restored resource {$resItem['code']}: {$resItem['name']} (#$id)");
+    $db->prepare("
+        INSERT INTO resource_transactions (
+            resource_id, transaction_type, quantity, reference_type, reference_id, remarks, performed_by, created_at
+        ) VALUES (?, 'Restock', 0, 'manual', ?, ?, ?, NOW())
+    ")->execute([
+        $id,
+        $id,
+        "Commodity '{$resItem['name']}' [{$resItem['code']}] restored to Active inventory by {$user['full_name']}",
+        $user['id']
+    ]);
+
+    logSystemEvent('RESTORE_SUPPLY', 'Supplies', "Restored supply {$resItem['code']}: {$resItem['name']} (#$id)");
 
     redirectWithFlash($returnUrl, 'success', "Resource '{$resItem['name']}' restored to Active.");
 } catch (Exception $e) {

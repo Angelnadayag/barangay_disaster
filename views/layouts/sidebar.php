@@ -94,12 +94,45 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
             <?php if (!empty($pendingReqs) && $pendingReqs > 0): ?><span class="nav-badge nav-badge-danger"><?= $pendingReqs ?> Active</span><?php endif; ?>
           </a>
         </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php" class="nav-link <?= $currentPage === 'manage-resources.php' ? 'active' : '' ?>">
+        <?php 
+          $resTab = $_GET['tab'] ?? '';
+          $isManageResourcesActive = in_array($currentPage, [
+            'manage-resources.php', 
+            'active-resources.php', 
+            'resource-allocated.php', 
+            'resources-requested.php'
+          ], true);
+        ?>
+        <li class="nav-item nav-item-dropdown <?= $isManageResourcesActive ? 'active-dropdown' : '' ?>" id="sidebarManageResourcesDropdown">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=active" class="nav-link <?= $isManageResourcesActive ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
-            Manage Resources
-            <?php if (!empty($pendingResourceReqs) && $pendingResourceReqs > 0): ?><span class="nav-badge nav-badge-danger"><?= $pendingResourceReqs ?> New</span><?php endif; ?>
+            <span style="flex:1;">Manage Supplies</span>
+            <?php if (!empty($pendingResourceReqs) && $pendingResourceReqs > 0): ?><span class="nav-badge nav-badge-danger" style="margin-right:4px; font-size:9px; padding:1px 5px;"><?= $pendingResourceReqs ?> New</span><?php endif; ?>
+            <svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </a>
+          <ul class="nav-submenu">
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/active-resources.php" class="nav-submenu-link <?= ($currentPage === 'active-resources.php' || ($currentPage === 'manage-resources.php' && ($resTab === 'active' || empty($resTab)))) ? 'active' : '' ?>" title="View Active Supplies">
+                <span class="nav-submenu-bullet"></span>
+                <span>Active Supplies</span>
+              </a>
+            </li>
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/resource-allocated.php" class="nav-submenu-link <?= ($currentPage === 'resource-allocated.php' || ($currentPage === 'manage-resources.php' && $resTab === 'allocations')) ? 'active' : '' ?>" title="View Supplies Allocated">
+                <span class="nav-submenu-bullet"></span>
+                <span>Supplies Allocated</span>
+              </a>
+            </li>
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/resources-requested.php" class="nav-submenu-link <?= ($currentPage === 'resources-requested.php' || ($currentPage === 'manage-resources.php' && $resTab === 'requests')) ? 'active' : '' ?>" title="View Supplies Requested">
+                <span class="nav-submenu-bullet"></span>
+                <span style="flex:1;">Supplies Requested</span>
+                <?php if (!empty($pendingResourceReqs) && $pendingResourceReqs > 0): ?>
+                  <span class="nav-badge nav-badge-danger" style="font-size:8.5px; padding:1px 4px;"><?= $pendingResourceReqs ?></span>
+                <?php endif; ?>
+              </a>
+            </li>
+          </ul>
         </li>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/inventory.php" class="nav-link <?= in_array($currentPage, ['inventory.php', 'resources.php', 'inventory-history.php', 'inventory-adjustment.php']) ? 'active' : '' ?>">
@@ -111,14 +144,56 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/icdrrmo/financial-aid-allocation.php" class="nav-link <?= $currentPage === 'financial-aid-allocation.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>
-            Financial Aid Allocation
+            Manage Resources
           </a>
         </li>
         <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/icdrrmo/events.php" class="nav-link <?= $currentPage === 'events.php' ? 'active' : '' ?>">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/events.php" class="nav-link <?= in_array($currentPage, ['events.php', 'event-details.php'], true) ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-            Manage Events
+            Preparedness Activities
           </a>
+        </li>
+        <?php 
+          $sysLogModule = $_GET['module'] ?? '';
+          $isLogsActive = in_array($currentPage, [
+            'event-logs.php', 
+            'system-logs.php', 
+            'resources-logs.php', 
+            'supplies-logs.php'
+          ], true); 
+        ?>
+        <li class="nav-item nav-item-dropdown <?= $isLogsActive ? 'active-dropdown' : '' ?>" id="sidebarSystemLogsDropdown">
+          <a href="<?= BASE_URL ?>/views/icdrrmo/system-logs.php" class="nav-link <?= $isLogsActive ? 'active' : '' ?>">
+            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></span>
+            <span style="flex:1;">System Logs</span>
+            <svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </a>
+          <ul class="nav-submenu">
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/event-logs.php" class="nav-submenu-link <?= $currentPage === 'event-logs.php' ? 'active' : '' ?>" title="View Barangay Event Logs">
+                <span class="nav-submenu-bullet"></span>
+                <span>Event Logs</span>
+              </a>
+            </li>
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/system-logs.php" class="nav-submenu-link <?= ($currentPage === 'system-logs.php' && empty($sysLogModule)) ? 'active' : '' ?>" title="View All System Audit Logs">
+                <span class="nav-submenu-bullet"></span>
+                <span>All System Logs</span>
+              </a>
+            </li>
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/resources-logs.php" class="nav-submenu-link <?= ($currentPage === 'resources-logs.php' || ($currentPage === 'system-logs.php' && ($sysLogModule === 'Manage Resources' || $sysLogModule === 'Resources'))) ? 'active' : '' ?>" title="View Resources Logs">
+                <span class="nav-submenu-bullet"></span>
+                <span>Resources Logs</span>
+              </a>
+            </li>
+            <li class="nav-submenu-item">
+              <a href="<?= BASE_URL ?>/views/icdrrmo/supplies-logs.php" class="nav-submenu-link <?= ($currentPage === 'supplies-logs.php' || ($currentPage === 'system-logs.php' && $sysLogModule === 'Supplies')) ? 'active' : '' ?>" title="View Supplies Logs">
+                <span class="nav-submenu-bullet"></span>
+                <span>Supplies Logs</span>
+              </a>
+            </li>
+          </ul>
         </li>
       </ul>
     </div>
@@ -140,16 +215,11 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
             Disaster Reports
           </a>
         </li>
-        <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/barangay/users.php" class="nav-link <?= in_array($currentPage, ['users.php', 'residents.php', 'responders.php'], true) ? 'active' : '' ?>">
-            <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
-            Manage User
-          </a>
-        </li>
+        <?php /* Manage User removed for Barangay Head — user management is restricted to ICDRRMO only */ ?>
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/barangay/resources.php" class="nav-link <?= $currentPage === 'resources.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
-            Manage Resources
+            Manage Supplies
           </a>
         </li>
         <li class="nav-item">
@@ -162,11 +232,11 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
         <li class="nav-item">
           <a href="<?= BASE_URL ?>/views/barangay/financial-aid-distribution.php" class="nav-link <?= $currentPage === 'financial-aid-distribution.php' ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>
-            Financial Aid Distribution
+            Manage Resources
           </a>
         </li>
         <li class="nav-item">
-          <a href="<?= BASE_URL ?>/views/barangay/events.php" class="nav-link <?= $currentPage === 'events.php' ? 'active' : '' ?>">
+          <a href="<?= BASE_URL ?>/views/barangay/events.php" class="nav-link <?= in_array($currentPage, ['events.php', 'event-details.php'], true) ? 'active' : '' ?>">
             <span class="nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
             Manage Event
           </a>
@@ -197,4 +267,94 @@ if ($role === 'icdrrmo' || $role === 'barangay_head') {
     </div>
   <?php endif; ?>
 </aside>
+
+<style>
+/* Sidebar Submenu & Hover Extended Dropdown */
+.nav-item-dropdown {
+  position: relative;
+}
+.nav-item-dropdown > .nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 10px);
+  position: relative;
+}
+.nav-chevron {
+  margin-left: auto;
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+.nav-submenu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, transform 0.22s ease, padding 0.2s ease;
+  padding-left: 28px;
+}
+/* Trigger open on hover or active page */
+.nav-item-dropdown:hover .nav-chevron,
+.nav-item-dropdown.active-dropdown .nav-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+.nav-item-dropdown:hover .nav-submenu,
+.nav-item-dropdown.active-dropdown .nav-submenu {
+  max-height: 180px;
+  opacity: 1;
+  transform: translateY(0);
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.nav-submenu-item {
+  width: 100%;
+}
+.nav-submenu-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #475569);
+  text-decoration: none;
+  border-radius: var(--radius-primary, 5px);
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+.nav-submenu-bullet {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #94A3B8;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.nav-submenu-link:hover {
+  background: var(--color-surface-subtle, #F0F3F4);
+  color: var(--color-primary, #17324D);
+  padding-left: 13px;
+}
+.nav-submenu-link:hover .nav-submenu-bullet {
+  background: var(--color-primary, #17324D);
+  transform: scale(1.4);
+}
+.nav-submenu-link.active {
+  background: var(--color-surface-subtle, #F0F3F4);
+  color: var(--color-primary, #17324D);
+  font-weight: 700;
+  border-left: 2px solid var(--color-primary, #17324D);
+  border-radius: 0 var(--radius-primary, 5px) var(--radius-primary, 5px) 0;
+}
+.nav-submenu-link.active .nav-submenu-bullet {
+  background: var(--color-primary, #17324D);
+  transform: scale(1.4);
+}
+</style>
 

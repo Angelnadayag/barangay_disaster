@@ -28,21 +28,32 @@ if (!$actId) {
     redirectWithFlash($returnUrl, 'error', 'Invalid activity ID.');
 }
 
-// Verify jurisdiction for barangay head
-if ($user['role'] === 'barangay_head') {
-    $chkStmt = $db->prepare("SELECT barangay_id FROM events WHERE id = ?");
-    $chkStmt->execute([$actId]);
-    $actOwner = $chkStmt->fetch();
-    if ($actOwner && (int)$actOwner['barangay_id'] !== (int)$user['barangay_id']) {
-        if ($isAjax) jsonResponse(['success' => false, 'message' => 'Unauthorized for this barangay event.'], 403);
-        redirectWithFlash($returnUrl, 'error', 'Unauthorized for this event.');
-    }
+// Fetch event record to check jurisdiction and prior evaluation status
+$chkStmt = $db->prepare("SELECT id, title, status, evaluation_summary, barangay_id FROM events WHERE id = ?");
+$chkStmt->execute([$actId]);
+$actOwner = $chkStmt->fetch();
+
+if (!$actOwner) {
+    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Event not found.'], 404);
+    redirectWithFlash($returnUrl, 'error', 'Event not found.');
 }
+
+if ($user['role'] === 'barangay_head' && (int)$actOwner['barangay_id'] !== (int)$user['barangay_id']) {
+    if ($isAjax) jsonResponse(['success' => false, 'message' => 'Unauthorized for this barangay event.'], 403);
+    redirectWithFlash($returnUrl, 'error', 'Unauthorized for this event.');
+}
+
+$wasAlreadyEvaluated = ($actOwner['status'] === 'Completed' || !empty($actOwner['evaluation_summary']));
 
 $status = trim($_POST['status'] ?? 'Completed');
 $summary = trim($_POST['evaluation_summary'] ?? '');
 
 // Self-heal table schema if necessary
+$colsEvalAt = $db->query("SHOW COLUMNS FROM events LIKE 'evaluated_at'")->fetchAll();
+if (empty($colsEvalAt)) {
+    $db->exec("ALTER TABLE events ADD COLUMN evaluated_at DATETIME NULL AFTER evaluation_summary");
+}
+
 $colsAct = $db->query("SHOW COLUMNS FROM events LIKE 'content_execution'")->fetchAll();
 if (empty($colsAct)) {
     $db->exec("ALTER TABLE events ADD COLUMN content_execution TEXT NULL AFTER evaluation_summary");
@@ -107,6 +118,7 @@ try {
                 status = ?,
                 actual_participants = ?,
                 evaluation_summary = ?,
+                evaluated_at = NOW(),
                 content_execution = ?,
                 expected_activities = ?
             WHERE id = ?
@@ -118,13 +130,16 @@ try {
                 status = ?,
                 actual_participants = ?,
                 evaluation_summary = ?,
+                evaluated_at = NOW(),
                 content_execution = ?
             WHERE id = ?
         ");
         $stmt->execute([$status, $actual, $summary, $contentExecutionJson, $actId]);
     }
 
-    logSystemEvent('EVALUATE_ACTIVITY', 'Preparedness', "Evaluated activity #$actId ($status, $actual participants attended)");
+    $actionCode = $wasAlreadyEvaluated ? 'REEVALUATE_ACTIVITY' : 'EVALUATE_ACTIVITY';
+    $actionVerb = $wasAlreadyEvaluated ? 'Re-evaluated' : 'Evaluated';
+    logSystemEvent($actionCode, 'Preparedness', "$actionVerb event #$actId: '{$actOwner['title']}' ($status, $actual participants attended)");
 
     if ($isAjax) {
         jsonResponse([

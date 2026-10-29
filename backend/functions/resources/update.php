@@ -133,7 +133,28 @@ try {
         $db->prepare("INSERT IGNORE INTO resource_brands (name) VALUES (?)")->execute([$brand]);
     }
 
-    logSystemEvent('UPDATE_RESOURCE', 'Resources', "Updated resource '$name' ($code)");
+    $qtyDiff = $availableQuantity - (int)$res['available_quantity'];
+    if ($qtyDiff !== 0) {
+        $transType = $qtyDiff > 0 ? 'Restock' : 'Adjusted';
+        $db->prepare("
+            INSERT INTO resource_transactions (
+                resource_id, transaction_type, quantity, reference_type, reference_id, remarks, performed_by, created_at
+            ) VALUES (?, ?, ?, 'manual', ?, ?, ?, NOW())
+        ")->execute([
+            $id,
+            $transType,
+            abs($qtyDiff),
+            $id,
+            "Stock updated from {$res['available_quantity']} to {$availableQuantity} {$unit} by {$user['full_name']}",
+            $user['id']
+        ]);
+    }
+
+    logSystemEvent(
+        'UPDATE_SUPPLY',
+        'Supplies',
+        "Updated supply '{$name}' [{$code}] (Stock: {$availableQuantity} {$unit}, Category: {$category}, Condition: {$itemCondition})"
+    );
 
     if ($isAjax) {
         jsonResponse([

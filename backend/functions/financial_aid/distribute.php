@@ -126,7 +126,7 @@ try {
                 $allocationId, (int)$alloc['barangay_id'], $auditText,
                 $totalBudget, $user['id'], $user['full_name'], $role
             ]);
-            logSystemEvent('UPDATE_FINANCIAL_AID_PLAN', 'Financial Aid', $auditText);
+            logSystemEvent('UPDATE_RESOURCE_FUND_PLAN', 'Manage Resources', $auditText);
 
             $succMsg = "Financial aid distribution for '{$programName}' configured successfully.";
         } else {
@@ -168,7 +168,7 @@ try {
                 $allocationId, $bId, $auditText,
                 $totalBudget, $user['id'], $user['full_name'], $role
             ]);
-            logSystemEvent('CREATE_FINANCIAL_AID_PLAN', 'Financial Aid', $auditText);
+            logSystemEvent('CREATE_RESOURCE_FUND_PLAN', 'Manage Resources', $auditText);
 
             $succMsg = "Financial aid distribution for '{$programName}' created successfully.";
         }
@@ -357,7 +357,8 @@ try {
             $auditText, $amount, $user['id'], $user['full_name'], $role
         ]);
 
-        logSystemEvent('DISBURSE_FINANCIAL_AID', 'Financial Aid', $auditText);
+        $aidAction = ($claimStatus === 'Claimed') ? 'RECEIVED_RESOURCE_AID' : 'REQUEST_RESOURCE_AID';
+        logSystemEvent($aidAction, 'Manage Resources', $auditText);
 
         // In-app Notification for Resident (scoped to beneficiary or their purok)
         try {
@@ -501,7 +502,7 @@ try {
             $auditText, $amount, $user['id'], $user['full_name'], $role
         ]);
 
-        logSystemEvent('DISBURSE_FINANCIAL_AID', 'Financial Aid', $auditText);
+        logSystemEvent('RECEIVED_RESOURCE_AID', 'Manage Resources', $auditText);
 
         // In-app Notification for Resident (only for registered user accounts)
         try {
@@ -711,7 +712,7 @@ try {
         ");
         $auditStmt->execute([$dist['allocation_id'], $distId, $dist['barangay_id'], $auditText, $amount, $user['id'], $user['full_name'], $role]);
 
-        logSystemEvent('VOID_FINANCIAL_AID', 'Financial Aid', $auditText);
+        logSystemEvent('NOT_RECEIVED_RESOURCE_AID', 'Manage Resources', $auditText);
 
         if ($isAjax) {
             jsonResponse([

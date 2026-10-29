@@ -15,7 +15,8 @@ $db = getDBConnection();
 
 $returnUrl = $_POST['return_url'] ?? ($_SERVER['HTTP_REFERER'] ?? (BASE_URL . '/views/icdrrmo/users.php'));
 
-if ($user['role'] !== 'icdrrmo' && $user['role'] !== 'barangay_head') {
+// User management is restricted to ICDRRMO only
+if ($user['role'] !== 'icdrrmo') {
     redirectWithFlash($returnUrl, 'error', 'Unauthorized.');
 }
 

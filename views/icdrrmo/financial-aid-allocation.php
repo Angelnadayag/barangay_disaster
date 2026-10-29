@@ -13,7 +13,7 @@ requireRole('icdrrmo');
 $user = getCurrentUser();
 $db = getDBConnection();
 
-$pageTitle = "Financial Aid Allocation — ICDRRMO Admin";
+$pageTitle = "Manage Resources — ICDRRMO Admin";
 require_once __DIR__ . '/../layouts/header.php';
 require_once __DIR__ . '/../layouts/sidebar.php';
 
@@ -301,7 +301,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-title-wrap">
-      <h1>Financial Aid Allocation</h1>
+      <h1>Manage Resources</h1>
       <p class="page-header-desc">
         Centralized disaster cash assistance programming, Hinaplanon purok fund allocation, and distribution audits.
       </p>

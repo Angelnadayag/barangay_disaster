@@ -133,7 +133,7 @@ try {
             $auditDetails, $totalBudget, $user['id'], $user['full_name']
         ]);
 
-        logSystemEvent('ALLOCATE_FINANCIAL_AID', 'Financial Aid', "Allocated ₱{$totalBudget} to {$barangayName} ({$allocationCode})");
+        logSystemEvent('CREATE_RESOURCE_ALLOCATION', 'Manage Resources', "ICDRRMO created resource allocation {$allocationCode}: ₱" . number_format($totalBudget, 2) . " for Barangay {$barangayName} ({$programName}, {$targetBeneficiaries} target families)");
 
         // Notify residents of the targeted barangay
         try {
@@ -179,12 +179,68 @@ try {
         ");
         $auditStmt->execute([$id, $alloc['barangay_id'], $auditDetails, $user['id'], $user['full_name']]);
 
-        logSystemEvent('UPDATE_FINANCIAL_AID_STATUS', 'Financial Aid', $auditDetails);
+        $statusAction = ($newStatus === 'Archived') ? 'ARCHIVE_RESOURCE_ALLOCATION' : (($newStatus === 'Active' && $alloc['status'] === 'Archived') ? 'RESTORE_RESOURCE_ALLOCATION' : 'UPDATE_RESOURCE_STATUS');
+        logSystemEvent($statusAction, 'Manage Resources', $auditDetails);
 
         if ($isAjax) {
             jsonResponse(['success' => true, 'message' => "Allocation status updated to {$newStatus}."]);
         }
         redirectWithFlash($returnUrl, 'success', "Allocation status updated to {$newStatus}.");
+
+    } elseif ($action === 'edit' || $action === 'update') {
+        $id = (int)($_POST['id'] ?? 0);
+        $programName = trim($_POST['program_name'] ?? '');
+        $disasterType = trim($_POST['disaster_type'] ?? '') ?: 'General Calamity';
+        $targetPurok = trim($_POST['target_purok'] ?? 'All Puroks');
+        $totalBudget = (float)($_POST['total_budget'] ?? 0);
+        $amountPerBeneficiary = (float)($_POST['amount_per_beneficiary'] ?? 0);
+        $fundingSource = trim($_POST['funding_source'] ?? 'LGU Calamity Fund');
+        $notes = trim($_POST['notes'] ?? '') ?: null;
+
+        $checkStmt = $db->prepare("SELECT a.*, b.name AS barangay_name FROM financial_aid_allocations a JOIN barangays b ON a.barangay_id = b.id WHERE a.id = ?");
+        $checkStmt->execute([$id]);
+        $alloc = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$alloc) {
+            throw new Exception("Allocation not found.");
+        }
+
+        $targetBeneficiaries = ($amountPerBeneficiary > 0) ? (int)floor($totalBudget / $amountPerBeneficiary) : $alloc['target_beneficiaries'];
+        $remainingBudget = max(0, $totalBudget - (float)$alloc['disbursed_budget']);
+
+        $upStmt = $db->prepare("
+            UPDATE financial_aid_allocations SET
+                program_name = ?,
+                disaster_type = ?,
+                target_purok = ?,
+                total_budget = ?,
+                amount_per_beneficiary = ?,
+                remaining_budget = ?,
+                funding_source = ?,
+                target_beneficiaries = ?,
+                notes = ?,
+                updated_at = NOW()
+            WHERE id = ?
+        ");
+        $upStmt->execute([
+            $programName, $disasterType, $targetPurok, $totalBudget,
+            $amountPerBeneficiary, $remainingBudget, $fundingSource,
+            $targetBeneficiaries, $notes, $id
+        ]);
+
+        $auditDetails = "Edited resource allocation {$alloc['allocation_code']} ({$programName}): Budget ₱" . number_format($totalBudget, 2) . ", Target: {$targetPurok}";
+        $auditStmt = $db->prepare("
+            INSERT INTO financial_aid_audits (
+                allocation_id, barangay_id, action, details, amount, actor_id, actor_name, actor_role
+            ) VALUES (?, ?, 'Status Change', ?, ?, ?, ?, 'icdrrmo')
+        ");
+        $auditStmt->execute([$id, $alloc['barangay_id'], $auditDetails, $totalBudget, $user['id'], $user['full_name']]);
+
+        logSystemEvent('EDIT_RESOURCE_ALLOCATION', 'Manage Resources', $auditDetails);
+
+        if ($isAjax) {
+            jsonResponse(['success' => true, 'message' => "Allocation {$alloc['allocation_code']} updated successfully."]);
+        }
+        redirectWithFlash($returnUrl, 'success', "Allocation {$alloc['allocation_code']} updated successfully.");
 
     } elseif ($action === 'delete') {
         $id = (int)($_POST['id'] ?? 0);
@@ -202,7 +258,7 @@ try {
         $delStmt = $db->prepare("DELETE FROM financial_aid_allocations WHERE id = ?");
         $delStmt->execute([$id]);
 
-        logSystemEvent('DELETE_FINANCIAL_AID', 'Financial Aid', "Deleted allocation {$alloc['allocation_code']} for {$alloc['barangay_name']}");
+        logSystemEvent('DELETE_RESOURCE_ALLOCATION', 'Manage Resources', "Deleted allocation {$alloc['allocation_code']} for {$alloc['barangay_name']}");
 
         if ($isAjax) {
             jsonResponse(['success' => true, 'message' => "Allocation {$alloc['allocation_code']} removed."]);

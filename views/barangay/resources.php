@@ -112,12 +112,17 @@ $invStmt->execute($invParams);
 $inventoryList = $invStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 2. Fetch Requisition Requests submitted by this Barangay
+// 2. Fetch Requisition Requests submitted by this Barangay
+// Display active supply requests only (Pending, Rejected, or Approved awaiting delivery receipt).
+// Once confirmed "Received", it transfers to Tab 3 (Received Relief Allocations).
 $reqSql = "
-    SELECT r.*, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name
+    SELECT r.*, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name,
+           rec_u.full_name AS received_by_name
     FROM barangay_resource_requests r
     LEFT JOIN users u ON r.requested_by = u.id
     LEFT JOIN users rev ON r.reviewed_by = rev.id
-    WHERE r.barangay_id = ?
+    LEFT JOIN users rec_u ON r.received_by = rec_u.id
+    WHERE r.barangay_id = ? AND (r.receipt_status != 'Received' OR r.receipt_status IS NULL)
 ";
 $reqParams = [$barangayId];
 
@@ -130,12 +135,12 @@ if (!empty($search) && $activeTab === 'requests') {
   $reqParams[] = $like;
 }
 
-$reqSql .= " ORDER BY r.created_at DESC";
+$reqSql .= " ORDER BY (r.status = 'Pending') DESC, (r.receipt_status = 'Pending') DESC, r.created_at DESC";
 $reqStmt = $db->prepare($reqSql);
 $reqStmt->execute($reqParams);
 $requestsList = $reqStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// 3. Fetch Received Relief Allocations
+// 3. Fetch Received Relief Allocations (Decision Tree Dispatches)
 $allocStmt = $db->prepare("
     SELECT ri.*, res.code, res.name AS resource_name, res.unit, res.category,
            r.recommendation_code, dr.tracking_code, dr.disaster_type, dr.purok_name, r.reviewed_at
@@ -148,6 +153,21 @@ $allocStmt = $db->prepare("
 ");
 $allocStmt->execute([$barangayId]);
 $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// 3b. Fetch Confirmed Received Requisition Relief Dispatches
+$reqAllocStmt = $db->prepare("
+    SELECT brr.*, brr.item_name AS resource_name,
+           COALESCE(brr.approved_quantity, brr.requested_quantity) AS allocated_quantity,
+           res.code, rev.full_name AS approved_by_name
+    FROM barangay_resource_requests brr
+    LEFT JOIN resources res ON brr.resource_id = res.id
+    LEFT JOIN users rev ON brr.reviewed_by = rev.id
+    WHERE brr.barangay_id = ? AND brr.status = 'Approved' AND brr.receipt_status = 'Received'
+    ORDER BY brr.received_at DESC, brr.updated_at DESC
+");
+$reqAllocStmt->execute([$barangayId]);
+$receivedReqAllocations = $reqAllocStmt->fetchAll(PDO::FETCH_ASSOC);
+$totalAllocationsCount = count($allocations) + count($receivedReqAllocations);
 
 // 4. Central Depot Catalog (for requisition items dropdown)
 $centralCatalog = $db->query("
@@ -257,7 +277,7 @@ foreach ($standardResources as $std) {
 }
 ksort($resourceCatalog, SORT_NATURAL | SORT_FLAG_CASE);
 
-$pageTitle = "Manage Resources — Barangay " . clean($barangay['name']);
+$pageTitle = "Manage Supplies — Barangay " . clean($barangay['name']);
 require_once __DIR__ . '/../layouts/header.php';
 require_once __DIR__ . '/../layouts/sidebar.php';
 ?>
@@ -474,7 +494,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
   <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-title-wrap">
-      <h1>Barangay <?= clean($barangay['name']) ?> Manage Resources</h1>
+      <h1>Barangay <?= clean($barangay['name']) ?> Manage Supplies</h1>
       <p class="page-header-desc">
         Maintain local relief and emergency provisions, track inventory stock, and submit supply requisition requests
         directly to the ICDRRMO Central Depot.
@@ -543,7 +563,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
         <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
         <line x1="12" y1="22.08" x2="12" y2="12"></line>
       </svg>
-      Received Relief Allocations (<?= count($allocations) ?>)
+      Received Relief Allocations (<?= $totalAllocationsCount ?>)
     </a>
   </div>
 
@@ -558,7 +578,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           </path>
         </svg>
       </div>
-      <div class="metric-value" style="color:var(--color-primary);"><?= number_format($localTotalStock) ?></div>
+      <div class="metric-value" id="brgyLocalTotalStock" style="color:var(--color-primary);"><?= number_format($localTotalStock) ?></div>
       <div class="metric-meta">On hand in Barangay Hall stockroom</div>
     </div>
 
@@ -750,8 +770,8 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       <div class="card-header"
         style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div>
-          <h3 class="card-title">Requisitions Submitted to ICDRRMO Central Depot</h3>
-          <div class="card-subtitle">Track requisition reviews, view remarks, and inspect stock transferred upon approval
+          <h3 class="card-title">Active Supply Requisitions</h3>
+          <div class="card-subtitle">Pending reviews and dispatches awaiting delivery receipt. Confirmed deliveries transfer to Received Relief Allocations.
           </div>
         </div>
         <button type="button" class="btn btn-primary btn-sm" onclick="openRequestResourceModal()">
@@ -831,9 +851,24 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                   <td style="font-size:11px;font-weight:500;">
                     <?= clean($req['target_purok'] ?: 'Barangay-wide') ?>
                   </td>
-                  <td>
+                  <td id="brgy-req-status-cell-<?= $req['id'] ?>">
                     <?php if ($req['status'] === 'Approved'): ?>
-                      <span class="badge badge-success">Approved</span>
+                      <?php if (!empty($req['receipt_status']) && $req['receipt_status'] === 'Received'): ?>
+                        <span class="badge badge-success" style="font-size:9.5px;padding:3px 8px;display:inline-flex;align-items:center;gap:3px;">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                          Received
+                        </span>
+                      <?php elseif (!empty($req['receipt_status']) && $req['receipt_status'] === 'Not Received'): ?>
+                        <span class="badge badge-danger" style="font-size:9.5px;padding:3px 8px;display:inline-flex;align-items:center;gap:3px;">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                          Not Received
+                        </span>
+                      <?php else: ?>
+                        <span class="badge badge-warning" style="font-size:9.5px;padding:3px 8px;display:inline-flex;align-items:center;gap:3px;">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                          Awaiting Receipt
+                        </span>
+                      <?php endif; ?>
                     <?php elseif ($req['status'] === 'Rejected'): ?>
                       <span class="badge badge-danger">Rejected</span>
                     <?php else: ?>
@@ -844,11 +879,22 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                     <?= formatDate($req['created_at'], 'M d, Y') ?>
                   </td>
                   <td style="text-align:right;">
-                    <!-- Single View button matching style -->
-                    <button type="button" class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:10.5px;"
-                      onclick="viewRequisitionDetails(<?= htmlspecialchars(json_encode($req)) ?>)">
-                      View
-                    </button>
+                    <div style="display:inline-flex;gap:6px;align-items:center;justify-content:flex-end;" id="brgy-req-actions-cell-<?= $req['id'] ?>">
+                      <?php if ($req['status'] === 'Approved'): ?>
+                        <button type="button" class="btn btn-sm btn-primary"
+                          style="padding:3px 8px;font-size:10.5px;background:var(--color-secondary,#2F6F73);border-color:var(--color-secondary,#2F6F73);display:inline-flex;align-items:center;gap:3px;"
+                          onclick="openReceiveReceiptModal(<?= htmlspecialchars(json_encode($req)) ?>)">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                          Receive
+                        </button>
+                      <?php endif; ?>
+                      <button type="button" class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:10.5px;"
+                        onclick="viewRequisitionDetails(<?= htmlspecialchars(json_encode($req)) ?>)">
+                        View
+                      </button>
+                    </div>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -859,57 +905,119 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     </div>
 
   <?php elseif ($activeTab === 'allocations'): ?>
-    <!-- TAB 3: RECEIVED RELIEF ALLOCATIONS (INCIDENTS) -->
+    <!-- TAB 3: RECEIVED RELIEF ALLOCATIONS (INCIDENTS & REQUISITIONS) -->
     <div class="card" style="margin-bottom:var(--space-4);">
-      <div class="card-header">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div>
-          <h3 class="card-title">Dispatched & Received Relief Allocations</h3>
-          <div class="card-subtitle">Approved by ICDRRMO via Decision Tree Recommender for Barangay
-            <?= clean($barangay['name']) ?></div>
+          <h3 class="card-title" style="font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;margin:0;">Dispatched & Received Relief Allocations</h3>
+          <div class="card-subtitle" style="font-family:'Roboto',sans-serif;font-size:10px;color:var(--color-text-muted);margin-top:2px;">
+            Confirmed relief provisions and emergency supplies received by Barangay <?= clean($barangay['name']) ?> from ICDRRMO
+          </div>
         </div>
-        <span class="badge badge-success"><?= count($allocations) ?> Allocation Batch(es)</span>
+        <span class="badge badge-success" style="font-size:9.5px;"><?= $totalAllocationsCount ?> Allocation Batch(es) Received</span>
       </div>
       <div class="table-responsive">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Disaster Incident</th>
-              <th>Purok Target</th>
+              <th>Allocation / Requisition Ref</th>
+              <th>Target Purok</th>
               <th>Allocated Resource</th>
               <th>Category</th>
-              <th>Allocated Quantity</th>
-              <th>Recommendation Ref</th>
-              <th>Dispatch Approval Date</th>
+              <th>Received Quantity</th>
+              <th>Source / Approval</th>
+              <th>Receipt Date</th>
+              <th>Status</th>
+              <th style="text-align:right;">Action</th>
             </tr>
           </thead>
           <tbody>
-            <?php if (empty($allocations)): ?>
+            <?php if (empty($allocations) && empty($receivedReqAllocations)): ?>
               <tr>
-                <td colspan="7" style="text-align:center;padding:36px;color:var(--color-text-muted);">No disaster incident
-                  packages have been allocated to this barangay yet.</td>
+                <td colspan="9" style="text-align:center;padding:36px;color:var(--color-text-muted);">
+                  No relief allocations or requisition dispatches have been confirmed received yet.
+                </td>
               </tr>
             <?php else: ?>
+              <?php foreach ($receivedReqAllocations as $ra): ?>
+                <tr>
+                  <td style="font-weight:600;font-family:var(--font-secondary);">
+                    <span style="color:var(--color-primary);"><?= clean($ra['request_code']) ?></span>
+                    <div style="margin-top:2px;">
+                      <span class="badge badge-info" style="font-size:8px;padding:1px 5px;font-weight:600;">Requisition Dispatch</span>
+                    </div>
+                  </td>
+                  <td style="font-weight:600;font-size:11px;"><?= clean($ra['target_purok'] ?: 'Barangay Hall Depot') ?></td>
+                  <td>
+                    <div style="font-weight:600;color:var(--color-primary);font-size:12px;"><?= clean($ra['resource_name']) ?></div>
+                    <?php if (!empty($ra['code'])): ?>
+                      <div style="font-size:9px;color:var(--color-text-muted);"><?= clean($ra['code']) ?></div>
+                    <?php endif; ?>
+                  </td>
+                  <td><span class="badge badge-neutral" style="font-size:9px;"><?= clean($ra['category']) ?></span></td>
+                  <td style="font-family:var(--font-secondary);font-weight:700;color:var(--color-success);font-size:12px;">
+                    <?= number_format($ra['allocated_quantity']) ?> <?= clean($ra['unit']) ?>
+                  </td>
+                  <td style="font-family:var(--font-secondary);font-size:10px;">
+                    <div>ICDRRMO Central Depot</div>
+                    <?php if (!empty($ra['approved_by_name'])): ?>
+                      <div style="font-size:8.5px;color:var(--color-text-muted);">Approved by: <?= clean($ra['approved_by_name']) ?></div>
+                    <?php endif; ?>
+                  </td>
+                  <td style="font-size:10px;color:var(--color-text-muted);font-family:var(--font-secondary);">
+                    <?= !empty($ra['received_at']) ? date('M d, Y h:i A', strtotime($ra['received_at'])) : formatDate($ra['created_at']) ?>
+                  </td>
+                  <td>
+                    <span class="badge badge-success" style="font-size:9px;padding:3px 7px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      Received
+                    </span>
+                  </td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:4px;justify-content:flex-end;">
+                      <button type="button" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:10px;"
+                        onclick='viewRequisitionDetails(<?= htmlspecialchars(json_encode($ra), ENT_QUOTES, 'UTF-8') ?>)'>
+                        View
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline" style="padding:3px 8px;font-size:10px;color:var(--color-primary);"
+                        title="Change delivery receipt status"
+                        onclick='openReceiveReceiptModal(<?= htmlspecialchars(json_encode($ra), ENT_QUOTES, 'UTF-8') ?>)'>
+                        Receipt Status
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
               <?php foreach ($allocations as $a): ?>
                 <tr>
                   <td style="font-weight:600;font-family:var(--font-secondary);">
                     <span style="color:var(--color-primary);"><?= clean($a['tracking_code']) ?></span>
-                    <div style="font-size:9.5px;color:var(--color-text-secondary);"><?= clean($a['disaster_type']) ?></div>
+                    <div style="font-size:9px;color:var(--color-text-secondary);"><?= clean($a['disaster_type']) ?></div>
                   </td>
-                  <td style="font-weight:600;font-size:11px;"><?= clean($a['purok_name']) ?></td>
+                  <td style="font-weight:600;font-size:11px;"><?= clean($a['purok_name'] ?: 'All Puroks') ?></td>
                   <td>
-                    <div style="font-weight:600;color:var(--color-primary);font-size:12px;"><?= clean($a['resource_name']) ?>
-                    </div>
+                    <div style="font-weight:600;color:var(--color-primary);font-size:12px;"><?= clean($a['resource_name']) ?></div>
                     <div style="font-size:9px;color:var(--color-text-muted);"><?= clean($a['code']) ?></div>
                   </td>
-                  <td><?= clean($a['category']) ?></td>
+                  <td><span class="badge badge-neutral" style="font-size:9px;"><?= clean($a['category']) ?></span></td>
                   <td style="font-family:var(--font-secondary);font-weight:700;color:var(--color-success);font-size:12px;">
-                    <?= number_format($a['allocated_quantity']) ?>       <?= clean($a['unit']) ?>
+                    <?= number_format($a['allocated_quantity']) ?> <?= clean($a['unit']) ?>
                   </td>
                   <td style="font-family:var(--font-secondary);font-size:10px;">
-                    <?= clean($a['recommendation_code']) ?>
+                    <div><?= clean($a['recommendation_code']) ?></div>
+                    <div style="font-size:8.5px;color:var(--color-text-muted);">Decision Tree Dispatch</div>
                   </td>
                   <td style="font-size:10px;color:var(--color-text-muted);font-family:var(--font-secondary);">
                     <?= formatDate($a['reviewed_at']) ?>
+                  </td>
+                  <td>
+                    <span class="badge badge-success" style="font-size:9px;padding:3px 7px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      Received
+                    </span>
+                  </td>
+                  <td style="text-align:right;">
+                    <span style="font-size:10px;color:var(--color-text-muted);">Allocated</span>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -941,15 +1049,28 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       <input type="hidden" name="barangay_id" value="<?= $barangayId ?>">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
 
-        <!-- Master Resource Catalog Direct Selection -->
-        <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:8px;padding:12px 14px;">
-          <label class="form-label" style="font-weight:700;color:var(--color-primary);font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-            <span>📦</span> Select Resource from Master Catalog <span style="font-size:10px;font-weight:500;color:var(--color-secondary);">(Diretso nalang)</span>
-          </label>
-          <select name="resource_id" id="create_select_catalog_resource" class="form-control" onchange="onCatalogResourceSelected(this)" style="font-weight:600;background:#FFFFFF;border-color:#94A3B8;">
-            <option value="">— Select from Static Resources Catalog (Diretso nalang) —</option>
+        <!-- Master Resource Catalog Selector & Dynamic Creator -->
+        <div class="form-group" style="margin-bottom:12px; background:var(--color-surface-subtle,#F0F3F4); border:1px solid var(--color-border,#D9E0E3); border-radius:8px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label class="form-label" style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; color:var(--color-primary,#17324D); margin:0; display:flex; align-items:center; gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+              Select Resource from Master Catalog
+            </label>
+            <button type="button" class="btn btn-outline btn-xs" id="btnAdd_catalog_resource_create" onclick="toggleDynamicCatalogResource('create')"
+              style="font-family:'Poppins',sans-serif; font-size:10.5px; font-weight:600; padding:2px 8px; height:auto; line-height:1.2; color:var(--color-primary,#17324D); border-color:var(--color-border,#D9E0E3); background:var(--color-surface,#FFFFFF);">
+              + Add New Resource
+            </button>
+          </div>
+
+          <select name="resource_id" id="create_select_catalog_resource" class="form-control" onchange="onCatalogResourceSelected(this)"
+            style="background:var(--color-surface,#FFFFFF); border-color:var(--color-border,#D9E0E3); font-weight:500; font-size:11.5px; color:var(--color-text,#24313A);">
+            <option value="">— Select an existing commodity from Master Catalog —</option>
             <?php foreach ($catalogByCategory as $catGroup => $cItems): ?>
-              <optgroup label="📂 <?= clean($catGroup) ?>">
+              <optgroup label="<?= clean($catGroup) ?>">
                 <?php foreach ($cItems as $ci): ?>
                   <option value="<?= $ci['id'] ?>"
                           data-code="<?= clean($ci['code']) ?>"
@@ -964,10 +1085,31 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 <?php endforeach; ?>
               </optgroup>
             <?php endforeach; ?>
-            <option value="custom">➕ Or Add New Custom Resource Definition</option>
+            <option value="custom">+ Add New Custom Resource Definition</option>
           </select>
-          <div style="font-size:10px;color:#475569;margin-top:4px;">
-            Choosing a resource auto-populates the official SKU code, item name, category, and unit into your local agency inventory.
+
+          <!-- Inline Dynamic Catalog Creator -->
+          <div id="dynAddContainer_catalog_resource_create" style="display:none; margin-top:8px; background:var(--color-surface,#FFFFFF); border:1px dashed var(--color-border,#D9E0E3); padding:10px 12px; border-radius:6px;">
+            <div style="font-family:'Poppins',sans-serif; font-size:11px; font-weight:600; color:var(--color-primary,#17324D); margin-bottom:6px;">
+              Quick Add Resource to Master Catalog
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:6px; margin-bottom:6px;">
+              <input type="text" id="new_catalog_name_create" class="form-control" placeholder="Resource item name *" style="font-size:11px; height:28px;">
+              <select id="new_catalog_category_create" class="form-control" style="font-size:11px; height:28px;">
+                <?php foreach ($categories as $cat): ?>
+                  <option value="<?= clean($cat) ?>"><?= clean($cat) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <input type="text" id="new_catalog_unit_create" class="form-control" placeholder="Unit (e.g. units, pcs, boxes)" value="units" style="font-size:11px; height:28px;">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:6px;">
+              <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicCatalogResource('create')" style="font-size:10px; padding:3px 8px;">Cancel</button>
+              <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicCatalogResource('create')" style="font-size:10px; padding:3px 10px;">Save to Master Catalog</button>
+            </div>
+          </div>
+
+          <div style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:4px;">
+            Selecting or adding a resource synchronizes official SKU code, category, and unit across ICDRRMO and all Barangays.
           </div>
         </div>
 
@@ -1436,17 +1578,17 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           <option value="">-- Choose from ICDRRMO Catalog (or specify custom item below) --</option>
           <?php foreach ($centralCatalog as $catItem): ?>
             <?php
-            $isOutOfStock = ((int) $catItem['available_quantity'] <= 0);
-            $isLow = ((int) $catItem['available_quantity'] <= (int) ($catItem['min_threshold'] ?? 50));
+            $avail = (int) $catItem['available_quantity'];
+            $isOutOfStock = ($avail <= 0);
+            $isLow = ($avail > 0 && $avail <= (int) ($catItem['min_threshold'] ?? 20));
             ?>
             <option value="<?= $catItem['id'] ?>" data-name="<?= htmlspecialchars($catItem['name']) ?>"
               data-category="<?= htmlspecialchars($catItem['category']) ?>"
               data-unit="<?= htmlspecialchars($catItem['unit']) ?>"
-              data-avail="<?= (int) $catItem['available_quantity'] ?>"
+              data-avail="<?= $avail ?>"
               <?= $isOutOfStock ? 'disabled style="color:#94A3B8;background:#F8FAFC;"' : '' ?>>
               [<?= clean($catItem['category']) ?>] <?= clean($catItem['name']) ?> —
-              <?= number_format($catItem['available_quantity']) ?>   <?= clean($catItem['unit']) ?> available
-              <?= $isOutOfStock ? '(DEPOT DEPLETED)' : ($isLow ? '(LOW STOCK)' : '') ?>
+              <?= $isOutOfStock ? '0 ' . clean($catItem['unit']) . ' (OUT OF STOCK - CANNOT BE REQUESTED)' : number_format($avail) . ' ' . clean($catItem['unit']) . ' available' . ($isLow ? ' (LIMITED STOCK: ' . number_format($avail) . ' LEFT)' : '') ?>
             </option>
           <?php endforeach; ?>
         </select>
@@ -1593,9 +1735,117 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       </div>
     </div>
 
-    <div class="modal-footer" style="justify-content:flex-end;">
+    <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+      <div id="viewReqActionContainer">
+        <button type="button" class="btn btn-sm btn-primary" id="btnViewModalReceive" style="font-size:11px; background:var(--color-secondary,#2F6F73); border-color:var(--color-secondary,#2F6F73); display:none;" onclick="openReceiveFromViewModal()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px; vertical-align:-1px;">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          Confirm Receipt
+        </button>
+      </div>
       <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('viewRequestModal')">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- Modal: Confirm / Report Requisition Delivery Receipt                      -->
+<!-- ========================================================================= -->
+<div class="modal-overlay" id="receiveReceiptModal">
+  <div class="modal-dialog" style="max-width:540px; border-radius:10px;">
+    <div class="modal-header" style="background:#FFFFFF; border-bottom:1px solid var(--color-border,#D9E0E3); padding:14px 18px;">
+      <div>
+        <span style="font-family:'Roboto',sans-serif; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-secondary,#2F6F73);">Requisition Delivery Acknowledgment</span>
+        <h3 class="modal-title" style="font-family:'Poppins',sans-serif; font-size:15px; font-weight:600; color:var(--color-primary,#17324D); margin:2px 0 0 0;">
+          Confirm Resource Receipt
+        </h3>
+        <div style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:2px;">
+          Tracking Code: <strong id="receiptModalCode" style="font-family:'Poppins',sans-serif; color:var(--color-primary,#17324D);"></strong>
+        </div>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeModal('receiveReceiptModal')">&times;</button>
+    </div>
+
+    <form id="receiveReceiptForm" onsubmit="submitReceiptConfirmation(event)">
+      <input type="hidden" id="receipt_request_id">
+      <input type="hidden" id="receipt_selected_status" value="Received">
+
+      <div class="modal-body" style="padding:16px 18px; display:flex; flex-direction:column; gap:12px; background:#FAFCFD;">
+        <!-- Requisition Overview Card -->
+        <div style="background:#FFFFFF; border:1px solid var(--color-border,#D9E0E3); border-radius:8px; padding:12px 14px;">
+          <div style="font-family:'Roboto',sans-serif; font-size:9.5px; text-transform:uppercase; font-weight:700; color:var(--color-text-secondary,#66737D); letter-spacing:0.4px;">
+            Allocated Resource Provision
+          </div>
+          <div id="receiptModalItemName" style="font-family:'Poppins',sans-serif; font-size:14px; font-weight:700; color:var(--color-primary,#17324D); margin-top:3px;">
+            —
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding-top:6px; border-top:1px dashed var(--color-border,#D9E0E3);">
+            <span style="font-family:'Roboto',sans-serif; font-size:11px; color:var(--color-text-secondary,#66737D);">Approved Allocation:</span>
+            <span id="receiptModalAllocatedQty" style="font-family:'Poppins',sans-serif; font-size:13px; font-weight:700; color:var(--color-success,#16A34A);">—</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+            <span style="font-family:'Roboto',sans-serif; font-size:10.5px; color:var(--color-text-secondary,#66737D);">Destination Purok:</span>
+            <span id="receiptModalPurok" style="font-family:'Roboto',sans-serif; font-size:11px; font-weight:500; color:var(--color-primary,#17324D);">—</span>
+          </div>
+        </div>
+
+        <!-- Receipt Status Options -->
+        <div>
+          <label class="form-label" style="font-family:'Roboto',sans-serif; font-size:11px; font-weight:600; margin-bottom:6px;">
+            Delivery Status from ICDRRMO Central Depot <span style="color:var(--color-danger)">*</span>
+          </label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <!-- Option 1: Received -->
+            <div id="receiptOptReceived" class="receipt-choice-card active" onclick="selectReceiptChoice('Received')"
+              style="cursor:pointer; border:2px solid var(--color-secondary,#2F6F73); background:#F0FDF4; border-radius:8px; padding:12px; transition:all 0.2s ease;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:22px; height:22px; border-radius:50%; background:#16A34A; color:#FFFFFF; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <div style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:700; color:#166534;">Receive</div>
+                  <div style="font-family:'Roboto',sans-serif; font-size:9.5px; color:#15803D;">Supplies arrived & received</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Option 2: Not Received -->
+            <div id="receiptOptNotReceived" class="receipt-choice-card" onclick="selectReceiptChoice('Not Received')"
+              style="cursor:pointer; border:1px solid var(--color-border,#D9E0E3); background:#FFFFFF; border-radius:8px; padding:12px; transition:all 0.2s ease;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:22px; height:22px; border-radius:50%; background:#EF4444; color:#FFFFFF; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+                <div>
+                  <div style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:700; color:#991B1B;">Not Received</div>
+                  <div style="font-family:'Roboto',sans-serif; font-size:9.5px; color:#B91C1C;">Shipment has not arrived</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remarks Input -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-family:'Roboto',sans-serif; font-size:11px; margin-bottom:4px;">
+            Delivery Remarks / Inspection Notes (Optional)
+          </label>
+          <textarea id="receipt_remarks_input" class="form-control" rows="2" style="font-family:'Roboto',sans-serif; font-size:11px;"
+            placeholder="e.g. Received at Barangay Hall in good condition, or Dispatched delivery truck has not arrived yet."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="background:#FFFFFF; border-top:1px solid var(--color-border,#D9E0E3); padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('receiveReceiptModal')" style="font-size:11px;">
+          Cancel
+        </button>
+        <button type="submit" id="btnSubmitReceiptConfirm" class="btn btn-primary btn-sm"
+          style="background:var(--color-secondary,#2F6F73); border-color:var(--color-secondary,#2F6F73); font-size:11px;">
+          Confirm Receipt
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -1855,6 +2105,96 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     }
   }
 
+  function toggleDynamicCatalogResource(mode) {
+    const container = document.getElementById(`dynAddContainer_catalog_resource_${mode}`);
+    if (!container) return;
+    const isHidden = container.style.display === 'none' || !container.style.display;
+    container.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      const input = document.getElementById(`new_catalog_name_${mode}`);
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+    }
+  }
+
+  async function confirmDynamicCatalogResource(mode) {
+    const nameInput = document.getElementById(`new_catalog_name_${mode}`);
+    const catSelect = document.getElementById(`new_catalog_category_${mode}`);
+    const unitInput = document.getElementById(`new_catalog_unit_${mode}`);
+    if (!nameInput) return;
+
+    const name = nameInput.value.trim();
+    if (!name) {
+      alert('Please enter a resource item name.');
+      nameInput.focus();
+      return;
+    }
+    const category = catSelect ? catSelect.value : 'Relief Goods';
+    const unit = (unitInput && unitInput.value.trim()) ? unitInput.value.trim() : 'units';
+
+    try {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('category', category);
+      formData.append('unit', unit);
+
+      const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/add_catalog_resource.php', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message || 'Error saving to catalog.');
+        return;
+      }
+
+      const item = data.item;
+      const catSelectElem = document.getElementById('create_select_catalog_resource');
+      if (catSelectElem) {
+        let optgroup = null;
+        for (let i = 0; i < catSelectElem.children.length; i++) {
+          if (catSelectElem.children[i].tagName === 'OPTGROUP' && catSelectElem.children[i].label.toLowerCase() === item.category.toLowerCase()) {
+            optgroup = catSelectElem.children[i];
+            break;
+          }
+        }
+        if (!optgroup) {
+          optgroup = document.createElement('optgroup');
+          optgroup.label = item.category;
+          catSelectElem.appendChild(optgroup);
+        }
+
+        let opt = catSelectElem.querySelector(`option[value="${item.id}"]`);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${item.name} (${item.code} — ${item.unit})`;
+          opt.setAttribute('data-code', item.code);
+          opt.setAttribute('data-name', item.name);
+          opt.setAttribute('data-category', item.category);
+          opt.setAttribute('data-unit', item.unit);
+          opt.setAttribute('data-brand', item.brand || '');
+          opt.setAttribute('data-desc', item.description || '');
+          opt.setAttribute('data-perishable', item.is_perishable ? '1' : '0');
+          optgroup.appendChild(opt);
+        }
+        catSelectElem.value = item.id;
+        onCatalogResourceSelected(catSelectElem);
+      }
+
+      toggleDynamicCatalogResource(mode);
+      if (typeof showToast === 'function') {
+        showToast(data.message, 'success');
+      }
+    } catch (err) {
+      console.error('Error adding catalog resource:', err);
+      alert('Network or server error while adding catalog resource.');
+    }
+  }
+
   // Catalog Resource Auto-Fill handler (Direct selection from static resources)
   function onCatalogResourceSelected(selectElem) {
     const val = selectElem.value;
@@ -1869,7 +2209,8 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const perishCheck = form.querySelector('input[name="is_perishable"]');
 
     if (val === 'custom') {
-      if (codeInput) { codeInput.value = ''; codeInput.readOnly = false; codeInput.focus(); }
+      toggleDynamicCatalogResource('create');
+      if (codeInput) { codeInput.value = ''; codeInput.readOnly = false; }
       if (nameInput) { nameInput.value = ''; nameInput.readOnly = false; }
       if (descInput) { descInput.value = ''; }
       return;
@@ -1887,8 +2228,8 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const category = opt.getAttribute('data-category') || '';
     const unit = opt.getAttribute('data-unit') || '';
     const brand = opt.getAttribute('data-brand') || '';
-    const desc = opt.getAttribute('data-desc') || '';
-    const perish = opt.getAttribute('data-perishable') === '1';
+    const desc = opt.getAttribute('data-desc') || opt.getAttribute('data-description') || '';
+    const perish = opt.getAttribute('data-perishable') === '1' || opt.getAttribute('data-is-perishable') === '1';
 
     if (codeInput) { codeInput.value = code; codeInput.readOnly = true; }
     if (nameInput) { nameInput.value = name; nameInput.readOnly = true; }
@@ -1909,6 +2250,8 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       if (codeInput) codeInput.readOnly = false;
       if (nameInput) nameInput.readOnly = false;
     }
+    const catContainer = document.getElementById('dynAddContainer_catalog_resource_create');
+    if (catContainer) catContainer.style.display = 'none';
     ['category', 'brand', 'supplier'].forEach(f => {
       const c = document.getElementById(`dynAddContainer_${f}_create`);
       if (c) c.style.display = 'none';
@@ -2025,19 +2368,23 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const infoBox = document.getElementById('centralDepotInfoBox');
     const alertEl = document.getElementById('depotStockAlert');
     const hintEl = document.getElementById('reqQuantityMaxHint');
+    const submitBtn = document.getElementById('btnSubmitRequisition');
 
     if (!opt || !opt.value) {
       selectedCentralResourceMax = null;
       if (infoBox) infoBox.style.display = 'none';
       if (alertEl) alertEl.innerText = '';
       if (hintEl) hintEl.innerText = '';
+      const qtyInput = document.getElementById('req_quantity');
+      if (qtyInput) { qtyInput.disabled = false; qtyInput.removeAttribute('max'); }
+      if (submitBtn) submitBtn.disabled = false;
       validateRequisitionQuantity();
       return;
     }
 
     const name = opt.getAttribute('data-name');
     const cat = opt.getAttribute('data-category');
-    const unit = opt.getAttribute('data-unit');
+    const unit = opt.getAttribute('data-unit') || 'units';
     const avail = parseInt(opt.getAttribute('data-avail') || 0);
 
     selectedCentralResourceMax = avail;
@@ -2049,11 +2396,17 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     // Set quantity input max
     const qtyInput = document.getElementById('req_quantity');
     if (qtyInput) {
-      qtyInput.max = avail;
-      if (avail > 0 && parseInt(qtyInput.value) > avail) {
-        qtyInput.value = avail;
-      } else if (avail > 0 && (!qtyInput.value || parseInt(qtyInput.value) <= 0)) {
-        qtyInput.value = Math.min(50, avail);
+      if (avail <= 0) {
+        qtyInput.value = 0;
+        qtyInput.max = 0;
+        qtyInput.disabled = true;
+      } else {
+        qtyInput.disabled = false;
+        qtyInput.max = avail;
+        const curVal = parseInt(qtyInput.value) || 0;
+        if (curVal > avail || curVal <= 0) {
+          qtyInput.value = avail;
+        }
       }
     }
 
@@ -2068,21 +2421,27 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       const badge = document.getElementById('boxDepotBadge');
       if (avail <= 0) {
         badge.className = 'badge badge-danger';
-        badge.innerText = 'Out of Stock';
+        badge.innerText = 'Out of Stock (0 Left)';
         document.getElementById('boxDepotStockNum').style.color = 'var(--color-danger)';
-      } else if (avail < 50) {
+      } else if (avail <= 10) {
         badge.className = 'badge badge-warning';
-        badge.innerText = 'Limited Depot Stock';
+        badge.innerText = `Limited Stock (${avail.toLocaleString()} Left)`;
         document.getElementById('boxDepotStockNum').style.color = '#D97706';
       } else {
         badge.className = 'badge badge-success';
-        badge.innerText = 'Sufficient In Stock';
+        badge.innerText = 'In Stock';
         document.getElementById('boxDepotStockNum').style.color = 'var(--color-success)';
       }
     }
 
     if (hintEl) {
-      hintEl.innerText = `Max available: ${avail.toLocaleString()} ${unit}`;
+      if (avail <= 0) {
+        hintEl.innerText = 'Out of Stock — Cannot be requested';
+        hintEl.style.color = 'var(--color-danger)';
+      } else {
+        hintEl.innerText = `Max allowable request: ${avail.toLocaleString()} ${unit} (Depot Stock)`;
+        hintEl.style.color = (avail <= 10) ? '#D97706' : 'var(--color-primary)';
+      }
     }
 
     validateRequisitionQuantity();
@@ -2095,30 +2454,32 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     const warningBox = document.getElementById('boxDepotWarning');
     const warningText = document.getElementById('boxDepotWarningText');
     const alertEl = document.getElementById('depotStockAlert');
+    const unitInput = document.getElementById('req_unit');
+    const unit = (unitInput && unitInput.value.trim()) ? unitInput.value.trim() : 'units';
 
     if (!qtyInput) return;
     const qty = parseInt(qtyInput.value) || 0;
-
-    if (qty <= 0) {
-      if (alertEl) {
-        alertEl.style.color = 'var(--color-danger)';
-        alertEl.innerText = '⚠ Requested quantity must be at least 1.';
-      }
-      if (warningBox) warningBox.style.display = 'none';
-      if (submitBtn) submitBtn.disabled = true;
-      return;
-    }
 
     if (selectedCentralResourceMax !== null) {
       if (selectedCentralResourceMax <= 0) {
         if (warningBox) {
           warningBox.style.display = 'flex';
-          warningText.innerText = 'Selected commodity is depleted at ICDRRMO Depot. Please choose another commodity.';
+          warningText.innerText = 'This resource commodity is currently OUT OF STOCK at ICDRRMO Central Depot and cannot be requested.';
         }
         if (alertEl) {
           alertEl.style.color = 'var(--color-danger)';
-          alertEl.innerText = '⚠ Item depleted at central depot.';
+          alertEl.innerText = '⚠ Out of stock (0 available). This resource cannot be requested.';
         }
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+      }
+
+      if (qty <= 0) {
+        if (alertEl) {
+          alertEl.style.color = 'var(--color-danger)';
+          alertEl.innerText = '⚠ Requested quantity must be at least 1.';
+        }
+        if (warningBox) warningBox.style.display = 'none';
         if (submitBtn) submitBtn.disabled = true;
         return;
       }
@@ -2126,25 +2487,33 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       if (qty > selectedCentralResourceMax) {
         if (warningBox) {
           warningBox.style.display = 'flex';
-          warningText.innerText = `Cannot request ${qty}. Only ${selectedCentralResourceMax.toLocaleString()} units available at Central Depot.`;
+          warningText.innerText = `Cannot request ${qty.toLocaleString()} ${unit}. Only ${selectedCentralResourceMax.toLocaleString()} ${unit} available at ICDRRMO Central Depot. Maximum request allowed is ${selectedCentralResourceMax.toLocaleString()} ${unit}.`;
         }
         if (alertEl) {
           alertEl.style.color = 'var(--color-danger)';
-          alertEl.innerText = `⚠ Exceeds depot available stock (Max: ${selectedCentralResourceMax.toLocaleString()}).`;
+          alertEl.innerText = `⚠ Exceeds available stock! Maximum request allowed: ${selectedCentralResourceMax.toLocaleString()} ${unit}.`;
         }
         if (submitBtn) submitBtn.disabled = true;
         return;
       }
 
-      // Valid quantity within stock
+      // Valid quantity within available stock (e.g. <= 10)
       if (warningBox) warningBox.style.display = 'none';
       if (alertEl) {
         alertEl.style.color = 'var(--color-success)';
-        alertEl.innerText = `✓ Within depot available stock (${selectedCentralResourceMax.toLocaleString()} available).`;
+        alertEl.innerText = `✓ Valid request: ${qty.toLocaleString()} of ${selectedCentralResourceMax.toLocaleString()} ${unit} currently available in Central Stock.`;
       }
       if (submitBtn) submitBtn.disabled = false;
     } else {
       // Custom item not bound to central catalog
+      if (qty <= 0) {
+        if (alertEl) {
+          alertEl.style.color = 'var(--color-danger)';
+          alertEl.innerText = '⚠ Requested quantity must be at least 1.';
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+      }
       if (warningBox) warningBox.style.display = 'none';
       if (alertEl) alertEl.innerText = '';
       if (submitBtn) submitBtn.disabled = false;
@@ -2154,9 +2523,43 @@ require_once __DIR__ . '/../layouts/sidebar.php';
   // AJAX Submission for Resource Requisition
   document.addEventListener('DOMContentLoaded', function () {
     const reqForm = document.getElementById('requestResourceForm');
+    const reqItemNameInput = document.getElementById('req_item_name');
+
+    // Auto-link item name input with central catalog option if typed manually
+    if (reqItemNameInput) {
+      reqItemNameInput.addEventListener('change', function () {
+        const val = this.value.trim().toLowerCase();
+        const sel = document.getElementById('req_central_resource_id');
+        if (sel) {
+          for (let i = 0; i < sel.options.length; i++) {
+            const opt = sel.options[i];
+            const optName = (opt.getAttribute('data-name') || '').toLowerCase();
+            if (optName && optName === val) {
+              sel.selectedIndex = i;
+              onSelectCentralResource(sel);
+              break;
+            }
+          }
+        }
+      });
+    }
+
     if (reqForm) {
       reqForm.addEventListener('submit', async function (e) {
         e.preventDefault();
+
+        // Enforce stock availability guards before sending request
+        if (selectedCentralResourceMax !== null) {
+          if (selectedCentralResourceMax <= 0) {
+            showToast('This resource is out of stock at ICDRRMO and cannot be requested.', 'danger');
+            return;
+          }
+          const qty = parseInt(document.getElementById('req_quantity').value) || 0;
+          if (qty > selectedCentralResourceMax) {
+            showToast(`Requested quantity (${qty}) cannot be greater than available ICDRRMO stock (${selectedCentralResourceMax}).`, 'danger');
+            return;
+          }
+        }
 
         const submitBtn = document.getElementById('btnSubmitRequisition');
         const origHtml = submitBtn.innerHTML;
@@ -2546,8 +2949,11 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     );
   }
 
+  let activeReqForReceipt = null;
+
   // 5. View Requisition Details
   function viewRequisitionDetails(req) {
+    activeReqForReceipt = req;
     document.getElementById('viewReqCode').innerText = req.request_code;
     document.getElementById('viewReqItemName').innerText = req.item_name;
     document.getElementById('viewReqMeta').innerText = `Category: ${req.category} • Requested by: ${req.requested_by_name || 'Barangay Head'} on ${req.created_at}`;
@@ -2573,8 +2979,16 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     // Status Badge
     const b = document.getElementById('viewReqStatusBadge');
     if (req.status === 'Approved') {
-      b.className = 'badge badge-success';
-      b.innerText = 'Approved';
+      if (req.receipt_status === 'Received') {
+        b.className = 'badge badge-success';
+        b.innerText = 'Received';
+      } else if (req.receipt_status === 'Not Received') {
+        b.className = 'badge badge-danger';
+        b.innerText = 'Not Received';
+      } else {
+        b.className = 'badge badge-warning';
+        b.innerText = 'Awaiting Receipt';
+      }
     } else if (req.status === 'Rejected') {
       b.className = 'badge badge-danger';
       b.innerText = 'Rejected';
@@ -2606,7 +3020,149 @@ require_once __DIR__ . '/../layouts/sidebar.php';
       revSec.style.display = 'none';
     }
 
+    const btnReceive = document.getElementById('btnViewModalReceive');
+    if (btnReceive) {
+      btnReceive.style.display = (req.status === 'Approved') ? 'inline-flex' : 'none';
+      if (req.receipt_status === 'Received') {
+        btnReceive.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px; vertical-align:-1px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Update Receipt (Received)';
+      } else if (req.receipt_status === 'Not Received') {
+        btnReceive.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px; vertical-align:-1px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Update Receipt (Not Received)';
+      } else {
+        btnReceive.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px; vertical-align:-1px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Confirm Receipt';
+      }
+    }
+
     openModal('viewRequestModal');
+  }
+
+  // 6. Delivery Receipt Modal Handlers
+  let currentReceiptReq = null;
+
+  function openReceiveReceiptModal(req) {
+    currentReceiptReq = req;
+    document.getElementById('receipt_request_id').value = req.id;
+    document.getElementById('receiptModalCode').innerText = req.request_code;
+    document.getElementById('receiptModalItemName').innerText = req.item_name;
+    const qty = parseInt(req.approved_quantity || req.requested_quantity);
+    document.getElementById('receiptModalAllocatedQty').innerText = `${qty.toLocaleString()} ${req.unit}`;
+    document.getElementById('receiptModalPurok').innerText = req.target_purok || 'Barangay-wide Hall Depot';
+
+    const curStatus = (req.receipt_status === 'Not Received') ? 'Not Received' : 'Received';
+    selectReceiptChoice(curStatus);
+
+    document.getElementById('receipt_remarks_input').value = req.receipt_remarks || '';
+    openModal('receiveReceiptModal');
+  }
+
+  function openReceiveFromViewModal() {
+    if (activeReqForReceipt) {
+      closeModal('viewRequestModal');
+      openReceiveReceiptModal(activeReqForReceipt);
+    }
+  }
+
+  function selectReceiptChoice(choice) {
+    const hiddenInput = document.getElementById('receipt_selected_status');
+    const optReceived = document.getElementById('receiptOptReceived');
+    const optNotReceived = document.getElementById('receiptOptNotReceived');
+    const submitBtn = document.getElementById('btnSubmitReceiptConfirm');
+    if (!hiddenInput || !optReceived || !optNotReceived || !submitBtn) return;
+
+    hiddenInput.value = choice;
+
+    if (choice === 'Received') {
+      optReceived.style.border = '2px solid var(--color-secondary,#2F6F73)';
+      optReceived.style.background = '#F0FDF4';
+      optNotReceived.style.border = '1px solid var(--color-border,#D9E0E3)';
+      optNotReceived.style.background = '#FFFFFF';
+
+      submitBtn.style.background = 'var(--color-secondary,#2F6F73)';
+      submitBtn.style.borderColor = 'var(--color-secondary,#2F6F73)';
+      submitBtn.innerText = 'Confirm Received';
+    } else {
+      optNotReceived.style.border = '2px solid #EF4444';
+      optNotReceived.style.background = '#FEF2F2';
+      optReceived.style.border = '1px solid var(--color-border,#D9E0E3)';
+      optReceived.style.background = '#FFFFFF';
+
+      submitBtn.style.background = '#DC2626';
+      submitBtn.style.borderColor = '#DC2626';
+      submitBtn.innerText = 'Report Not Received';
+    }
+  }
+
+  async function submitReceiptConfirmation(e) {
+    e.preventDefault();
+    if (!currentReceiptReq) return;
+
+    const reqId = document.getElementById('receipt_request_id').value;
+    const status = document.getElementById('receipt_selected_status').value;
+    const remarks = document.getElementById('receipt_remarks_input').value.trim();
+    const submitBtn = document.getElementById('btnSubmitReceiptConfirm');
+
+    submitBtn.disabled = true;
+    const origText = submitBtn.innerText;
+    submitBtn.innerText = 'Updating...';
+
+    try {
+      const formData = new FormData();
+      formData.append('request_id', reqId);
+      formData.append('receipt_status', status);
+      formData.append('receipt_remarks', remarks);
+
+      const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/confirm_receipt.php', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showToast(data.message, 'success');
+        closeModal('receiveReceiptModal');
+
+        // Update local object
+        currentReceiptReq.receipt_status = status;
+        currentReceiptReq.receipt_remarks = remarks;
+        currentReceiptReq.received_at = data.received_at;
+
+        // Dynamically update Local Available Units metric card
+        if (data.live_local_stock !== undefined) {
+          const localStockEl = document.getElementById('brgyLocalTotalStock');
+          if (localStockEl) {
+            localStockEl.innerText = Number(data.live_local_stock).toLocaleString();
+          }
+        }
+
+        if (status === 'Received') {
+          // Animate row removal if in requests table, then seamlessly navigate to Received Relief Allocations
+          const reqRow = document.getElementById(`brgy-req-status-cell-${reqId}`)?.closest('tr');
+          if (reqRow) {
+            reqRow.style.transition = 'all 0.4s ease';
+            reqRow.style.backgroundColor = '#DCFCE7';
+            reqRow.style.opacity = '0';
+          }
+          showToast(`Requisition ${currentReceiptReq.request_code || ''} confirmed received and transferred to Received Relief Allocations!`, 'success');
+          setTimeout(() => {
+            window.location.href = '<?= BASE_URL ?>/views/barangay/resources.php?tab=allocations';
+          }, 700);
+        } else {
+          // If Not Received, inform user and navigate/refresh requests table
+          showToast(`Requisition ${currentReceiptReq.request_code || ''} marked Not Received.`, 'warning');
+          setTimeout(() => {
+            window.location.href = '<?= BASE_URL ?>/views/barangay/resources.php?tab=requests';
+          }, 700);
+        }
+      } else {
+        showToast(data.message || 'Failed to update receipt status.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Network error while recording delivery receipt.', 'danger');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerText = origText;
+    }
   }
 </script>
 

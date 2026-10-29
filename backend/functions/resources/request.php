@@ -36,15 +36,25 @@ $purpose = trim($_POST['purpose'] ?? '');
 // Check if a central resource was selected from catalog or matches by item name
 $catItem = null;
 if ($resourceId) {
-    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity FROM resources WHERE id = ? AND barangay_id IS NULL AND status = 'active'");
+    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity FROM resources WHERE id = ? AND (barangay_id IS NULL OR barangay_id = 0) AND (status = 'active' OR status IS NULL)");
     $cStmt->execute([$resourceId]);
     $catItem = $cStmt->fetch(PDO::FETCH_ASSOC);
 }
 
 if (!$catItem && !empty($itemName)) {
-    // Try to auto-match with active central resource
-    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity FROM resources WHERE barangay_id IS NULL AND status = 'active' AND LOWER(name) = LOWER(?) LIMIT 1");
+    // Try to auto-match with active central resource by exact name
+    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity FROM resources WHERE (barangay_id IS NULL OR barangay_id = 0) AND (status = 'active' OR status IS NULL) AND LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1");
     $cStmt->execute([$itemName]);
+    $catItem = $cStmt->fetch(PDO::FETCH_ASSOC);
+    if ($catItem) {
+        $resourceId = (int)$catItem['id'];
+    }
+}
+
+if (!$catItem && !empty($itemName)) {
+    // Also try fuzzy match on central resources
+    $cStmt = $db->prepare("SELECT id, name, category, unit, available_quantity FROM resources WHERE (barangay_id IS NULL OR barangay_id = 0) AND (status = 'active' OR status IS NULL) AND LOWER(TRIM(name)) LIKE LOWER(TRIM(?)) LIMIT 1");
+    $cStmt->execute(['%' . $itemName . '%']);
     $catItem = $cStmt->fetch(PDO::FETCH_ASSOC);
     if ($catItem) {
         $resourceId = (int)$catItem['id'];
@@ -58,12 +68,12 @@ if ($catItem) {
 
     $avail = (int)$catItem['available_quantity'];
     if ($avail <= 0) {
-        $err = "Commodity '{$catItem['name']}' is currently OUT OF STOCK at ICDRRMO Central Depot (0 {$catItem['unit']} available).";
+        $err = "Resource commodity '{$catItem['name']}' is currently OUT OF STOCK at ICDRRMO Central Depot (0 {$catItem['unit']} available) and cannot be requested.";
         if ($isAjax) jsonResponse(['success' => false, 'message' => $err], 400);
         redirectWithFlash($returnUrl, 'error', $err);
     }
     if ($requestedQuantity > $avail) {
-        $err = "Requested quantity ({$requestedQuantity} {$catItem['unit']}) exceeds available stock in ICDRRMO Central Depot (Max available: {$avail} {$catItem['unit']}).";
+        $err = "Requested quantity ({$requestedQuantity} {$catItem['unit']}) cannot be greater than available ICDRRMO Central Depot stock (Maximum allowable: {$avail} {$catItem['unit']}).";
         if ($isAjax) jsonResponse(['success' => false, 'message' => $err], 400);
         redirectWithFlash($returnUrl, 'error', $err);
     }
@@ -114,7 +124,7 @@ try {
     $notifMsg = "Barangay $bName submitted supply requisition $requestCode for $requestedQuantity $unit of $itemName ($urgency Urgency).";
     $notifStmt->execute([$barangayId, "Requisition Request: $requestCode", $notifMsg, $alertLevel, $requestId]);
 
-    logSystemEvent('REQUEST_RESOURCES', 'Resources', "Barangay $bName filed resource requisition $requestCode ($requestedQuantity $unit of $itemName)");
+    logSystemEvent('REQUEST_SUPPLIES', 'Supplies', "Barangay $bName filed supply requisition $requestCode ($requestedQuantity $unit of $itemName)");
 
     if ($isAjax) {
         jsonResponse([

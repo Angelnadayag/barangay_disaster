@@ -129,7 +129,7 @@ try {
     $trx->execute([$trxResourceCatId, $qty, $remarks, $user['id']]);
     $trxId = (int)$db->lastInsertId();
 
-    logSystemEvent('RESTOCK_RESOURCE', 'Inventory', "Restocked resource #{$trxResourceCatId} with $qty units. $remarks");
+    logSystemEvent('RESTOCK_SUPPLY', 'Supplies', "Restocked supply #{$trxResourceCatId} with {$qty} units. Remarks: {$remarks}");
     $db->commit();
 
     // Fetch updated record representation

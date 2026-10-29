@@ -37,8 +37,8 @@ if ($dssModalRole === 'icdrrmo'):
       <div id="dssStageSetup" style="display: flex; flex-direction: column; height: 100%;">
         <div class="modal-header">
           <div>
-            <h3 class="modal-title" style="margin:0;">Decision Support System (DSS)</h3>
-            <div class="dss-subtext">NDRRMC &amp; DSWD Resource Allocation Engine</div>
+            <h3 class="modal-title" style="margin:0;">AI Decision Support System (DSS)</h3>
+            <div class="dss-subtext">AI Resource Allocation Engine</div>
           </div>
           <button type="button" class="modal-close-btn" onclick="closeModal('dssExecutionModal')">&times;</button>
         </div>
@@ -120,33 +120,24 @@ if ($dssModalRole === 'icdrrmo'):
             </div>
           </label>
 
-          <!-- Financial Aid Parameters (optional customization - active for 'both' or 'financial_aid') -->
+          <!-- Financial Aid Parameters (active for 'both' or 'financial_aid') -->
           <div class="dss-aid-inputs-box" id="dssAidInputsContainer">
             <div class="dss-aid-head">
               <span class="dss-section-title" style="margin:0;">Financial Aid Parameters &amp; Funding Source</span>
               <span class="badge badge-neutral" id="dssAidActiveBadge">Optional</span>
             </div>
 
-            <label class="dss-check">
-              <input type="checkbox" id="dssAidCustomizeToggle" onchange="toggleDssAidCustomize(this.checked)">
-              <span>Customize parameters
-                <span class="dss-subtext" style="display:block;">Leave unchecked to use the AI-recommended amount,
-                  source and scope.</span>
-              </span>
-            </label>
-
-            <div id="dssAidCustomFields" style="display:none;margin-top:10px;">
+            <div id="dssAidCustomFields" style="margin-top:8px;">
               <div class="dss-aid-grid">
                 <div>
                   <label class="dss-label" for="dssInputAidAmount">Cash aid amount (₱ / family)</label>
                   <input type="number" id="dssInputAidAmount" name="financial_aid_amount" class="form-control"
                     placeholder="e.g. 4000" min="500" step="100">
-                  <div class="dss-subtext">DSWD standard: ₱5k Critical, ₱4k High, ₱3k Moderate</div>
                 </div>
                 <div>
                   <label class="dss-label" for="dssInputAidSponsor">Funding sponsor</label>
                   <input type="text" id="dssInputAidSponsor" name="financial_aid_sponsor" list="dssSponsorOptions"
-                    class="form-control" placeholder="e.g. LGU Calamity Fund (QRF)" value="LGU Calamity Fund (QRF)">
+                    class="form-control" placeholder="Optional sponsor" value="" oninput="updateDssSponsorChips()">
                   <datalist id="dssSponsorOptions">
                     <option value="LGU Calamity Fund (QRF)">
                     <option value="DSWD Quick Response Fund (QRF)">
@@ -155,7 +146,6 @@ if ($dssModalRole === 'icdrrmo'):
                     <option value="Philippine Red Cross Calamity Grant">
                     <option value="Private Donor / NGO Assistance">
                   </datalist>
-                  <div class="dss-subtext">Authorized agency, LGU fund, or sponsor</div>
                 </div>
               </div>
 
@@ -169,25 +159,16 @@ if ($dssModalRole === 'icdrrmo'):
 
               <div class="dss-chip-row">
                 <span class="dss-subtext">Quick sponsors:</span>
-                <span class="dss-sponsor-chip"
-                  onclick="document.getElementById('dssInputAidSponsor').value='LGU Calamity Fund (QRF)'">LGU Calamity
-                  Fund</span>
-                <span class="dss-sponsor-chip"
-                  onclick="document.getElementById('dssInputAidSponsor').value='DSWD Quick Response Fund (QRF)'">DSWD
-                  QRF</span>
-                <span class="dss-sponsor-chip"
-                  onclick="document.getElementById('dssInputAidSponsor').value='City Mayor\'s Calamity Grant'">Mayor's
-                  Grant</span>
-                <span class="dss-sponsor-chip"
-                  onclick="document.getElementById('dssInputAidSponsor').value='Philippine Red Cross'">Red Cross</span>
+                <span class="dss-sponsor-chip" data-sponsor="LGU Calamity Fund (QRF)"
+                  onclick="setDssSponsor('LGU Calamity Fund (QRF)')">LGU Calamity Fund</span>
+                <span class="dss-sponsor-chip" data-sponsor="DSWD Quick Response Fund (QRF)"
+                  onclick="setDssSponsor('DSWD Quick Response Fund (QRF)')">DSWD QRF</span>
+                <span class="dss-sponsor-chip" data-sponsor="City Mayor's Calamity Grant"
+                  onclick="setDssSponsor('City Mayor\'s Calamity Grant')">Mayor's Grant</span>
+                <span class="dss-sponsor-chip" data-sponsor="Philippine Red Cross"
+                  onclick="setDssSponsor('Philippine Red Cross')">Red Cross</span>
               </div>
             </div><!-- /dssAidCustomFields -->
-          </div>
-
-          <div class="dss-note">
-            <strong>Rule-based transparency:</strong> The Decision Tree model traverses DSWD/NDRRMC disaster matrices
-            and checks Central Depot stock before producing an explainable confidence rating and a recommendation for
-            human review.
           </div>
         </div>
 
@@ -204,9 +185,9 @@ if ($dssModalRole === 'icdrrmo'):
       <!-- STAGE 2: Evaluation Progress -->
       <div id="dssStageLoading" style="display: none; padding: 24px 20px;">
         <div class="dss-loading-wrapper">
-          <h3 class="dss-result-title">Running Decision Tree Engine</h3>
+          <h3 class="dss-result-title">Running AI Allocation Engine</h3>
           <p id="dssLoadingStatusText" class="dss-subtext" style="margin-bottom:10px;">
-            Traversing decision rules and NDRRMC disaster matrices...
+            Evaluating disaster data and resource matrices...
           </p>
 
           <div class="dss-progress-bar-container">
@@ -228,11 +209,11 @@ if ($dssModalRole === 'icdrrmo'):
             </div>
             <div class="dss-step-item" id="dssStep4">
               <span class="dss-step-icon">4</span>
-              <span>Calculate calamity cash aid (Ayuda) rates</span>
+              <span>Calculate emergency financial aid rates</span>
             </div>
             <div class="dss-step-item" id="dssStep5">
               <span class="dss-step-icon">5</span>
-              <span>Compute explainable path and confidence score</span>
+              <span>Compute AI recommendation and confidence score</span>
             </div>
           </div>
         </div>
@@ -242,7 +223,7 @@ if ($dssModalRole === 'icdrrmo'):
       <div id="dssStageResults" style="display: none; padding: 20px 20px 16px;">
         <div style="margin-bottom:14px;">
           <h3 class="dss-result-title">Recommendation Generated</h3>
-          <p class="dss-subtext" id="dssResultsSubtitle">DSS algorithm completed with full explainability.</p>
+          <p class="dss-subtext" id="dssResultsSubtitle">AI recommendation generated successfully.</p>
         </div>
 
         <div class="dss-result-grid">

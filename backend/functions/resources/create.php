@@ -118,6 +118,23 @@ $agencyId = $targetAgency ? (int)$targetAgency['id'] : 1;
 try {
     $resourceId = $selectedResourceId;
 
+    // Check if resource name already exists in master catalog to prevent duplicates
+    if (!$resourceId && !empty($name)) {
+        $existingStmt = $db->prepare("SELECT id, code, name, category, unit, brand, description FROM resources WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1");
+        $existingStmt->execute([$name]);
+        $existingRes = $existingStmt->fetch(PDO::FETCH_ASSOC);
+        if ($existingRes) {
+            $resourceId = (int)$existingRes['id'];
+            $selectedResourceId = $resourceId;
+            $name = $existingRes['name'];
+            $code = $existingRes['code'];
+            $category = $existingRes['category'];
+            $unit = $existingRes['unit'];
+            if (empty($brand) && !empty($existingRes['brand'])) $brand = $existingRes['brand'];
+            if (empty($description) && !empty($existingRes['description'])) $description = $existingRes['description'];
+        }
+    }
+
     if (!$resourceId) {
         // Ensure unique code for new static resource definition
         $check = $db->prepare("SELECT id FROM resources WHERE LOWER(code) = LOWER(?)");
@@ -126,7 +143,8 @@ try {
             $code .= '-' . rand(10, 99);
         }
 
-        // Insert new static catalog resource definition
+        // Insert new master catalog resource definition (barangay_id IS NULL so it's a global catalog item)
+        $centralInitial = ($role === 'icdrrmo') ? $initialQuantity : 0;
         $stmt = $db->prepare("
             INSERT INTO resources (
                 code, name, category, status, description, unit, total_quantity,
@@ -134,24 +152,26 @@ try {
                 batch_number, supplier_id, date_acquired,
                 expiry_date, is_perishable, brand, weight_per_unit, cost_per_unit,
                 item_condition, barangay_id, updated_at, created_at
-            ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW(), NOW())
         ");
         $stmt->execute([
-            $code, $name, $category, $description, $unit, $initialQuantity,
-            $initialQuantity, $minThreshold, $batchNumber, $supplierId,
+            $code, $name, $category, $description, $unit, $centralInitial,
+            $centralInitial, $minThreshold, $batchNumber, $supplierId,
             $dateAcquired, $expiryDate, $isPerishable, $brand, $weightPerUnit,
-            $costPerUnit, $itemCondition, $barangayId
+            $costPerUnit, $itemCondition
         ]);
         $resourceId = (int)$db->lastInsertId();
     } else {
-        // Update catalog aggregate quantity if needed
-        $db->prepare("
-            UPDATE resources SET 
-                total_quantity = total_quantity + ?,
-                available_quantity = available_quantity + ?,
-                updated_at = NOW()
-            WHERE id = ?
-        ")->execute([$initialQuantity, $initialQuantity, $resourceId]);
+        // Update central depot aggregate quantity if added by ICDRRMO
+        if ($role === 'icdrrmo' && $initialQuantity > 0) {
+            $db->prepare("
+                UPDATE resources SET 
+                    total_quantity = total_quantity + ?,
+                    available_quantity = available_quantity + ?,
+                    updated_at = NOW()
+                WHERE id = ?
+            ")->execute([$initialQuantity, $initialQuantity, $resourceId]);
+        }
     }
 
     // Insert or update into agency_resources junction table
@@ -204,7 +224,7 @@ try {
         ]);
     }
 
-    logSystemEvent('CREATE_RESOURCE', 'Resources', "Created resource '$name' ($code) with $initialQuantity $unit");
+    logSystemEvent('CREATE_SUPPLY', 'Supplies', "Created supply item '$name' ($code) with $initialQuantity $unit");
 
     if ($isAjax) {
         jsonResponse([

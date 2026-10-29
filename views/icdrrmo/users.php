@@ -18,10 +18,11 @@ $user = getCurrentUser();
 $currentUserId = (int) $user['id'];
 $db = getDBConnection();
 
-// Active Tab: 'officials', 'responders', 'residents', or 'archived'
-$activeTab = $_GET['tab'] ?? 'officials';
-if (!in_array($activeTab, ['officials', 'responders', 'residents', 'archived'], true)) {
-  $activeTab = 'officials';
+// Active Tab: 'all', 'officials', 'responders', 'residents', or 'archived'
+// Default is 'all' so ICDRRMO sees every user type at a glance.
+$activeTab = $_GET['tab'] ?? 'all';
+if (!in_array($activeTab, ['all', 'officials', 'responders', 'residents', 'archived'], true)) {
+  $activeTab = 'all';
 }
 
 // Request filters
@@ -43,6 +44,12 @@ $archivedUsersCount = (int) $db->query("SELECT COUNT(*) FROM users WHERE status 
 $archivedResidentsCount = (int) $db->query("SELECT COUNT(*) FROM residents WHERE status = 'archived'")->fetchColumn();
 $totalArchivedCount = $archivedUsersCount + $archivedResidentsCount;
 $totalActiveUsers = $activeOfficialsCount + $activeRespondersCount + $activeResidentsCount;
+
+// Per-role breakdown for the All Users summary bar
+$activeIcdrrmoCount = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'icdrrmo' AND status != 'archived'")->fetchColumn();
+$activeBrgyHeadCount = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'barangay_head' AND status != 'archived'")->fetchColumn();
+$pendingAccountsCount = (int) $db->query("SELECT COUNT(*) FROM users WHERE status = 'pending' AND role != 'resident'")->fetchColumn()
+  + (int) $db->query("SELECT COUNT(*) FROM residents WHERE status = 'pending'")->fetchColumn();
 
 // Fetch all barangays for filters and dropdowns
 $barangays = $db->query("SELECT id, name FROM barangays ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -86,12 +93,96 @@ $availKpis = $kpiStmt->fetch(PDO::FETCH_ASSOC) ?: [
 ];
 
 // Query Data based on Active Tab
+$allUsersList = [];
 $officialsList = [];
 $respondersList = [];
 $residentsList = [];
 $archivedList = [];
 
-if ($activeTab === 'officials') {
+if ($activeTab === 'all') {
+  // Unified registry: staff accounts from `users` + citizens from `residents`.
+  // users.role = 'resident' rows are mirrors of `residents`, so residents are sourced
+  // from the residents table only (same as the Residents tab) to avoid duplicates.
+  $userRoles = ['icdrrmo', 'barangay_head', 'responder'];
+  $includeUsers = ($filterRole === '' || in_array($filterRole, $userRoles, true));
+  $includeResidents = ($filterRole === '' || $filterRole === 'resident');
+
+  if ($includeUsers) {
+    $uSql = "
+        SELECT u.*, b.name AS barangay_name, a.name AS agency_name, a.agency_type, 'user' AS user_type
+        FROM users u
+        LEFT JOIN barangays b ON u.barangay_id = b.id
+        LEFT JOIN agencies a ON u.agency_id = a.id
+        WHERE u.status != 'archived' AND u.role IN ('icdrrmo', 'barangay_head', 'responder')
+    ";
+    $uParams = [];
+    if ($filterRole !== '') {
+      $uSql .= " AND u.role = ?";
+      $uParams[] = $filterRole;
+    }
+    if (!empty($filterBarangay)) {
+      if ($filterBarangay === 'central') {
+        $uSql .= " AND (u.barangay_id IS NULL OR u.role = 'icdrrmo')";
+      } else {
+        $uSql .= " AND u.barangay_id = ?";
+        $uParams[] = (int) $filterBarangay;
+      }
+    }
+    if (!empty($filterStatus)) {
+      $uSql .= " AND u.status = ?";
+      $uParams[] = $filterStatus;
+    }
+    if (!empty($search)) {
+      $uSql .= " AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR u.position LIKE ?)";
+      $like = "%$search%";
+      $uParams = array_merge($uParams, [$like, $like, $like, $like, $like, $like]);
+    }
+    $uStmt = $db->prepare($uSql);
+    $uStmt->execute($uParams);
+    $allUsersList = array_merge($allUsersList, $uStmt->fetchAll(PDO::FETCH_ASSOC));
+  }
+
+  // 'central' jurisdiction only applies to staff accounts; residents always belong to a barangay
+  if ($includeResidents && $filterBarangay !== 'central') {
+    $rSql = "
+        SELECT r.*, b.name AS barangay_name, NULL AS agency_name, 'resident' AS user_type, 'resident' AS role
+        FROM residents r
+        LEFT JOIN barangays b ON r.barangay_id = b.id
+        WHERE r.status != 'archived'
+    ";
+    $rParams = [];
+    if (!empty($filterBarangay)) {
+      $rSql .= " AND r.barangay_id = ?";
+      $rParams[] = (int) $filterBarangay;
+    }
+    if (!empty($filterStatus)) {
+      $rSql .= " AND r.status = ?";
+      $rParams[] = $filterStatus;
+    }
+    if (!empty($search)) {
+      $rSql .= " AND (r.first_name LIKE ? OR r.last_name LIKE ? OR r.username LIKE ? OR r.email LIKE ? OR r.phone LIKE ?)";
+      $like = "%$search%";
+      $rParams = array_merge($rParams, [$like, $like, $like, $like, $like]);
+    }
+    $rStmt = $db->prepare($rSql);
+    $rStmt->execute($rParams);
+    $allUsersList = array_merge($allUsersList, $rStmt->fetchAll(PDO::FETCH_ASSOC));
+  }
+
+  // Sort: role hierarchy, then pending first, then name
+  $roleOrder = ['icdrrmo' => 0, 'barangay_head' => 1, 'responder' => 2, 'resident' => 3];
+  $statusOrder = ['pending' => 0, 'active' => 1, 'inactive' => 2];
+  usort($allUsersList, function ($a, $b) use ($roleOrder, $statusOrder) {
+    $ra = $roleOrder[$a['role']] ?? 9;
+    $rb = $roleOrder[$b['role']] ?? 9;
+    if ($ra !== $rb) return $ra <=> $rb;
+    $sa = $statusOrder[$a['status']] ?? 9;
+    $sb = $statusOrder[$b['status']] ?? 9;
+    if ($sa !== $sb) return $sa <=> $sb;
+    return strcasecmp(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? ''), ($b['first_name'] ?? '') . ' ' . ($b['last_name'] ?? ''));
+  });
+
+} elseif ($activeTab === 'officials') {
   $sql = "
         SELECT u.*, b.name AS barangay_name, 'user' AS user_type
         FROM users u 
@@ -259,6 +350,19 @@ if ($activeTab === 'officials') {
   });
   $archivedList = $archivedUsers;
 }
+
+// Never expose password hashes in the JSON payloads embedded in the page
+$stripPasswords = function (array $rows) {
+  foreach ($rows as $i => $row) {
+    unset($rows[$i]['password']);
+  }
+  return $rows;
+};
+$allUsersList = $stripPasswords($allUsersList);
+$officialsList = $stripPasswords($officialsList);
+$respondersList = $stripPasswords($respondersList);
+$residentsList = $stripPasswords($residentsList);
+$archivedList = $stripPasswords($archivedList);
 
 $pageTitle = "Consolidated User Management — ICDRRMO Central Command";
 require_once __DIR__ . '/../layouts/header.php';
@@ -501,7 +605,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
   <div class="page-header-title-wrap">
     <h1>Consolidated User Management — ICDRRMO Central Command</h1>
     <p class="page-header-desc">
-      City-wide central registry for Barangay Officials, Responders Force, and Citizen Residents across all 15 barangays.
+      City-wide central registry of all user accounts — ICDRRMO personnel, Barangay Heads, Responders Force, and Citizen Residents across all barangays.
     </p>
   </div>
   <div class="page-header-actions">
@@ -519,6 +623,16 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 
 <!-- Tabs Navigation -->
 <div class="nav-tabs">
+  <a href="?tab=all" class="nav-tab-item <?= $activeTab === 'all' ? 'active' : '' ?>">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="3" width="7" height="7"></rect>
+      <rect x="14" y="3" width="7" height="7"></rect>
+      <rect x="14" y="14" width="7" height="7"></rect>
+      <rect x="3" y="14" width="7" height="7"></rect>
+    </svg>
+    All Users
+    <span class="nav-tab-badge"><?= $totalActiveUsers ?></span>
+  </a>
   <a href="?tab=officials" class="nav-tab-item <?= $activeTab === 'officials' ? 'active' : '' ?>">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M5 21V10.85M19 21V10.85M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
@@ -555,9 +669,182 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 </div>
 
 <!-- ========================================================================= -->
+<!-- TAB 0: ALL USERS (Every account type, city-wide)                          -->
+<!-- ========================================================================= -->
+<?php if ($activeTab === 'all'): ?>
+
+  <!-- Role Breakdown Summary -->
+  <div class="readiness-kpi-bar">
+    <a href="?tab=all&role=icdrrmo" class="kpi-pill" style="text-decoration:none;">
+      <div class="kpi-pill-title">ICDRRMO Personnel</div>
+      <div class="kpi-pill-val blue"><?= $activeIcdrrmoCount ?></div>
+    </a>
+    <a href="?tab=all&role=barangay_head" class="kpi-pill" style="text-decoration:none;">
+      <div class="kpi-pill-title">Barangay Heads</div>
+      <div class="kpi-pill-val amber"><?= $activeBrgyHeadCount ?></div>
+    </a>
+    <a href="?tab=all&role=responder" class="kpi-pill" style="text-decoration:none;">
+      <div class="kpi-pill-title">Responders</div>
+      <div class="kpi-pill-val green"><?= $activeRespondersCount ?></div>
+    </a>
+    <a href="?tab=all&role=resident" class="kpi-pill" style="text-decoration:none;">
+      <div class="kpi-pill-title">Residents</div>
+      <div class="kpi-pill-val purple"><?= $activeResidentsCount ?></div>
+    </a>
+    <a href="?tab=all&status=pending" class="kpi-pill" style="text-decoration:none;">
+      <div class="kpi-pill-title">Pending Approval</div>
+      <div class="kpi-pill-val"><?= $pendingAccountsCount ?></div>
+    </a>
+  </div>
+
+  <!-- Search & Filters -->
+  <div class="card" style="margin-bottom:var(--space-4);">
+    <div class="card-body">
+      <form method="GET" action="" class="filter-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <input type="hidden" name="tab" value="all">
+
+        <div style="flex:2;min-width:180px;">
+          <label style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:var(--color-text-muted);display:block;margin-bottom:3px;">Search Any User</label>
+          <input type="text" name="search" class="form-control" placeholder="Name, username, email, phone, position..."
+            value="<?= clean($search) ?>">
+        </div>
+
+        <div style="flex:1;min-width:140px;">
+          <label style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:var(--color-text-muted);display:block;margin-bottom:3px;">Jurisdiction</label>
+          <select name="barangay_id" class="form-control">
+            <option value="">All Jurisdictions</option>
+            <option value="central" <?= $filterBarangay === 'central' ? 'selected' : '' ?>>City Central / ICDRRMO</option>
+            <?php foreach ($barangays as $b): ?>
+              <option value="<?= $b['id'] ?>" <?= $filterBarangay == $b['id'] ? 'selected' : '' ?>>
+                <?= clean($b['name']) ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div style="flex:1;min-width:130px;">
+          <label style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:var(--color-text-muted);display:block;margin-bottom:3px;">User Type</label>
+          <select name="role" class="form-control">
+            <option value="">All User Types</option>
+            <option value="icdrrmo" <?= $filterRole === 'icdrrmo' ? 'selected' : '' ?>>ICDRRMO Admin / Staff</option>
+            <option value="barangay_head" <?= $filterRole === 'barangay_head' ? 'selected' : '' ?>>Barangay Head</option>
+            <option value="responder" <?= $filterRole === 'responder' ? 'selected' : '' ?>>Responder</option>
+            <option value="resident" <?= $filterRole === 'resident' ? 'selected' : '' ?>>Resident</option>
+          </select>
+        </div>
+
+        <div style="flex:1;min-width:110px;">
+          <label style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:var(--color-text-muted);display:block;margin-bottom:3px;">Account Status</label>
+          <select name="status" class="form-control">
+            <option value="">All Statuses</option>
+            <option value="active" <?= $filterStatus === 'active' ? 'selected' : '' ?>>Active</option>
+            <option value="inactive" <?= $filterStatus === 'inactive' ? 'selected' : '' ?>>Deactivated</option>
+            <option value="pending" <?= $filterStatus === 'pending' ? 'selected' : '' ?>>Pending</option>
+          </select>
+        </div>
+
+        <div style="display:flex;gap:6px;">
+          <button type="submit" class="btn btn-primary" style="height:36px;">Filter</button>
+          <a href="?tab=all" class="btn btn-outline" style="height:36px;">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- All Users Data Table -->
+  <div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 class="card-title" style="margin:0;">All Registered Users (<?= count($allUsersList) ?>)</h3>
+      <span style="font-size:10px;color:var(--color-text-muted);">ICDRRMO, Barangay Heads, Responders &amp; Residents</span>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>User Type &amp; Position</th>
+            <th>Jurisdiction</th>
+            <th>Contact Details</th>
+            <th>Status</th>
+            <th style="text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (empty($allUsersList)): ?>
+            <tr>
+              <td colspan="6" style="text-align:center;padding:36px;color:var(--color-text-muted);">
+                <div style="font-size:13px;font-weight:600;margin-bottom:4px;">No Users Found</div>
+                <div style="font-size:11px;">No active accounts match your current filters.</div>
+              </td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($allUsersList as $au): ?>
+              <?php
+                $auRole = $au['role'] ?? 'resident';
+                $auJson = htmlspecialchars(json_encode($au), ENT_QUOTES, 'UTF-8');
+                switch ($auRole) {
+                  case 'icdrrmo':
+                    $auBadge = '<span class="badge badge-secondary" style="font-size:9px;">ICDRRMO Officer</span>';
+                    $auSub = $au['position'] ?: 'Operations Head';
+                    break;
+                  case 'barangay_head':
+                    $auBadge = '<span class="badge badge-warning" style="font-size:9px;">Barangay Head</span>';
+                    $auSub = $au['position'] ?: 'Punong Barangay';
+                    break;
+                  case 'responder':
+                    $auBadge = '<span class="badge badge-info" style="font-size:9px;">Responder</span>';
+                    $auSub = ($au['position'] ?: 'Responder') . (!empty($au['agency_name']) ? ' · ' . $au['agency_name'] : '');
+                    break;
+                  default:
+                    $auBadge = '<span class="badge badge-neutral" style="font-size:9px;">Resident</span>';
+                    $auSub = !empty($au['purok']) ? 'Purok: ' . $au['purok'] : 'Citizen';
+                }
+                $auJurisdiction = $au['barangay_name']
+                  ? 'Brgy. ' . $au['barangay_name']
+                  : ($auRole === 'resident' ? 'Unassigned' : 'Central Command / ICDRRMO');
+              ?>
+              <tr>
+                <td>
+                  <a href="javascript:void(0)" onclick="viewUserDetails(<?= $auJson ?>, '<?= clean($auRole) ?>')" class="table-user-link">
+                    <div class="table-user-name" style="font-weight:600;color:var(--color-primary);font-size:11.5px;">
+                      <?= clean(trim(($au['first_name'] ?? '') . ' ' . ($au['last_name'] ?? '')) ?: ($au['full_name'] ?? '')) ?>
+                    </div>
+                    <div style="font-size:10px;color:var(--color-text-muted);">@<?= clean($au['username']) ?></div>
+                  </a>
+                </td>
+                <td>
+                  <div><?= $auBadge ?></div>
+                  <div style="font-size:10.5px;color:var(--color-text);margin-top:2px;font-weight:500;"><?= clean($auSub) ?></div>
+                </td>
+                <td>
+                  <span style="font-size:11px;font-weight:600;color:var(--color-primary);"><?= clean($auJurisdiction) ?></span>
+                </td>
+                <td>
+                  <div style="font-size:10.5px;color:var(--color-text);"><?= clean($au['phone'] ?: 'No Phone') ?></div>
+                  <div style="font-size:9.5px;color:var(--color-text-muted);"><?= clean($au['email']) ?></div>
+                </td>
+                <td>
+                  <?= renderStatusBadge($au['status']) ?>
+                </td>
+                <td style="text-align:right;">
+                  <button type="button" class="btn btn-outline btn-sm"
+                    onclick="viewUserDetails(<?= $auJson ?>, '<?= clean($auRole) ?>')"
+                    style="padding:4px 10px;font-size:10.5px;">
+                    View
+                  </button>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+<!-- ========================================================================= -->
 <!-- TAB 1: OFFICIALS & STAFF (Barangay Heads & ICDRRMO)                      -->
 <!-- ========================================================================= -->
-<?php if ($activeTab === 'officials'): ?>
+<?php elseif ($activeTab === 'officials'): ?>
 
   <!-- Search & Filters -->
   <div class="card" style="margin-bottom:var(--space-4);">

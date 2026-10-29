@@ -24,7 +24,7 @@ if (!$barangay) {
   die("Barangay jurisdiction not assigned.");
 }
 
-$pageTitle = "Financial Aid Distribution — Barangay " . clean($barangay['name']);
+$pageTitle = "Manage Resources — Barangay " . clean($barangay['name']);
 require_once __DIR__ . '/../layouts/header.php';
 require_once __DIR__ . '/../layouts/sidebar.php';
 
@@ -431,7 +431,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-title-wrap">
-      <h1>Financial Aid Distribution — Barangay <?= clean($barangay['name']) ?></h1>
+      <h1>Manage Resources — Barangay <?= clean($barangay['name']) ?></h1>
       <p class="page-header-desc">
         Select an allocated calamity aid fund from ICDRRMO to dynamically inspect and manage recipient distributions,
         track balances, and audit releases.

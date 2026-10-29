@@ -261,7 +261,9 @@ try {
             }
             if (!$hasColumn($pdo, 'recommendations', 'financial_aid_source')) {
                 echo "  [+] Adding column `financial_aid_source` to `recommendations`...\n";
-                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_source` varchar(150) NOT NULL DEFAULT 'LGU Calamity Fund (QRF)' AFTER `financial_aid_target_families`;");
+                $pdo->exec("ALTER TABLE `recommendations` ADD COLUMN `financial_aid_source` varchar(150) DEFAULT NULL AFTER `financial_aid_target_families`;");
+            } else {
+                $pdo->exec("ALTER TABLE `recommendations` MODIFY COLUMN `financial_aid_source` varchar(150) DEFAULT NULL;");
             }
             if (!$hasColumn($pdo, 'recommendations', 'financial_aid_approved_budget')) {
                 echo "  [+] Adding column `financial_aid_approved_budget` to `recommendations`...\n";

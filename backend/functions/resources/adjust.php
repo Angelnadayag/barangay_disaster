@@ -227,7 +227,7 @@ try {
     $trx->execute([$trxResourceCatId, $type, $qty, $remarks, $user['id']]);
     $trxId = (int)$db->lastInsertId();
 
-    logSystemEvent('INVENTORY_ADJUSTMENT', 'Inventory', "Adjusted resource #{$trxResourceCatId} ($type $qty units)");
+    logSystemEvent('INVENTORY_ADJUSTMENT', 'Supplies', "Adjusted supply #{$trxResourceCatId} ({$type} {$qty} units). Remarks: {$remarks}");
     $db->commit();
 
     // Fetch updated record representation

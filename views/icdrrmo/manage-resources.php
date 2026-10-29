@@ -13,10 +13,37 @@ requireRole('icdrrmo');
 $user = getCurrentUser();
 $db = getDBConnection();
 
-$pageTitle = "Manage Resources — ICDRRMO Admin";
-require_once __DIR__ . '/../layouts/header.php';
-
 $activeTab = in_array($_GET['tab'] ?? '', ['active', 'archived', 'allocations', 'movements', 'requests', 'barangays']) ? $_GET['tab'] : ((isset($_GET['barangay_id']) && $_GET['barangay_id'] !== '') ? 'barangays' : 'active');
+
+$moduleTitles = [
+    'active' => [
+        'title' => 'Active Supplies',
+        'desc' => 'Central depot emergency provisions, inventory levels, and cataloged commodities.'
+    ],
+    'allocations' => [
+        'title' => 'Supplies Allocated',
+        'desc' => 'Relief item allocations, barangay distribution dispatches, and aid release tracking.'
+    ],
+    'requests' => [
+        'title' => 'Supplies Requested',
+        'desc' => 'Formal barangay disaster resource requests, relief requisitions, and review actions.'
+    ],
+    'archived' => [
+        'title' => 'Archived Supplies',
+        'desc' => 'Decommissioned, expired, or retired emergency inventory provisions.'
+    ],
+    'movements' => [
+        'title' => 'Stock Movements & Audit Logs',
+        'desc' => 'Transaction audit log of stock inflows, allocations, and inventory adjustments.'
+    ],
+    'barangays' => [
+        'title' => 'Barangay Stock & History',
+        'desc' => 'Comparative two-column tracker of barangay depot inventory and transfer logs.'
+    ]
+];
+$currentModuleInfo = $moduleTitles[$activeTab] ?? $moduleTitles['active'];
+$pageTitle = $currentModuleInfo['title'] . " — Manage Supplies";
+require_once __DIR__ . '/../layouts/header.php';
 
 // Filter parameters for resources
 $filterCategory = $_GET['category'] ?? '';
@@ -99,6 +126,41 @@ $allocStmt = $db->query("
 ");
 $allocations = $allocStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Approved Requisition Allocations to Barangays (Hinaplanon)
+$reqAllocStmt = $db->query("
+    SELECT brr.*, b.name AS barangay_name, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name,
+           rec_u.full_name AS received_by_name,
+           COALESCE(res.name, brr.item_name) AS resource_name,
+           COALESCE(res.code, '') AS code,
+           COALESCE(res.available_quantity, 0) AS depot_available_quantity,
+           COALESCE(res.unit, brr.unit) AS unit,
+           COALESCE(res.category, brr.category) AS category
+    FROM barangay_resource_requests brr
+    JOIN barangays b ON brr.barangay_id = b.id
+    LEFT JOIN users u ON brr.requested_by = u.id
+    LEFT JOIN users rev ON brr.reviewed_by = rev.id
+    LEFT JOIN users rec_u ON brr.received_by = rec_u.id
+    LEFT JOIN resources res ON brr.resource_id = res.id
+    WHERE brr.barangay_id = 12 AND brr.status = 'Approved'
+    ORDER BY (brr.receipt_status = 'Pending') DESC, brr.reviewed_at DESC, brr.id DESC
+");
+$requisitionAllocations = $reqAllocStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Combined Allocation Metrics
+$reqAllocCount = count($requisitionAllocations);
+$totalAllocRecords = count($allocations) + $reqAllocCount;
+$totalReqAllocQty = 0;
+$receivedReqCount = 0;
+$notReceivedReqCount = 0;
+$pendingReceiptReqCount = 0;
+foreach ($requisitionAllocations as $ra) {
+    $totalReqAllocQty += (int)($ra['approved_quantity'] ?: $ra['requested_quantity']);
+    if ($ra['receipt_status'] === 'Received') $receivedReqCount++;
+    elseif ($ra['receipt_status'] === 'Not Received') $notReceivedReqCount++;
+    else $pendingReceiptReqCount++;
+}
+$grandTotalAllocatedUnits = $totalAllocatedQty + $totalReqAllocQty;
+
 // Pending Recommendation Batches (Strictly Hinaplanon)
 $pendingRecBatches = $db->query("
     SELECT r.id AS rec_id, r.recommendation_code, r.disaster_request_id, dr.tracking_code, dr.disaster_type, dr.severity, dr.purok_name,
@@ -127,12 +189,21 @@ $transactions = $trxStmt->fetchAll(PDO::FETCH_ASSOC);
 $pendingRequestsCount = (int) $db->query("SELECT COUNT(*) FROM barangay_resource_requests WHERE status = 'Pending' AND barangay_id = 12")->fetchColumn();
 $reqStmt = $db->query("
     SELECT brr.*, b.name AS barangay_name, u.full_name AS requested_by_name, rev.full_name AS reviewed_by_name,
-           res.name AS central_res_name, res.available_quantity AS central_res_avail, res.unit AS central_res_unit
+           rec_u.full_name AS received_by_name,
+           COALESCE(res.name, res_name.name, brr.item_name) AS central_res_name,
+           COALESCE(res.code, res_name.code, '') AS central_res_code,
+           COALESCE(res.available_quantity, res_name.available_quantity, 0) AS central_res_avail,
+           COALESCE(res.total_quantity, res_name.total_quantity, 0) AS central_res_total,
+           COALESCE(res.unit, res_name.unit, brr.unit) AS central_res_unit,
+           COALESCE(res.category, res_name.category, brr.category) AS central_res_category,
+           COALESCE(res.min_threshold, res_name.min_threshold, 20) AS central_res_min_threshold
     FROM barangay_resource_requests brr
     JOIN barangays b ON brr.barangay_id = b.id
     LEFT JOIN users u ON brr.requested_by = u.id
     LEFT JOIN users rev ON brr.reviewed_by = rev.id
-    LEFT JOIN resources res ON brr.resource_id = res.id
+    LEFT JOIN users rec_u ON brr.received_by = rec_u.id
+    LEFT JOIN resources res ON (brr.resource_id IS NOT NULL AND brr.resource_id = res.id)
+    LEFT JOIN resources res_name ON (brr.resource_id IS NULL AND LOWER(TRIM(brr.item_name)) = LOWER(TRIM(res_name.name)) AND (res_name.status = 'active' OR res_name.status IS NULL) AND (res_name.barangay_id IS NULL OR res_name.barangay_id = 0))
     WHERE brr.barangay_id = 12
     ORDER BY (brr.status = 'Pending') DESC, brr.created_at DESC
 ");
@@ -397,110 +468,50 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 </style>
 
-<div class="page-header">
+<div class="page-header" style="margin-bottom:var(--space-3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
   <div class="page-header-title-wrap">
-    <h1>Manage Resources & Relief Inventory</h1>
-    <p class="page-header-desc">
-      Catalog emergency provisions, manage central depot stock, archive obsolete items, and supervise relief allocation
-      dispatches.
+    <h1 style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:700;color:var(--color-primary,#17324D);margin:0;line-height:1.3;"><?= clean($currentModuleInfo['title']) ?></h1>
+    <p class="page-header-desc" style="font-family:'Roboto',sans-serif;font-size:10px;color:var(--color-text-muted,#64748B);margin:3px 0 0 0;line-height:1.4;">
+      <?= clean($currentModuleInfo['desc']) ?>
     </p>
   </div>
   <div class="page-header-actions" style="display:flex;gap:8px;">
-    <button class="btn btn-secondary" onclick="openDirectAllocationModal()"
-      style="display:inline-flex;align-items:center;gap:6px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path
-          d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-        </path>
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-        <line x1="12" y1="22.08" x2="12" y2="12"></line>
-      </svg>
-      Allocate Resources
-    </button>
-    <button class="btn btn-primary" onclick="openCreateResourceModal()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        style="margin-right:4px;">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
-      </svg>
-      Add New Resource
-    </button>
+    <?php if ($activeTab === 'allocations'): ?>
+      <button class="btn btn-primary" onclick="openDirectAllocationModal()"
+        style="display:inline-flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:11px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path
+            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+          </path>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+        Allocate Resources
+      </button>
+    <?php elseif ($activeTab === 'active' || empty($activeTab) || $activeTab === 'archived'): ?>
+      <button class="btn btn-secondary" onclick="openDirectAllocationModal()"
+        style="display:inline-flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:11px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path
+            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+          </path>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>
+        Allocate Resources
+      </button>
+      <button class="btn btn-primary" onclick="openCreateResourceModal()"
+        style="display:inline-flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:11px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add New Resource
+      </button>
+    <?php endif; ?>
   </div>
 </div>
 
-<!-- Navigation Tabs: Active vs Archived vs Allocations vs Movements -->
-<div style="display:flex;gap:8px;margin-bottom:var(--space-3);align-items:center;flex-wrap:wrap;">
-  <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=active"
-    class="btn btn-sm <?= $activeTab === 'active' ? 'btn-primary' : 'btn-outline' ?>" style="font-size:11px;">
-    Active Resources (<?= $activeCount ?>)
-  </a>
-  <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=archived"
-    class="btn btn-sm <?= $activeTab === 'archived' ? 'btn-primary' : 'btn-outline' ?>"
-    style="font-size:11px;<?= $activeTab === 'archived' ? '' : 'color:var(--color-text-muted);' ?>">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-      style="margin-right:4px;vertical-align:-1px;">
-      <polyline points="21 8 21 21 3 21 3 8"></polyline>
-      <rect x="1" y="3" width="22" height="5"></rect>
-      <line x1="10" y1="12" x2="14" y2="12"></line>
-    </svg>
-    Archived Resources (<?= $archivedCount ?>)
-  </a>
-  <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=allocations"
-    class="btn btn-sm <?= $activeTab === 'allocations' ? 'btn-primary' : 'btn-outline' ?>"
-    style="font-size:11px;<?= $activeTab === 'allocations' ? '' : 'color:var(--color-text-muted);' ?>">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-      style="margin-right:4px;vertical-align:-1px;">
-      <path
-        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-      </path>
-    </svg>
-    Resource Allocations (<span id="tabAllocationsCount"><?= count($allocations) ?></span>)
-    <?php
-    $pendingAllocCount = 0;
-    foreach ($allocations as $itemChk) {
-      if ($itemChk['status'] === 'Pending')
-        $pendingAllocCount++;
-    }
-    if ($pendingAllocCount > 0): ?>
-      <span class="badge badge-warning" id="tabPendingAllocBadge"
-        style="margin-left:4px;font-size:9px;"><?= $pendingAllocCount ?> Pending</span>
-    <?php endif; ?>
-  </a>
-  <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=requests"
-    class="btn btn-sm <?= $activeTab === 'requests' ? 'btn-primary' : 'btn-outline' ?>"
-    style="font-size:11px;<?= $activeTab === 'requests' ? '' : 'color:var(--color-text-muted);' ?>">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-      style="margin-right:4px;vertical-align:-1px;">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-      <polyline points="14 2 14 8 20 8"></polyline>
-      <line x1="16" y1="13" x2="8" y2="13"></line>
-      <line x1="16" y1="17" x2="8" y2="17"></line>
-    </svg>
-    Barangay Resource Requests (<?= count($barangayRequests) ?>)
-    <?php if ($pendingRequestsCount > 0): ?>
-      <span class="badge badge-danger" id="tabPendingReqsBadge"
-        style="margin-left:4px;font-size:9px;"><?= $pendingRequestsCount ?> Pending</span>
-    <?php else: ?>
-      <span class="badge badge-danger" id="tabPendingReqsBadge" style="margin-left:4px;font-size:9px;display:none;">0
-        Pending</span>
-    <?php endif; ?>
-  </a>
-  <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=movements"
-    class="btn btn-sm <?= $activeTab === 'movements' ? 'btn-primary' : 'btn-outline' ?>"
-    style="font-size:11px;<?= $activeTab === 'movements' ? '' : 'color:var(--color-text-muted);' ?>">
-    Stock Movements & Audit Logs (<?= count($transactions) ?>)
-  </a>
-  <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=barangays"
-    class="btn btn-sm <?= $activeTab === 'barangays' ? 'btn-primary' : 'btn-outline' ?>"
-    style="font-size:11px;<?= $activeTab === 'barangays' ? '' : 'color:var(--color-text-muted);' ?>">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-      style="margin-right:4px;vertical-align:-1px;">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-      <polyline points="9 22 9 12 15 12 15 22"></polyline>
-    </svg>
-    Barangay Stock & History (2-Column Tracker)
-  </a>
-</div>
 
 <!-- Metrics Overview -->
 <div class="metrics-grid">
@@ -531,7 +542,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
   </div>
 
   <div class="metric-card" style="cursor:pointer;"
-    onclick="location.href='<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=requests'">
+    onclick="location.href='<?= BASE_URL ?>/views/icdrrmo/resources-requested.php'">
     <div class="metric-header">
       <span class="metric-label">Barangay Requisitions</span>
       <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -603,6 +614,19 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
             </svg>
             Brgy. Hinaplanon Stock
           </a>
+
+          <?php if ($activeTab === 'archived'): ?>
+            <a href="<?= BASE_URL ?>/views/icdrrmo/active-resources.php" class="btn btn-outline btn-sm"
+              style="font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:5px;background:#F8FAFC;padding:7px 12px;">
+              &larr; Active Supplies (<?= $activeCount ?>)
+            </a>
+          <?php else: ?>
+            <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=archived" class="btn btn-outline btn-sm"
+              style="font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:5px;background:#F8FAFC;padding:7px 12px;color:var(--color-text-muted);"
+              title="View Archived Supplies">
+              Archived (<?= $archivedCount ?>)
+            </a>
+          <?php endif; ?>
 
           <select name="category" class="form-control" style="width:170px;">
             <option value="">All Categories</option>
@@ -778,12 +802,16 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
       id="batchPendingBanner">
       <div style="display:flex;align-items:center;gap:12px;">
         <div
-          style="width:36px;height:36px;border-radius:50%;background:#FEF3C7;color:#D97706;display:flex;align-items:center;justify-content:center;font-size:18px;">
-          ⚠️
+          style="width:32px;height:32px;border-radius:6px;background:var(--color-surface-subtle);color:var(--color-secondary);display:flex;align-items:center;justify-content:center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
         </div>
         <div>
-          <div style="font-weight:700;font-size:13px;color:#92400E;">Pending Decision Tree Recommendation Batches</div>
-          <div style="font-size:11px;color:#B45309;margin-top:2px;">
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;color:var(--color-primary);">Pending Decision Tree Recommendation Batches</div>
+          <div style="font-family:'Roboto',sans-serif;font-size:10.5px;color:var(--color-text-muted);margin-top:2px;">
             <?php foreach ($pendingRecBatches as $bIdx => $batch): ?>
               <?= $bIdx > 0 ? ' &bull; ' : '' ?>
               <strong><?= clean($batch['recommendation_code']) ?></strong> (Brgy. <?= clean($batch['barangay_name']) ?> &bull;
@@ -797,7 +825,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         <?php foreach ($pendingRecBatches as $batch): ?>
           <button type="button" class="btn btn-sm btn-primary"
             onclick="batchAllocateRecommendation(<?= (int) $batch['rec_id'] ?>, '<?= clean(addslashes($batch['recommendation_code'])) ?>', '<?= clean(addslashes($batch['barangay_name'])) ?>')"
-            style="font-size:11px;">
+            style="font-family:'Poppins',sans-serif;font-size:11px;">
             Batch Allocate <?= clean($batch['recommendation_code']) ?>
           </button>
         <?php endforeach; ?>
@@ -810,16 +838,26 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="card-header"
       style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div>
-        <h3 class="card-title" style="font-size:13px;">Allocations & Relief Distribution Status</h3>
-        <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">
-          Direct dispatches and Decision Tree relief allocations sent to Barangay local inventories
+        <h3 class="card-title" style="font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;margin:0;">Resource Allocated & Relief Distribution Status</h3>
+        <div style="font-family:'Roboto',sans-serif;font-size:10px;color:var(--color-text-muted);margin-top:2px;">
+          Approved barangay requisitions and Decision Tree relief allocations dispatched to Barangay local inventories
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="badge badge-info" style="font-size:9.5px;" id="badgeActiveAllocations"><?= count($allocations) ?>
-          Total Records</span>
-        <span class="badge badge-success" style="font-size:9.5px;"
-          id="badgeAllocatedUnits"><?= number_format($totalAllocatedQty) ?> Units Dispatched</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="badge badge-info" style="font-size:9.5px;" id="badgeActiveAllocations"><?= $totalAllocRecords ?> Total Dispatches</span>
+        <span class="badge badge-success" style="font-size:9.5px;" id="badgeAllocatedUnits"><?= number_format($grandTotalAllocatedUnits) ?> Units Dispatched</span>
+        <?php if ($receivedReqCount > 0): ?>
+          <span class="badge" style="background:#E8F8F0;color:#0F5132;border:1px solid #C3E6CB;font-size:9px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <?= $receivedReqCount ?> Received
+          </span>
+        <?php endif; ?>
+        <?php if ($notReceivedReqCount > 0): ?>
+          <span class="badge" style="background:#FDE8E8;color:#9B1C1C;border:1px solid #F8B4B4;font-size:9px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <?= $notReceivedReqCount ?> Not Received
+          </span>
+        <?php endif; ?>
         <button type="button" class="btn btn-sm btn-primary" onclick="openDirectAllocationModal()"
           style="font-size:11px;display:inline-flex;align-items:center;gap:4px;">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -834,24 +872,102 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
       <table class="data-table">
         <thead>
           <tr>
-            <th>Disaster Request</th>
+            <th>Disaster / Requisition Reference</th>
             <th>Target Purok (Hinaplanon)</th>
             <th>Resource Commodity</th>
             <th>Category</th>
-            <th>Recommended</th>
+            <th>Recommended / Requested</th>
             <th>Allocated Qty</th>
             <th>Depot Stock</th>
-            <th>Status</th>
+            <th>Status & Delivery Receipt</th>
             <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
         <tbody id="allocationsTableBody">
-          <?php if (empty($allocations)): ?>
+          <?php if (empty($requisitionAllocations) && empty($allocations)): ?>
             <tr id="noAllocationsRow">
-              <td colspan="9" style="text-align:center;padding:28px;">No resource allocations recorded yet for Hinaplanon.
+              <td colspan="9" style="text-align:center;padding:28px;color:var(--color-text-muted);">
+                No resource allocations or approved dispatches recorded yet for Hinaplanon.
               </td>
             </tr>
           <?php else: ?>
+            <?php foreach ($requisitionAllocations as $ra): ?>
+              <tr id="req-alloc-row-<?= $ra['id'] ?>" style="background:#FAFCFD;">
+                <td>
+                  <div style="font-weight:700;color:var(--color-primary);font-size:11px;font-family:var(--font-secondary);">
+                    <?= clean($ra['request_code']) ?>
+                  </div>
+                  <div style="margin-top:2px;">
+                    <span class="badge badge-info" style="font-size:8px;padding:1px 5px;font-weight:600;">Requisition Dispatch</span>
+                  </div>
+                  <div style="font-size:9px;color:var(--color-text-muted);margin-top:2px;">
+                    By: <?= clean($ra['requested_by_name'] ?: 'Barangay Head') ?>
+                  </div>
+                </td>
+                <td style="font-size:11px;">
+                  <div style="font-weight:700;color:var(--color-primary);">
+                    <?= !empty($ra['target_purok']) ? clean($ra['target_purok']) : 'Barangay Hall Depot' ?>
+                  </div>
+                  <div style="font-size:9.5px;color:var(--color-text-muted);">Brgy. <?= clean($ra['barangay_name']) ?></div>
+                </td>
+                <td>
+                  <div style="font-weight:600;color:#0F172A;font-size:11px;"><?= clean($ra['resource_name']) ?></div>
+                  <?php if (!empty($ra['code'])): ?>
+                    <div style="font-size:9px;color:var(--color-text-muted);"><?= clean($ra['code']) ?></div>
+                  <?php endif; ?>
+                </td>
+                <td><span class="badge badge-neutral" style="font-size:9px;"><?= clean($ra['category']) ?></span></td>
+                <td style="font-family:var(--font-secondary);font-size:11px;">
+                  <div><?= number_format($ra['requested_quantity']) ?> <?= clean($ra['unit']) ?></div>
+                  <div style="font-size:8.5px;color:var(--color-text-muted);">Requested</div>
+                </td>
+                <td style="font-family:var(--font-secondary);font-weight:700;color:var(--color-success);font-size:12px;">
+                  <div><?= number_format($ra['approved_quantity'] ?: $ra['requested_quantity']) ?> <?= clean($ra['unit']) ?></div>
+                  <div style="font-size:8.5px;color:var(--color-text-muted);font-weight:normal;">Approved Allocation</div>
+                </td>
+                <td style="font-size:10.5px;">
+                  <span style="font-weight:600;color:#0F172A;">
+                    <?= number_format($ra['depot_available_quantity']) ?>
+                  </span>
+                  <span style="font-size:9px;color:var(--color-text-muted);"><?= clean($ra['unit']) ?></span>
+                </td>
+                <td>
+                  <?php if ($ra['receipt_status'] === 'Received'): ?>
+                    <span class="badge badge-success" style="font-size:9.5px;padding:3px 8px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      Received
+                    </span>
+                    <?php if (!empty($ra['received_at'])): ?>
+                      <div style="font-size:8.5px;color:var(--color-text-muted);margin-top:2px;">
+                        <?= date('M d, g:i A', strtotime($ra['received_at'])) ?>
+                      </div>
+                    <?php endif; ?>
+                  <?php elseif ($ra['receipt_status'] === 'Not Received'): ?>
+                    <span class="badge badge-danger" style="font-size:9.5px;padding:3px 8px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                      Not Received
+                    </span>
+                  <?php else: ?>
+                    <span class="badge badge-warning" style="font-size:9.5px;padding:3px 8px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                      Awaiting Receipt
+                    </span>
+                  <?php endif; ?>
+                </td>
+                <td style="text-align:right;">
+                  <button type="button" class="btn btn-outline btn-sm"
+                    style="padding:4px 12px;font-size:11px;display:inline-flex;align-items:center;gap:4px;"
+                    onclick='openReviewRequisitionModal(<?= htmlspecialchars(json_encode($ra), ENT_QUOTES, 'UTF-8') ?>)'>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    View
+                  </button>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+
             <?php foreach ($allocations as $a): ?>
               <tr id="alloc-row-<?= $a['id'] ?>" data-item-id="<?= $a['id'] ?>" data-rec-id="<?= $a['recommendation_id'] ?>"
                 data-resource-id="<?= $a['resource_id'] ?>" data-resource-name="<?= clean($a['resource_name']) ?>"
@@ -877,11 +993,13 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
                 </td>
                 <td><span class="badge badge-neutral" style="font-size:9px;"><?= clean($a['category']) ?></span></td>
                 <td style="font-family:var(--font-secondary);font-size:11.5px;">
-                  <?= number_format($a['recommended_quantity']) ?>       <?= clean($a['unit']) ?>
+                  <div><?= number_format($a['recommended_quantity']) ?> <?= clean($a['unit']) ?></div>
+                  <div style="font-size:8.5px;color:var(--color-text-muted);">Recommended</div>
                 </td>
                 <td style="font-family:var(--font-secondary);font-weight:800;color:var(--color-success);font-size:13px;"
                   id="alloc-qty-<?= $a['id'] ?>">
-                  <?= number_format($a['allocated_quantity']) ?>       <?= clean($a['unit']) ?>
+                  <div><?= number_format($a['allocated_quantity']) ?> <?= clean($a['unit']) ?></div>
+                  <div style="font-size:8.5px;color:var(--color-text-muted);font-weight:normal;">Decision Tree Dispatch</div>
                 </td>
                 <td style="font-size:10.5px;">
                   <span
@@ -917,6 +1035,29 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
   </div>
 
 <?php elseif ($activeTab === 'movements'): ?>
+  <!-- Top Navigation Subtabs (Audit & Logistics Trail) -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px; flex-wrap:wrap; gap:8px;">
+    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+      <a href="<?= BASE_URL ?>/views/icdrrmo/event-logs.php" class="btn btn-outline btn-sm" style="font-family:'Poppins',sans-serif;font-size:11px;font-weight:500;">
+        Event Logs
+      </a>
+      <a href="<?= BASE_URL ?>/views/icdrrmo/system-logs.php" class="btn btn-outline btn-sm" style="font-family:'Poppins',sans-serif;font-size:11px;font-weight:500;">
+        All System Logs
+      </a>
+      <a href="<?= BASE_URL ?>/views/icdrrmo/resources-logs.php" class="btn btn-outline btn-sm" style="font-family:'Poppins',sans-serif;font-size:11px;font-weight:500; display:inline-flex; align-items:center; gap:4px;" title="View Resources Logs">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        Resources Logs
+      </a>
+      <a href="<?= BASE_URL ?>/views/icdrrmo/supplies-logs.php" class="btn btn-outline btn-sm" style="font-family:'Poppins',sans-serif;font-size:11px;font-weight:500; display:inline-flex; align-items:center; gap:4px;" title="View Supplies Logs">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        Supplies Logs
+      </a>
+      <a href="<?= BASE_URL ?>/views/icdrrmo/manage-resources.php?tab=movements" class="btn btn-primary btn-sm" style="font-family:'Poppins',sans-serif;font-size:11px;font-weight:500;">
+        Stock Movements
+      </a>
+    </div>
+  </div>
+
   <!-- Stock Movement Audit Transactions -->
   <div class="card" style="margin-bottom:var(--space-4);">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
@@ -984,9 +1125,10 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="card-header"
       style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div>
-        <h3 class="card-title" style="font-size:13px;">Barangay Resource Requisitions</h3>
-        <div class="card-subtitle">Review incoming supply requests submitted by Barangay Heads, verify depot stock, and
-          accept or reject with notes</div>
+        <h3 class="card-title" style="font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;margin:0;">Resources Requested by Barangays</h3>
+        <div class="card-subtitle" style="font-family:'Roboto',sans-serif;font-size:10px;color:var(--color-text-muted);margin-top:2px;">
+          Review incoming supply requests submitted by Barangay Heads, verify depot stock, and accept or reject with notes
+        </div>
       </div>
       <span class="badge <?= $pendingRequestsCount > 0 ? 'badge-danger' : 'badge-neutral' ?>">
         <?= $pendingRequestsCount ?> Pending Requisition(s)
@@ -1061,7 +1203,22 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
                 <td style="font-size:11px;font-weight:500;"><?= clean($req['target_purok'] ?: 'Barangay-wide') ?></td>
                 <td id="req-status-cell-<?= $req['id'] ?>">
                   <?php if ($req['status'] === 'Approved'): ?>
-                    <span class="badge badge-success">Approved</span>
+                    <?php if (($req['receipt_status'] ?? '') === 'Received'): ?>
+                      <span class="badge badge-success" style="font-size:9.5px;padding:3px 8px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Received
+                      </span>
+                    <?php elseif (($req['receipt_status'] ?? '') === 'Not Received'): ?>
+                      <span class="badge badge-danger" style="font-size:9.5px;padding:3px 8px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        Not Received
+                      </span>
+                    <?php else: ?>
+                      <span class="badge badge-warning" style="font-size:9.5px;padding:3px 8px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        Awaiting Receipt
+                      </span>
+                    <?php endif; ?>
                   <?php elseif ($req['status'] === 'Rejected'): ?>
                     <span class="badge badge-danger">Declined</span>
                   <?php else: ?>
@@ -1156,18 +1313,21 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
 
   <!-- Scope KPI & Status Banner -->
   <div
-    style="background:linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);border:1px solid #DBEAFE;border-radius:var(--radius-md);padding:14px 18px;margin-bottom:var(--space-4);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+    style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:var(--space-4);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
     <div style="display:flex;align-items:center;gap:12px;">
       <div
-        style="width:40px;height:40px;border-radius:50%;background:#DBEAFE;color:#1D4ED8;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;">
-        🏢
+        style="width:36px;height:36px;border-radius:6px;background:var(--color-surface-subtle);color:var(--color-secondary);display:flex;align-items:center;justify-content:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
       </div>
       <div>
-        <div style="font-weight:700;font-size:14px;color:#1E3A8A;display:flex;align-items:center;gap:8px;">
+        <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;color:var(--color-primary);display:flex;align-items:center;gap:8px;">
           Barangay Hinaplanon Stockroom & Purok Allocations
           <span class="badge badge-primary" style="font-size:9.5px;">Brgy. Hinaplanon (ID: 12)</span>
         </div>
-        <div style="font-size:11.5px;color:#3B82F6;margin-top:2px;">
+        <div style="font-family:'Roboto',sans-serif;font-size:10.5px;color:var(--color-text-muted);margin-top:2px;">
           Real-time tracking of on-hand local reserves in Hinaplanon and supply allocations across its puroks.
         </div>
       </div>
@@ -1433,41 +1593,71 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('createResourceModal')">&times;</button>
     </div>
-    <form id="createResourceForm" method="POST" action="<?= BASE_URL ?>/backend/functions/resources/create.php">
+    <form id="createResourceForm" method="POST" action="<?= BASE_URL ?>/backend/functions/resources/create.php" onsubmit="handleCreateResource(event)">
       <input type="hidden" name="action" value="create">
       <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
 
-        <!-- Static Master Catalog Fast Selector (Diretso nalang) -->
-        <div class="form-group"
-          style="margin-bottom:10px; background: #EEF2FF; border: 1.5px solid #C7D2FE; border-radius: 8px; padding: 12px;">
-          <label class="form-label"
-            style="color: #3730A3; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
-            <span>⚡ Select from Static Master Catalog (Diretso nalang)</span>
-            <span class="badge" style="background:#4338CA;color:#fff;font-size:10px;">Catalog Types</span>
-          </label>
+        <!-- Master Resource Catalog Selector & Dynamic Creator -->
+        <div class="form-group" style="margin-bottom:12px; background:var(--color-surface-subtle,#F0F3F4); border:1px solid var(--color-border,#D9E0E3); border-radius:8px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label class="form-label" style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; color:var(--color-primary,#17324D); margin:0; display:flex; align-items:center; gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+              </svg>
+              Select Resource from Master Catalog
+            </label>
+            <button type="button" class="btn btn-outline btn-xs" id="btnAdd_catalog_resource_create" onclick="toggleDynamicCatalogResource('create')"
+              style="font-family:'Poppins',sans-serif; font-size:10.5px; font-weight:600; padding:2px 8px; height:auto; line-height:1.2; color:var(--color-primary,#17324D); border-color:var(--color-border,#D9E0E3); background:var(--color-surface,#FFFFFF);">
+              + Add New Resource
+            </button>
+          </div>
+
           <select id="create_select_catalog_resource" name="resource_id" class="form-control"
             onchange="onCatalogResourceSelected(this)"
-            style="background:#fff;border-color:#A5B4FC;font-weight:600;color:#1E1B4B;">
-            <option value="">— Select an existing resource type or define a custom item below —</option>
+            style="background:var(--color-surface,#FFFFFF); border-color:var(--color-border,#D9E0E3); font-weight:500; font-size:11.5px; color:var(--color-text,#24313A);">
+            <option value="">— Select an existing commodity from Master Catalog —</option>
             <?php foreach ($catalogByCategory as $catName => $catItems): ?>
-              <optgroup label="📂 <?= clean($catName) ?>">
+              <optgroup label="<?= clean($catName) ?>">
                 <?php foreach ($catItems as $item): ?>
                   <option value="<?= (int) $item['id'] ?>" data-code="<?= clean($item['code']) ?>"
                     data-name="<?= clean($item['name']) ?>" data-category="<?= clean($item['category']) ?>"
                     data-unit="<?= clean($item['unit']) ?>" data-brand="<?= clean($item['brand'] ?? '') ?>"
                     data-description="<?= clean($item['description'] ?? '') ?>"
                     data-is-perishable="<?= (int) ($item['is_perishable'] ?? 0) ?>">
-                    [<?= clean($item['code']) ?>] <?= clean($item['name']) ?> (<?= clean($item['unit']) ?>)
+                    <?= clean($item['name']) ?> (<?= clean($item['code']) ?> — <?= clean($item['unit']) ?>)
                   </option>
                 <?php endforeach; ?>
               </optgroup>
             <?php endforeach; ?>
+            <option value="custom">+ Add New Custom Resource Definition</option>
           </select>
-          <span style="font-size:11px;color:#4338CA;display:block;margin-top:4px;">
-            Selecting an item auto-fills its specifications and adds central inventory via the
-            <code>agency_resources</code> junction.
-          </span>
+
+          <!-- Inline Dynamic Catalog Creator -->
+          <div id="dynAddContainer_catalog_resource_create" style="display:none; margin-top:8px; background:var(--color-surface,#FFFFFF); border:1px dashed var(--color-border,#D9E0E3); padding:10px 12px; border-radius:6px;">
+            <div style="font-family:'Poppins',sans-serif; font-size:11px; font-weight:600; color:var(--color-primary,#17324D); margin-bottom:6px;">
+              Quick Add Resource to Master Catalog
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:6px; margin-bottom:6px;">
+              <input type="text" id="new_catalog_name_create" class="form-control" placeholder="Resource item name *" style="font-size:11px; height:28px;">
+              <select id="new_catalog_category_create" class="form-control" style="font-size:11px; height:28px;">
+                <?php foreach ($categories as $cat): ?>
+                  <option value="<?= clean($cat) ?>"><?= clean($cat) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <input type="text" id="new_catalog_unit_create" class="form-control" placeholder="Unit (e.g. units, pcs, boxes)" value="units" style="font-size:11px; height:28px;">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:6px;">
+              <button type="button" class="btn btn-outline btn-xs" onclick="toggleDynamicCatalogResource('create')" style="font-size:10px; padding:3px 8px;">Cancel</button>
+              <button type="button" class="btn btn-primary btn-xs" onclick="confirmDynamicCatalogResource('create')" style="font-size:10px; padding:3px 10px;">Save to Master Catalog</button>
+            </div>
+          </div>
+
+          <div style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:4px;">
+            Selecting or adding a resource synchronizes official SKU code, category, and unit across ICDRRMO and all Barangays.
+          </div>
         </div>
 
         <div class="form-section-title">Basic Information</div>
@@ -1964,12 +2154,22 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
 <!-- MODAL 3: Review Barangay Resource Requisition (Approve / Reject)           -->
 <!-- ========================================================================= -->
 <div class="modal-overlay" id="reviewRequisitionModal">
-  <div class="modal-dialog" style="max-width:680px;">
-    <div class="modal-header">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span id="reviewReqStatusBadge" class="badge"></span>
-        <span id="reviewReqCode"
-          style="font-family:var(--font-secondary);font-weight:700;font-size:12px;color:var(--color-primary);"></span>
+  <div class="modal-dialog" style="max-width:700px; border-radius:10px; overflow:hidden;">
+    <div class="modal-header" style="background:#FFFFFF; border-bottom:1px solid var(--color-border,#D9E0E3); padding:14px 18px; display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <span style="font-family:'Roboto',sans-serif; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--color-secondary,#2F6F73);">Supply Requisition</span>
+          <span id="reviewReqStatusBadge" class="badge"></span>
+          <span id="reviewReqUrgencyBadge" class="badge" style="font-size:9.5px;"></span>
+        </div>
+        <h3 class="modal-title" style="font-family:'Poppins',sans-serif; font-size:15px; font-weight:600; color:var(--color-primary,#17324D); margin:0;">
+          Requisition Review & Stock Verification
+        </h3>
+        <div style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:2px;">
+          Tracking Code: <strong id="reviewReqCode" style="font-family:'Poppins',sans-serif; color:var(--color-primary,#17324D);"></strong> &bull;
+          <span id="reviewReqBarangay"></span> &bull;
+          Submitted: <span id="reviewReqDate"></span>
+        </div>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('reviewRequisitionModal')">&times;</button>
     </div>
@@ -1977,101 +2177,168 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     <form id="reviewRequisitionForm" onsubmit="event.preventDefault();">
       <input type="hidden" id="review_req_id">
 
-      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <!-- Barangay Identity & Commodity Headline -->
-        <div style="padding-bottom:10px;border-bottom:1px solid var(--color-border-light);">
-          <div
-            style="font-size:11px;font-weight:700;color:var(--color-secondary);text-transform:uppercase;letter-spacing:0.5px;"
-            id="reviewReqBarangay">
-            Barangay
+      <div class="modal-body" style="padding:16px 18px; display:flex; flex-direction:column; gap:12px; background:#FAFCFD;">
+
+        <!-- Current Stock vs Requested Quantity Visual Intelligence Card -->
+        <div style="background:var(--color-surface-subtle,#F0F3F4); border:1px solid var(--color-border,#D9E0E3); border-radius:8px; padding:14px 16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <!-- Left Column: Barangay Requested Quantity -->
+            <div style="background:#FFFFFF; border:1px solid var(--color-border,#D9E0E3); border-radius:6px; padding:12px 14px;">
+              <div style="font-family:'Roboto',sans-serif; font-size:9.5px; text-transform:uppercase; font-weight:700; color:var(--color-text-secondary,#66737D); letter-spacing:0.4px;">
+                Requested by Barangay
+              </div>
+              <div style="display:flex; align-items:baseline; gap:6px; margin-top:4px;">
+                <span id="reviewReqQuantityDisplay" style="font-family:'Poppins',sans-serif; font-size:22px; font-weight:700; color:var(--color-primary,#17324D); line-height:1;">0</span>
+                <span id="reviewReqUnitDisplay" style="font-family:'Roboto',sans-serif; font-size:12px; font-weight:500; color:var(--color-text-secondary,#66737D);">units</span>
+              </div>
+              <div style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:4px;" id="reviewReqSubmitter">
+                Origin: Barangay Hinaplanon
+              </div>
+            </div>
+
+            <!-- Right Column: ICDRRMO Central Depot Current Stock -->
+            <div style="background:#FFFFFF; border:1px solid var(--color-border,#D9E0E3); border-radius:6px; padding:12px 14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-family:'Roboto',sans-serif; font-size:9.5px; text-transform:uppercase; font-weight:700; color:var(--color-secondary,#2F6F73); letter-spacing:0.4px;">
+                  Current ICDRRMO Depot Stock
+                </div>
+                <span id="reviewDepotStockBadge" class="badge" style="font-size:9px;">Checking...</span>
+              </div>
+              <div style="display:flex; align-items:baseline; gap:6px; margin-top:4px;">
+                <span id="reviewDepotAvailDisplay" style="font-family:'Poppins',sans-serif; font-size:22px; font-weight:700; color:var(--color-primary,#17324D); line-height:1;">—</span>
+                <span id="reviewDepotUnitDisplay" style="font-family:'Roboto',sans-serif; font-size:12px; font-weight:500; color:var(--color-text-secondary,#66737D);">available</span>
+              </div>
+              <div style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:4px;" id="reviewDepotTotalSub">
+                Central Depot Live Inventory
+              </div>
+            </div>
           </div>
-          <div id="reviewReqItemName" style="font-weight:800;font-size:17px;color:var(--color-primary);margin-top:2px;">
+
+          <!-- Stock Fulfillment Ratio & Health Bar -->
+          <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--color-border,#D9E0E3);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+              <span style="font-family:'Roboto',sans-serif; font-size:10px; font-weight:600; color:var(--color-primary,#17324D);" id="reviewStockFulfillmentLabel">
+                Depot Stock Availability Status
+              </span>
+              <span style="font-family:'Roboto',sans-serif; font-size:10px; font-weight:600;" id="reviewStockRatioPercent">
+                100%
+              </span>
+            </div>
+            <div style="height:6px; background:#D9E0E3; border-radius:3px; overflow:hidden;">
+              <div id="reviewStockProgressBar" style="height:100%; width:100%; background:var(--color-secondary,#2F6F73); border-radius:3px; transition:width 0.3s ease;"></div>
+            </div>
+            <div id="reviewStockFulfillmentNotice" style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:5px; line-height:1.45;">
+              Checking live depot inventory...
+            </div>
           </div>
-          <div id="reviewReqMetaSub" style="font-size:10px;color:var(--color-text-muted);margin-top:3px;"></div>
         </div>
 
-        <!-- Metric comparison cards -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div style="background:#F8FAFC;padding:10px;border-radius:6px;border:1px solid var(--color-border-light);">
-            <div style="font-size:9.5px;color:var(--color-text-muted);text-transform:uppercase;font-weight:600;">
-              Requested by Barangay</div>
-            <div id="reviewReqQuantityDisplay"
-              style="font-size:16px;font-weight:800;color:var(--color-primary);margin-top:2px;"></div>
+        <!-- Commodity Specifications & Purok Target -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div style="background:#FFFFFF; border:1px solid var(--color-border,#D9E0E3); border-radius:6px; padding:10px 12px;">
+            <div style="font-family:'Roboto',sans-serif; font-size:9.5px; text-transform:uppercase; font-weight:700; color:var(--color-text-secondary,#66737D);">
+              Resource Commodity
+            </div>
+            <div id="reviewReqItemName" style="font-family:'Poppins',sans-serif; font-size:13px; font-weight:600; color:var(--color-primary,#17324D); margin-top:2px;">
+              —
+            </div>
+            <div id="reviewReqMetaSub" style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-text-secondary,#66737D); margin-top:2px;">
+              —
+            </div>
           </div>
-          <div style="background:#F8FAFC;padding:10px;border-radius:6px;border:1px solid var(--color-border-light);">
-            <div style="font-size:9.5px;color:var(--color-text-muted);text-transform:uppercase;font-weight:600;">Central
-              Depot Stock Available</div>
-            <div id="reviewDepotAvailDisplay"
-              style="font-size:16px;font-weight:800;color:var(--color-success);margin-top:2px;">—</div>
+
+          <div style="background:#FFFFFF; border:1px solid var(--color-border,#D9E0E3); border-radius:6px; padding:10px 12px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div>
+                <div style="font-family:'Roboto',sans-serif; font-size:9.5px; text-transform:uppercase; font-weight:700; color:var(--color-text-secondary,#66737D);">
+                  Urgency Priority
+                </div>
+                <div id="reviewReqUrgency" style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; color:var(--color-primary,#17324D); margin-top:2px;">
+                  —
+                </div>
+              </div>
+              <div>
+                <div style="font-family:'Roboto',sans-serif; font-size:9.5px; text-transform:uppercase; font-weight:700; color:var(--color-text-secondary,#66737D);">
+                  Target Purok
+                </div>
+                <div id="reviewReqTargetPurok" style="font-family:'Roboto',sans-serif; font-size:11px; font-weight:500; color:var(--color-primary,#17324D); margin-top:2px;">
+                  —
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Urgency Priority</label>
-            <div id="reviewReqUrgency" style="font-size:11.5px;font-weight:600;"></div>
+        <!-- Purpose & Operational Justification -->
+        <div>
+          <div style="font-family:'Roboto',sans-serif; font-size:9.5px; text-transform:uppercase; font-weight:700; color:var(--color-text-secondary,#66737D); margin-bottom:4px;">
+            Barangay Operational Purpose & Justification
           </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Target Purok / Facility</label>
-            <div id="reviewReqTargetPurok" style="font-size:11.5px;font-weight:600;"></div>
-          </div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Barangay Purpose & Operational Justification</label>
-          <div id="reviewReqPurpose"
-            style="font-size:11.5px;color:var(--color-text);background:#F8FAFC;padding:10px;border-radius:6px;border:1px solid var(--color-border-light);line-height:1.5;">
+          <div id="reviewReqPurpose" style="font-family:'Roboto',sans-serif; font-size:10.5px; color:var(--color-primary,#17324D); background:var(--color-surface-subtle,#F0F3F4); border:1px solid var(--color-border,#D9E0E3); border-radius:6px; padding:10px 12px; line-height:1.5;">
+            —
           </div>
         </div>
 
         <!-- Editable Review Controls (shown when Pending) -->
-        <div id="reviewPendingControls"
-          style="background:#F1F5F9;border:1px solid #CBD5E1;padding:12px;border-radius:6px;display:flex;flex-direction:column;gap:10px;">
-          <div style="font-size:11px;font-weight:700;color:var(--color-primary);text-transform:uppercase;">
-            ICDRRMO Decision & Allocation
+        <div id="reviewPendingControls" style="background:#FFFFFF; border:1px solid var(--color-border,#D9E0E3); padding:14px; border-radius:8px; display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; color:var(--color-primary,#17324D); text-transform:uppercase; letter-spacing:0.3px;">
+              ICDRRMO Decision & Stock Allocation
+            </div>
+            <span id="reviewQuantityMaxHint" style="font-family:'Roboto',sans-serif; font-size:10px; color:var(--color-secondary,#2F6F73); font-weight:600;"></span>
           </div>
 
           <div class="form-group" style="margin-bottom:0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <label class="form-label" style="margin-bottom:0;">Approved Quantity to Allocate <span
-                  style="color:var(--color-danger)">*</span></label>
-              <span id="reviewQuantityMaxHint"
-                style="font-size:9.5px;color:var(--color-primary);font-weight:600;"></span>
-            </div>
+            <label class="form-label" style="font-family:'Roboto',sans-serif; font-size:11px; margin-bottom:4px;">
+              Approved Quantity to Allocate <span style="color:var(--color-danger)">*</span>
+            </label>
             <input type="number" id="review_approved_quantity" class="form-control" min="1" required
-              style="font-weight:700;font-size:13px;margin-top:4px;" oninput="validateReviewQuantity()">
+              style="font-family:'Poppins',sans-serif; font-weight:600; font-size:13px; height:34px;" oninput="validateReviewQuantity()">
             <div id="reviewQtyValidationAlert"
-              style="display:none;font-size:10.5px;color:#991B1B;background:#FEE2E2;border:1px solid #FECACA;border-radius:4px;padding:6px 10px;margin-top:6px;font-weight:600;">
+              style="display:none; font-family:'Roboto',sans-serif; font-size:10.5px; color:#991B1B; background:#FEE2E2; border:1px solid #FECACA; border-radius:4px; padding:6px 10px; margin-top:6px; font-weight:600;">
             </div>
-            <div style="font-size:9.5px;color:var(--color-text-muted);margin-top:3px;">
-              Upon acceptance, this quantity will be deducted in real-time from ICDRRMO Central Depot and credited
-              directly to the barangay hall inventory.
+            <div style="font-family:'Roboto',sans-serif; font-size:9.5px; color:var(--color-text-secondary,#66737D); margin-top:4px;">
+              Upon acceptance, this quantity will be deducted in real-time from ICDRRMO Central Depot and credited to the barangay local inventory.
             </div>
           </div>
 
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Review Remarks / Logistics Instructions</label>
-            <textarea id="review_remarks" class="form-control" rows="2"
+            <label class="form-label" style="font-family:'Roboto',sans-serif; font-size:11px; margin-bottom:4px;">
+              Review Remarks / Logistics Instructions
+            </label>
+            <textarea id="review_remarks" class="form-control" rows="2" style="font-family:'Roboto',sans-serif; font-size:11px;"
               placeholder="e.g. Approved for warehouse release. Barangay dispatch truck scheduled for 2:00 PM pickup."></textarea>
           </div>
         </div>
 
-        <!-- Read-Only Review Decision (shown when Approved or Rejected) -->
-        <div id="reviewCompletedDetails" style="display:none;padding:12px;border-radius:6px;">
-          <div style="font-size:11px;font-weight:700;" id="reviewCompletedTitle">Decision Recorded</div>
-          <div id="reviewCompletedRemarks" style="font-size:11.5px;margin-top:4px;line-height:1.4;"></div>
-          <div id="reviewCompletedMeta" style="font-size:9.5px;margin-top:6px;"></div>
+        <!-- Read-Only Review Decision (shown when Approved or Declined) -->
+        <div id="reviewCompletedDetails" style="display:none; padding:12px 14px; border-radius:8px; border:1px solid var(--color-border,#D9E0E3);">
+          <div style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:600;" id="reviewCompletedTitle">Decision Recorded</div>
+          <div id="reviewCompletedRemarks" style="font-family:'Roboto',sans-serif; font-size:11px; margin-top:4px; line-height:1.4;"></div>
+          <div id="reviewCompletedMeta" style="font-family:'Roboto',sans-serif; font-size:9.5px; margin-top:6px; color:var(--color-text-secondary,#66737D);"></div>
+        </div>
+
+        <!-- Barangay Delivery Receipt Confirmation (shown when Approved) -->
+        <div id="reviewReceiptDetails" style="display:none; padding:12px 14px; border-radius:8px; border:1px solid var(--color-border,#D9E0E3);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-family:'Poppins',sans-serif; font-size:12px; font-weight:600; color:var(--color-primary,#17324D);" id="reviewReceiptTitle">
+              Barangay Delivery Receipt Status
+            </div>
+            <span id="reviewReceiptBadge" class="badge" style="font-size:9.5px;"></span>
+          </div>
+          <div id="reviewReceiptRemarks" style="font-family:'Roboto',sans-serif; font-size:11px; margin-top:6px; line-height:1.4; color:var(--color-primary,#17324D);"></div>
+          <div id="reviewReceiptMeta" style="font-family:'Roboto',sans-serif; font-size:9.5px; margin-top:6px; color:var(--color-text-secondary,#66737D);"></div>
         </div>
       </div>
 
-      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="modal-footer" style="background:#FFFFFF; border-top:1px solid var(--color-border,#D9E0E3); padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
         <!-- Left: Decline Button (only when Pending) -->
         <div>
           <button type="button" class="btn btn-outline btn-sm" id="btnRejectRequisition"
-            style="color:var(--color-danger);border-color:var(--color-danger);"
+            style="color:var(--color-danger); border-color:var(--color-danger); font-size:11px;"
             onclick="submitRequisitionReview('reject')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              style="margin-right:3px;vertical-align:-1px;">
+              style="margin-right:4px; vertical-align:-1px;">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="15" y1="9" x2="9" y2="15"></line>
               <line x1="9" y1="9" x2="15" y2="15"></line>
@@ -2081,15 +2348,15 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <!-- Right: Close or Accept Button -->
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('reviewRequisitionModal')">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('reviewRequisitionModal')" style="font-size:11px;">
             Close
           </button>
           <button type="button" class="btn btn-primary btn-sm" id="btnApproveRequisition"
-            style="background:var(--color-success);border-color:var(--color-success);"
+            style="background:var(--color-success); border-color:var(--color-success); font-size:11px;"
             onclick="submitRequisitionReview('approve')">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              style="margin-right:3px;vertical-align:-1px;">
+              style="margin-right:4px; vertical-align:-1px;">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
             Accept & Allocate
@@ -2278,7 +2545,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
           <select id="directAllocResource" class="form-control" required onchange="onDirectResourceChange()">
             <option value="">-- Select Central Stock Commodity --</option>
             <?php foreach ($resourcesList as $res): ?>
-              <?php if (empty($res['barangay_id']) && $res['status'] === 'active'): ?>
+              <?php if ($res['status'] === 'active'): ?>
                 <option value="<?= $res['id'] ?>" data-code="<?= clean($res['code']) ?>"
                   data-name="<?= clean($res['name']) ?>" data-avail="<?= (int) $res['available_quantity'] ?>"
                   data-unit="<?= clean($res['unit']) ?>" data-category="<?= clean($res['category']) ?>">
@@ -2452,20 +2719,117 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     if (container) container.style.display = 'none';
   }
 
-  function onCatalogResourceSelected(selectElem) {
-    const opt = selectElem.options[selectElem.selectedIndex];
-    if (!opt || !opt.value) {
+  function toggleDynamicCatalogResource(mode) {
+    const container = document.getElementById(`dynAddContainer_catalog_resource_${mode}`);
+    if (!container) return;
+    const isHidden = container.style.display === 'none' || !container.style.display;
+    container.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      const input = document.getElementById(`new_catalog_name_${mode}`);
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+    }
+  }
+
+  async function confirmDynamicCatalogResource(mode) {
+    const nameInput = document.getElementById(`new_catalog_name_${mode}`);
+    const catSelect = document.getElementById(`new_catalog_category_${mode}`);
+    const unitInput = document.getElementById(`new_catalog_unit_${mode}`);
+    if (!nameInput) return;
+
+    const name = nameInput.value.trim();
+    if (!name) {
+      alert('Please enter a resource item name.');
+      nameInput.focus();
       return;
     }
-    const form = document.getElementById('createResourceForm');
+    const category = catSelect ? catSelect.value : 'Relief Goods';
+    const unit = (unitInput && unitInput.value.trim()) ? unitInput.value.trim() : 'units';
+
+    try {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('category', category);
+      formData.append('unit', unit);
+
+      const res = await fetch('<?= BASE_URL ?>/backend/functions/resources/add_catalog_resource.php', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message || 'Error saving to catalog.');
+        return;
+      }
+
+      const item = data.item;
+      const catSelectElem = document.getElementById('create_select_catalog_resource');
+      if (catSelectElem) {
+        let optgroup = null;
+        for (let i = 0; i < catSelectElem.children.length; i++) {
+          if (catSelectElem.children[i].tagName === 'OPTGROUP' && catSelectElem.children[i].label.toLowerCase() === item.category.toLowerCase()) {
+            optgroup = catSelectElem.children[i];
+            break;
+          }
+        }
+        if (!optgroup) {
+          optgroup = document.createElement('optgroup');
+          optgroup.label = item.category;
+          catSelectElem.appendChild(optgroup);
+        }
+
+        let opt = catSelectElem.querySelector(`option[value="${item.id}"]`);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${item.name} (${item.code} — ${item.unit})`;
+          opt.setAttribute('data-code', item.code);
+          opt.setAttribute('data-name', item.name);
+          opt.setAttribute('data-category', item.category);
+          opt.setAttribute('data-unit', item.unit);
+          opt.setAttribute('data-brand', item.brand || '');
+          opt.setAttribute('data-description', item.description || '');
+          opt.setAttribute('data-is-perishable', item.is_perishable ? '1' : '0');
+          optgroup.appendChild(opt);
+        }
+        catSelectElem.value = item.id;
+        onCatalogResourceSelected(catSelectElem);
+      }
+
+      toggleDynamicCatalogResource(mode);
+      if (typeof showToast === 'function') {
+        showToast(data.message, 'success');
+      }
+    } catch (err) {
+      console.error('Error adding catalog resource:', err);
+      alert('Network or server error while adding catalog resource.');
+    }
+  }
+
+  function onCatalogResourceSelected(selectElem) {
+    const val = selectElem.value;
+    const form = selectElem.closest('form') || document.getElementById('createResourceForm');
     if (!form) return;
+
+    if (val === 'custom') {
+      toggleDynamicCatalogResource('create');
+      return;
+    }
+
+    const opt = selectElem.options[selectElem.selectedIndex];
+    if (!opt || !val) {
+      return;
+    }
 
     const code = opt.getAttribute('data-code') || '';
     const name = opt.getAttribute('data-name') || '';
     const category = opt.getAttribute('data-category') || '';
     const unit = opt.getAttribute('data-unit') || '';
     const brand = opt.getAttribute('data-brand') || '';
-    const desc = opt.getAttribute('data-description') || '';
+    const desc = opt.getAttribute('data-description') || opt.getAttribute('data-desc') || '';
     const isPerishable = opt.getAttribute('data-is-perishable') === '1';
 
     if (form.elements['code']) form.elements['code'].value = code;
@@ -2487,6 +2851,8 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     if (form) form.reset();
     const catSel = document.getElementById('create_select_catalog_resource');
     if (catSel) catSel.selectedIndex = 0;
+    const catContainer = document.getElementById('dynAddContainer_catalog_resource_create');
+    if (catContainer) catContainer.style.display = 'none';
     ['category', 'brand', 'supplier'].forEach(f => {
       const c = document.getElementById(`dynAddContainer_${f}_create`);
       if (c) c.style.display = 'none';
@@ -2973,10 +3339,31 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     currentRequisition = req;
     document.getElementById('review_req_id').value = req.id;
     document.getElementById('reviewReqCode').innerText = req.request_code;
-    document.getElementById('reviewReqBarangay').innerText = `Origin: Barangay ${req.barangay_name}`;
+    document.getElementById('reviewReqBarangay').innerText = `Brgy. ${req.barangay_name}`;
     document.getElementById('reviewReqItemName').innerText = req.item_name;
-    document.getElementById('reviewReqMetaSub').innerText = `Category: ${req.category} • Submitted by ${req.requested_by_name || 'Barangay Head'} on ${req.created_at}`;
-    document.getElementById('reviewReqQuantityDisplay').innerText = `${parseInt(req.requested_quantity).toLocaleString()} ${req.unit}`;
+    document.getElementById('reviewReqMetaSub').innerText = `Category: ${req.category}` + (req.central_res_code ? ` • SKU: [${req.central_res_code}]` : '') + ` • Submitted by ${req.requested_by_name || 'Barangay Head'}`;
+    document.getElementById('reviewReqQuantityDisplay').innerText = `${parseInt(req.requested_quantity).toLocaleString()}`;
+    
+    const unitDisp = document.getElementById('reviewReqUnitDisplay');
+    if (unitDisp) unitDisp.innerText = req.unit || 'units';
+
+    const dateDisp = document.getElementById('reviewReqDate');
+    if (dateDisp) dateDisp.innerText = req.created_at || 'Recently';
+
+    const submitterDisp = document.getElementById('reviewReqSubmitter');
+    if (submitterDisp) submitterDisp.innerText = `Origin: Brgy. ${req.barangay_name} • By: ${req.requested_by_name || 'Barangay Head'}`;
+
+    const urgBadge = document.getElementById('reviewReqUrgencyBadge');
+    if (urgBadge) {
+      urgBadge.innerText = req.urgency;
+      if (req.urgency === 'Immediate') {
+        urgBadge.className = 'badge badge-danger';
+      } else if (req.urgency === 'High') {
+        urgBadge.className = 'badge badge-warning';
+      } else {
+        urgBadge.className = 'badge badge-info';
+      }
+    }
 
     // Central depot stock display
     updateDepotStockDisplay(req.central_res_avail, req.central_res_unit || req.unit, req.requested_quantity);
@@ -2990,6 +3377,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
           if (matched) {
             req.central_res_avail = matched.available_quantity;
             req.central_res_unit = matched.unit;
+            req.central_res_code = matched.code;
             updateDepotStockDisplay(matched.available_quantity, matched.unit, req.requested_quantity);
             validateReviewQuantity();
           }
@@ -2999,7 +3387,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
 
     document.getElementById('reviewReqUrgency').innerText = req.urgency;
     document.getElementById('reviewReqTargetPurok').innerText = req.target_purok || 'Barangay-wide Hall Depot';
-    document.getElementById('reviewReqPurpose').innerText = req.purpose || 'No description provided.';
+    document.getElementById('reviewReqPurpose').innerText = req.purpose || 'No justification provided.';
 
     // Status Badge & Controls
     const badge = document.getElementById('reviewReqStatusBadge');
@@ -3034,20 +3422,72 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
 
       document.getElementById('review_remarks').value = '';
       validateReviewQuantity();
+
+      const receiptDetails = document.getElementById('reviewReceiptDetails');
+      if (receiptDetails) receiptDetails.style.display = 'none';
     } else {
       pendingControls.style.display = 'none';
       completedDetails.style.display = 'block';
       btnApprove.style.display = 'none';
       btnReject.style.display = 'none';
 
+      const receiptDetails = document.getElementById('reviewReceiptDetails');
+
       if (req.status === 'Approved') {
-        badge.className = 'badge badge-success';
-        badge.innerText = 'Approved';
+        if (req.receipt_status === 'Received') {
+          badge.className = 'badge badge-success';
+          badge.innerText = 'Received';
+        } else if (req.receipt_status === 'Not Received') {
+          badge.className = 'badge badge-danger';
+          badge.innerText = 'Not Received';
+        } else {
+          badge.className = 'badge badge-warning';
+          badge.innerText = 'Awaiting Receipt';
+        }
         completedDetails.style.background = '#F0FDF4';
         completedDetails.style.border = '1px solid #BBF7D0';
-        document.getElementById('reviewCompletedTitle').innerText = `Approved (${req.approved_quantity} ${req.unit} allocated)`;
+        document.getElementById('reviewCompletedTitle').innerText = `Allocated (${req.approved_quantity} ${req.unit})`;
         document.getElementById('reviewCompletedTitle').style.color = '#166534';
         document.getElementById('reviewCompletedRemarks').style.color = '#15803D';
+
+        if (receiptDetails) {
+          receiptDetails.style.display = 'block';
+          const recBadge = document.getElementById('reviewReceiptBadge');
+          const recRemarks = document.getElementById('reviewReceiptRemarks');
+          const recMeta = document.getElementById('reviewReceiptMeta');
+
+          if (req.receipt_status === 'Received') {
+            receiptDetails.style.background = '#F0FDF4';
+            receiptDetails.style.border = '1px solid #BBF7D0';
+            recBadge.className = 'badge';
+            recBadge.style.background = '#E8F8F0';
+            recBadge.style.color = '#0F5132';
+            recBadge.style.border = '1px solid #C3E6CB';
+            recBadge.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:2px;vertical-align:-1px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Received by Barangay';
+            recRemarks.innerText = req.receipt_remarks ? `Barangay Remarks: "${req.receipt_remarks}"` : 'Supplies acknowledged and confirmed received in full by Barangay.';
+            recMeta.innerText = `Confirmed by: ${req.received_by_name || 'Barangay Head'}` + (req.received_at ? ` on ${req.received_at}` : '');
+          } else if (req.receipt_status === 'Not Received') {
+            receiptDetails.style.background = '#FEF2F2';
+            receiptDetails.style.border = '1px solid #FECACA';
+            recBadge.className = 'badge';
+            recBadge.style.background = '#FDE8E8';
+            recBadge.style.color = '#9B1C1C';
+            recBadge.style.border = '1px solid #F8B4B4';
+            recBadge.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:2px;vertical-align:-1px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Flagged Not Received';
+            recRemarks.innerText = req.receipt_remarks ? `Barangay Report: "${req.receipt_remarks}"` : 'Barangay reported that the approved supplies have not been received.';
+            recMeta.innerText = `Flagged by: ${req.received_by_name || 'Barangay Head'}` + (req.received_at ? ` on ${req.received_at}` : '');
+          } else {
+            receiptDetails.style.background = '#FFFBEB';
+            receiptDetails.style.border = '1px solid #FDE68A';
+            recBadge.className = 'badge';
+            recBadge.style.background = '#FEF3C7';
+            recBadge.style.color = '#92400E';
+            recBadge.style.border = '1px solid #FDE68A';
+            recBadge.innerHTML = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px;vertical-align:-1px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Awaiting Barangay Confirmation';
+            recRemarks.innerText = 'Dispatched from depot. Awaiting receipt confirmation from Barangay Head upon supply arrival.';
+            recMeta.innerText = 'Delivery Status: In transit / Dispatched to Barangay';
+          }
+        }
       } else {
         badge.className = 'badge badge-danger';
         badge.innerText = 'Declined';
@@ -3056,6 +3496,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         document.getElementById('reviewCompletedTitle').innerText = 'Requisition Declined';
         document.getElementById('reviewCompletedTitle').style.color = '#991B1B';
         document.getElementById('reviewCompletedRemarks').style.color = '#B91C1C';
+        if (receiptDetails) receiptDetails.style.display = 'none';
       }
 
       document.getElementById('reviewCompletedRemarks').innerText = req.review_remarks || '(No remarks provided)';
@@ -3067,13 +3508,111 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
 
   function updateDepotStockDisplay(avail, unit, requestedQty) {
     const depotDisp = document.getElementById('reviewDepotAvailDisplay');
-    if (!depotDisp) return;
-    if (avail !== null && avail !== undefined) {
-      depotDisp.innerText = `${parseInt(avail).toLocaleString()} ${unit}`;
-      depotDisp.style.color = (parseInt(avail) >= parseInt(requestedQty)) ? 'var(--color-success)' : 'var(--color-danger)';
+    const depotUnit = document.getElementById('reviewDepotUnitDisplay');
+    const badge = document.getElementById('reviewDepotStockBadge');
+    const totalSub = document.getElementById('reviewDepotTotalSub');
+    const progress = document.getElementById('reviewStockProgressBar');
+    const ratioPercent = document.getElementById('reviewStockRatioPercent');
+    const notice = document.getElementById('reviewStockFulfillmentNotice');
+    const btnApprove = document.getElementById('btnApproveRequisition');
+    const approvedInput = document.getElementById('review_approved_quantity');
+    const hint = document.getElementById('reviewQuantityMaxHint');
+
+    const reqQty = parseInt(requestedQty) || 1;
+    const availNum = (avail !== null && avail !== undefined) ? parseInt(avail) : null;
+    const unitStr = unit || (currentRequisition ? currentRequisition.unit : 'units');
+
+    if (depotUnit) depotUnit.innerText = `${unitStr} available`;
+
+    if (availNum === null) {
+      if (depotDisp) { depotDisp.innerText = 'Custom'; depotDisp.style.color = 'var(--color-text-secondary,#66737D)'; }
+      if (badge) { badge.className = 'badge badge-secondary'; badge.innerText = 'Custom Item'; }
+      if (progress) { progress.style.width = '100%'; progress.style.background = '#64748B'; }
+      if (ratioPercent) ratioPercent.innerText = 'Custom Definition';
+      if (notice) notice.innerText = 'This resource item is custom-specified and not linked to a Central Depot SKU.';
+      return;
+    }
+
+    if (depotDisp) depotDisp.innerText = availNum.toLocaleString();
+
+    if (availNum <= 0) {
+      // 0 left - Out of stock!
+      if (depotDisp) depotDisp.style.color = '#DC2626';
+      if (badge) {
+        badge.className = 'badge badge-danger';
+        badge.innerText = 'Out of Stock (0 Left)';
+      }
+      if (totalSub) totalSub.innerText = 'Central Depot inventory depleted';
+      if (progress) { progress.style.width = '0%'; progress.style.background = '#DC2626'; }
+      if (ratioPercent) { ratioPercent.innerText = '0%'; ratioPercent.style.color = '#DC2626'; }
+      if (notice) {
+        notice.innerHTML = '<span style="color:#DC2626; font-weight:700;">⚠ Out of Stock:</span> Central Depot currently has <strong>0 ' + unitStr + '</strong> available. This request cannot be allocated until new stock is replenished.';
+      }
+      if (approvedInput) {
+        approvedInput.value = 0;
+        approvedInput.max = 0;
+        approvedInput.disabled = true;
+      }
+      if (hint) {
+        hint.innerText = 'Depot Stock: 0 available (Depleted)';
+        hint.style.color = '#DC2626';
+      }
+      if (btnApprove && currentRequisition && currentRequisition.status === 'Pending') {
+        btnApprove.disabled = true;
+        btnApprove.title = 'Cannot allocate: Central Depot stock is 0.';
+      }
+    } else if (availNum < reqQty) {
+      // Limited stock (e.g. 10 only left, but requested 50!)
+      if (depotDisp) depotDisp.style.color = '#D97706';
+      if (badge) {
+        badge.className = 'badge badge-warning';
+        badge.innerText = `Limited Stock (${availNum.toLocaleString()} Left)`;
+      }
+      if (totalSub) totalSub.innerText = `Deficit: ${(reqQty - availNum).toLocaleString()} ${unitStr} short of request`;
+      const pct = Math.min(100, Math.round((availNum / reqQty) * 100));
+      if (progress) { progress.style.width = `${pct}%`; progress.style.background = '#D97706'; }
+      if (ratioPercent) { ratioPercent.innerText = `${pct}% stock coverage`; ratioPercent.style.color = '#D97706'; }
+      if (notice) {
+        notice.innerHTML = `<span style="color:#D97706; font-weight:700;">⚠ Partial Stock Available:</span> Barangay requested <strong>${reqQty.toLocaleString()} ${unitStr}</strong>, but Central Depot has only <strong>${availNum.toLocaleString()} ${unitStr}</strong>. Allocation is capped at maximum <strong>${availNum.toLocaleString()} ${unitStr}</strong>.`;
+      }
+      if (approvedInput) {
+        approvedInput.disabled = false;
+        approvedInput.max = availNum;
+        if (parseInt(approvedInput.value) > availNum || parseInt(approvedInput.value) <= 0) {
+          approvedInput.value = availNum;
+        }
+      }
+      if (hint) {
+        hint.innerText = `Max allocatable: ${availNum.toLocaleString()} ${unitStr} (Limited Stock)`;
+        hint.style.color = '#D97706';
+      }
+      if (btnApprove && currentRequisition && currentRequisition.status === 'Pending') {
+        btnApprove.disabled = false;
+      }
     } else {
-      depotDisp.innerText = 'Custom item (Not in central catalog)';
-      depotDisp.style.color = 'var(--color-text-muted)';
+      // Sufficient stock (availNum >= reqQty)
+      if (depotDisp) depotDisp.style.color = '#16A34A';
+      if (badge) {
+        badge.className = 'badge badge-success';
+        badge.innerText = `In Stock (${availNum.toLocaleString()} Available)`;
+      }
+      if (totalSub) totalSub.innerText = `Remaining after allocation: ${(availNum - reqQty).toLocaleString()} ${unitStr}`;
+      if (progress) { progress.style.width = '100%'; progress.style.background = '#16A34A'; }
+      if (ratioPercent) { ratioPercent.innerText = '100% Sufficient'; ratioPercent.style.color = '#16A34A'; }
+      if (notice) {
+        notice.innerHTML = `<span style="color:#16A34A; font-weight:700;">✓ Stock Fully Sufficient:</span> ICDRRMO Central Depot has <strong>${availNum.toLocaleString()} ${unitStr}</strong> available, fully covering the requested <strong>${reqQty.toLocaleString()} ${unitStr}</strong>.`;
+      }
+      if (approvedInput) {
+        approvedInput.disabled = false;
+        approvedInput.max = availNum;
+      }
+      if (hint) {
+        hint.innerText = `Depot Stock: ${availNum.toLocaleString()} ${unitStr} available`;
+        hint.style.color = 'var(--color-secondary,#2F6F73)';
+      }
+      if (btnApprove && currentRequisition && currentRequisition.status === 'Pending') {
+        btnApprove.disabled = false;
+      }
     }
   }
 
@@ -3088,6 +3627,15 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     const avail = (currentRequisition.central_res_avail !== null && currentRequisition.central_res_avail !== undefined)
       ? parseInt(currentRequisition.central_res_avail)
       : null;
+
+    if (avail !== null && avail <= 0) {
+      if (alertBox) {
+        alertBox.style.display = 'block';
+        alertBox.innerText = '⚠ Central Depot stock is depleted (0 available). Cannot allocate.';
+      }
+      if (btnApprove) btnApprove.disabled = true;
+      return;
+    }
 
     if (qty <= 0) {
       if (alertBox) {
@@ -3256,7 +3804,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
     const statusCell = document.getElementById(`req-status-cell-${reqId}`);
     if (statusCell) {
       if (status === 'Approved') {
-        statusCell.innerHTML = '<span class="badge badge-success">Approved</span>';
+        statusCell.innerHTML = '<span class="badge badge-warning" style="font-size:9.5px;padding:3px 8px;font-weight:600;display:inline-flex;align-items:center;gap:3px;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Awaiting Receipt</span>';
       } else {
         statusCell.innerHTML = '<span class="badge badge-danger">Declined</span>';
       }
@@ -3276,6 +3824,7 @@ $barangayInventoryHistory = $bTrxStmt->fetchAll(PDO::FETCH_ASSOC);
         currentRequisition.status = status;
         currentRequisition.approved_quantity = data.approved_quantity;
         currentRequisition.review_remarks = remarks;
+        currentRequisition.receipt_status = 'Pending';
         currentRequisition.reviewed_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
         actionsCell.innerHTML = `<button type="button" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:11px;display:inline-flex;align-items:center;gap:4px;" onclick='openReviewRequisitionModal(${JSON.stringify(currentRequisition)})'><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>View</button>`;
       } else {

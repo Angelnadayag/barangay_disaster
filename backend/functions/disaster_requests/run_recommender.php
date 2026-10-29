@@ -38,9 +38,13 @@ if (!in_array($modality, ['both', 'resources', 'financial_aid'])) {
     $modality = 'both';
 }
 
+$rawSponsor = isset($_POST['financial_aid_sponsor']) 
+    ? trim((string)$_POST['financial_aid_sponsor']) 
+    : (isset($_POST['financial_aid_source']) ? trim((string)$_POST['financial_aid_source']) : null);
+
 $options = [
     'financial_aid_amount' => isset($_POST['financial_aid_amount']) && is_numeric($_POST['financial_aid_amount']) ? (float)$_POST['financial_aid_amount'] : null,
-    'financial_aid_sponsor' => trim($_POST['financial_aid_sponsor'] ?? ($_POST['financial_aid_source'] ?? '')),
+    'financial_aid_sponsor' => ($rawSponsor !== null && $rawSponsor !== '') ? $rawSponsor : null,
     'financial_aid_target' => trim($_POST['financial_aid_target'] ?? 'displaced')
 ];
 

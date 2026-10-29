@@ -19,9 +19,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['change_passwo
     $newPass = $_POST['new_password'] ?? '';
     $confirmPass = $_POST['confirm_password'] ?? '';
 
-    $chkStmt = $db->prepare("SELECT password FROM users WHERE id = ?");
+    $targetTable = 'residents';
+    $chkStmt = $db->prepare("SELECT password FROM residents WHERE id = ?");
     $chkStmt->execute([$user['id']]);
     $currentHash = $chkStmt->fetchColumn();
+
+    if (!$currentHash) {
+        $chkStmt = $db->prepare("SELECT password FROM users WHERE id = ?");
+        $chkStmt->execute([$user['id']]);
+        $currentHash = $chkStmt->fetchColumn();
+        $targetTable = 'users';
+    }
 
     if (!password_verify($currentPass, $currentHash)) {
         $passwordError = "Current password does not match.";
@@ -31,7 +39,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['change_passwo
         $passwordError = "New passwords do not match.";
     } else {
         $newHash = password_hash($newPass, PASSWORD_BCRYPT);
-        $upd = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+        $upd = $db->prepare("UPDATE {$targetTable} SET previous_password = password, password = ? WHERE id = ?");
         $upd->execute([$newHash, $user['id']]);
         logSystemEvent('CHANGE_PASSWORD', 'Profile', "Resident {$user['username']} updated password.", $user['id'], $user['full_name'], $user['role']);
         $passwordMsg = "Password updated successfully.";

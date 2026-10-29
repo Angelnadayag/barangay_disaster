@@ -19,9 +19,10 @@ $targetUserId = (int)($_POST['user_id'] ?? 0);
 $userType = trim($_POST['user_type'] ?? '');
 $role = trim($_POST['role'] ?? '');
 
-// Determine whether this target is in residents table or users table
+// Determine whether this target is in residents table or users table.
+// IDs overlap between `users` and `residents`, so only guess when user_type is not provided.
 $isResident = ($userType === 'resident' || $role === 'resident');
-if (!$isResident) {
+if (!$isResident && $userType === '') {
     // Check if ID exists in residents table
     $chkR = $db->prepare("SELECT id FROM residents WHERE id = ?");
     $chkR->execute([$targetUserId]);
@@ -80,6 +81,7 @@ try {
         $params = [$firstName, $lastName, $fullName, $username, $email, $phone, $gender, $age, $barangayId, $purok];
 
         if (!empty($password)) {
+            $fields[] = 'previous_password = password';
             $fields[] = 'password = ?';
             $params[] = password_hash($password, PASSWORD_BCRYPT);
         }
@@ -141,6 +143,7 @@ try {
         }
 
         if (!empty($password)) {
+            $fields[] = 'previous_password = password';
             $fields[] = 'password = ?';
             $params[] = password_hash($password, PASSWORD_BCRYPT);
         }

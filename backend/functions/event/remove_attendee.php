@@ -78,6 +78,23 @@ $newActual = $totalAtt;
 $updAct = $db->prepare("UPDATE events SET actual_participants = ? WHERE id = ?");
 $updAct->execute([$newActual, $resolvedActId]);
 
+$brgyName = 'City-Wide';
+if (!empty($act['barangay_id'])) {
+    $bStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
+    $bStmt->execute([(int)$act['barangay_id']]);
+    $brgyName = $bStmt->fetchColumn() ?: 'Barangay #' . $act['barangay_id'];
+}
+$actorRole = formatRoleName($user['role'] ?? '');
+
+logSystemEvent(
+    'VOID_ATTENDEE',
+    'Preparedness',
+    "{$user['full_name']} ({$actorRole}) voided/removed participant '{$attendee['resident_name']}' from event #$resolvedActId: '{$act['title']}' (Barangay {$brgyName})",
+    $user['id'],
+    $user['full_name'],
+    $user['role']
+);
+
 if ($isAjax) {
     jsonResponse([
         'success' => true,

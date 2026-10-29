@@ -50,8 +50,22 @@ try {
     // Also restore all attendees / participant families/members
     $updAtt = $db->prepare("UPDATE event_attendees SET is_archived = 0 WHERE activity_id = ?");
     $updAtt->execute([$id]);
+    $brgyName = 'City-Wide';
+    if (!empty($act['barangay_id'])) {
+        $bStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
+        $bStmt->execute([(int)$act['barangay_id']]);
+        $brgyName = $bStmt->fetchColumn() ?: 'Barangay #' . $act['barangay_id'];
+    }
 
-    logSystemEvent('RESTORE_ACTIVITY', 'Preparedness', "Restored event #$id: {$act['title']} and its registered participant(s)");
+    $actorRole = formatRoleName($user['role'] ?? '');
+    logSystemEvent(
+        'RESTORE_ACTIVITY',
+        'Preparedness',
+        "{$user['full_name']} ({$actorRole}) restored event #$id: '{$act['title']}' (Barangay {$brgyName}) and its registered participant(s) to Active",
+        $user['id'],
+        $user['full_name'],
+        $user['role']
+    );
 
     $msg = "Event '{$act['title']}' and its registered participant families/members restored to Active.";
     if ($isAjax) {
