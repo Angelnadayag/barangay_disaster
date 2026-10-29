@@ -121,6 +121,27 @@ $totalAtt = (int)($counts['total_att'] ?? 0);
 $updAct = $db->prepare("UPDATE events SET actual_participants = ? WHERE id = ?");
 $updAct->execute([$totalAtt, $resolvedActId]);
 
+$actionCode = ($targetAttended === 1) ? 'MARK_ATTENDANCE' : 'VOID_ATTENDANCE';
+$actionDesc = ($targetAttended === 1) ? 'Marked as Attended' : 'Voided attendance (Marked Absent)';
+$pName = !empty($residentName) ? $residentName : ($attendee['resident_name'] ?? 'Participant');
+
+$brgyName = 'City-Wide';
+if (!empty($act['barangay_id'])) {
+    $bStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
+    $bStmt->execute([(int)$act['barangay_id']]);
+    $brgyName = $bStmt->fetchColumn() ?: 'Barangay #' . $act['barangay_id'];
+}
+$actorRole = formatRoleName($user['role'] ?? '');
+
+logSystemEvent(
+    $actionCode,
+    'Preparedness',
+    "{$user['full_name']} ({$actorRole}) {$actionDesc} for participant '{$pName}' in event #$resolvedActId: '{$act['title']}' (Barangay {$brgyName})",
+    $user['id'],
+    $user['full_name'],
+    $user['role']
+);
+
 if ($isAjax) {
     jsonResponse([
         'success' => true,

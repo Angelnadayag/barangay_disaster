@@ -28,10 +28,21 @@ if (!$resItem) {
 }
 
 try {
-    $up = $db->prepare("UPDATE resources SET status = 'archived' WHERE id = ?");
+    $up = $db->prepare("UPDATE resources SET status = 'archived', updated_at = NOW() WHERE id = ?");
     $up->execute([$id]);
 
-    logSystemEvent('ARCHIVE_RESOURCE', 'Inventory', "Archived resource {$resItem['code']}: {$resItem['name']} (#$id)");
+    $db->prepare("
+        INSERT INTO resource_transactions (
+            resource_id, transaction_type, quantity, reference_type, reference_id, remarks, performed_by, created_at
+        ) VALUES (?, 'Archived', 0, 'manual', ?, ?, ?, NOW())
+    ")->execute([
+        $id,
+        $id,
+        "Commodity '{$resItem['name']}' [{$resItem['code']}] decommissioned / archived by {$user['full_name']}",
+        $user['id']
+    ]);
+
+    logSystemEvent('ARCHIVE_SUPPLY', 'Supplies', "Archived supply {$resItem['code']}: {$resItem['name']} (#$id)");
 
     redirectWithFlash($returnUrl, 'success', "Resource '{$resItem['name']}' moved to Archived.");
 } catch (Exception $e) {

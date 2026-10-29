@@ -474,7 +474,7 @@ if ($recId > 0) {
               <div style="font-size:9px;color:var(--color-text-muted);text-transform:uppercase;font-weight:700;">Authorized
                 Funding Source</div>
               <div style="font-size:12.5px;font-weight:600;color:var(--color-text);margin-top:4px;">
-                <?= clean($rec['financial_aid_source'] ?? 'LGU Calamity Fund (QRF)') ?>
+                <?= !empty($rec['financial_aid_source']) ? clean($rec['financial_aid_source']) : '<span style="color:var(--color-text-muted);font-weight:normal;font-style:italic;">None specified</span>' ?>
               </div>
             </div>
           </div>
@@ -767,8 +767,8 @@ if ($recId > 0) {
                 Authorized Funding Source
               </label>
               <input type="text" id="ayudaModalFundingSource" name="funding_source" class="form-control"
-                value="<?= clean($rec['financial_aid_source'] ?? 'LGU Calamity Fund (QRF)') ?>"
-                placeholder="e.g. LGU Calamity Fund (QRF)" style="font-size:11px;height:32px;">
+                value="<?= clean($rec['financial_aid_source'] ?? '') ?>"
+                placeholder="Optional sponsor" style="font-size:11px;height:32px;">
             </div>
           </form>
         </div>

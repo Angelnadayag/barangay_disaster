@@ -50,7 +50,7 @@ try {
     $del = $db->prepare("DELETE FROM resources WHERE id = ?");
     $del->execute([$id]);
 
-    logSystemEvent('DELETE_RESOURCE', 'Resources', "Deleted resource '{$res['name']}' ({$res['code']})");
+    logSystemEvent('DELETE_SUPPLY', 'Supplies', "Deleted supply '{$res['name']}' ({$res['code']})");
 
     if ($isAjax) {
         jsonResponse([

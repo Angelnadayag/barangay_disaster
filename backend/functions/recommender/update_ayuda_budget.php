@@ -57,9 +57,7 @@ try {
     if ($perFamily <= 0) {
         $perFamily = (float)($rec['financial_aid_per_family'] ?: 3000);
     }
-    if (empty($fundingSource)) {
-        $fundingSource = $rec['financial_aid_source'] ?: 'LGU Calamity Fund (QRF)';
-    }
+    $fundingSource = !empty($fundingSource) ? $fundingSource : null;
 
     $targetFamilies = (int)floor($totalBudget / $perFamily);
 

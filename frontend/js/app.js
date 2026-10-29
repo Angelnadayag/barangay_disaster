@@ -84,7 +84,7 @@ function initRoleSwitcher() {
         const data = await res.json();
         if (data.success) {
           const folder = (data.role === 'barangay_head') ? 'barangay' : data.role;
-          const targetPage = (data.role === 'barangay_head') ? 'users.php' : ((data.role === 'icdrrmo') ? 'users.php' : 'dashboard.php');
+          const targetPage = (data.role === 'icdrrmo') ? 'users.php' : 'dashboard.php';
           window.location.href = `${BASE_URL}/views/${folder}/${targetPage}`;
         } else {
           showToast(data.message || 'Unable to switch role', 'danger');
@@ -479,11 +479,6 @@ function openDssExecutionModal(reportData, onCompleteCallback) {
     runBtn.innerHTML = 'Run Recommendation';
   }
 
-  // Customization is optional: default to AI-recommended values
-  const customToggle = document.getElementById('dssAidCustomizeToggle');
-  if (customToggle) customToggle.checked = false;
-  toggleDssAidCustomize(false);
-
   // Pre-calculate suggested aid rate if empty or based on severity
   let suggestedRate = 3000;
   if (reportData.severity === 'Critical') suggestedRate = 5000;
@@ -494,7 +489,8 @@ function openDssExecutionModal(reportData, onCompleteCallback) {
     aidAmountInput.value = reportData.financial_aid_per_family || suggestedRate;
   }
   if (aidSponsorInput) {
-    aidSponsorInput.value = reportData.financial_aid_source || 'LGU Calamity Fund (QRF)';
+    aidSponsorInput.value = reportData.financial_aid_source || '';
+    updateDssSponsorChips();
   }
   if (aidTargetSelect) {
     aidTargetSelect.value = (Number(reportData.displaced_families || 0) > 0) ? 'displaced' : 'all_affected';
@@ -512,6 +508,30 @@ function openDssExecutionModal(reportData, onCompleteCallback) {
   }
 
   openModal('dssExecutionModal');
+}
+
+function setDssSponsor(name) {
+  const input = document.getElementById('dssInputAidSponsor');
+  if (!input) return;
+  if (input.value.trim().toLowerCase() === name.trim().toLowerCase()) {
+    input.value = '';
+  } else {
+    input.value = name;
+  }
+  updateDssSponsorChips();
+}
+
+function updateDssSponsorChips() {
+  const input = document.getElementById('dssInputAidSponsor');
+  const val = input ? input.value.trim().toLowerCase() : '';
+  document.querySelectorAll('.dss-sponsor-chip').forEach(chip => {
+    const chipSponsor = (chip.getAttribute('data-sponsor') || chip.textContent.trim()).trim().toLowerCase();
+    if (val && chipSponsor && chipSponsor === val) {
+      chip.classList.add('active');
+    } else {
+      chip.classList.remove('active');
+    }
+  });
 }
 
 async function executeDssRecommender() {
@@ -562,34 +582,34 @@ async function executeDssRecommender() {
   // Launch smooth step sequence
   setStepState(1, 'active');
   if (progressBar) progressBar.style.width = '20%';
-  if (statusText) statusText.textContent = 'Classifying disaster incident & evaluating chosen modality...';
+  if (statusText) statusText.textContent = 'Classifying disaster incident & evaluating modality...';
 
   const t1 = setTimeout(() => {
     setStepState(1, 'completed');
     setStepState(2, 'active');
     if (progressBar) progressBar.style.width = '45%';
-    if (statusText) statusText.textContent = 'Analyzing severity index, operational urgency, & displacement scale...';
+    if (statusText) statusText.textContent = 'Analyzing severity index & displacement scale...';
   }, 450);
 
   const t2 = setTimeout(() => {
     setStepState(2, 'completed');
     setStepState(3, 'active');
     if (progressBar) progressBar.style.width = '65%';
-    if (statusText) statusText.textContent = 'Querying Central Depot warehouse stock & feasibility bottlenecks...';
+    if (statusText) statusText.textContent = 'Querying Central Depot warehouse inventory...';
   }, 950);
 
   const t3 = setTimeout(() => {
     setStepState(3, 'completed');
     setStepState(4, 'active');
     if (progressBar) progressBar.style.width = '85%';
-    if (statusText) statusText.textContent = 'Calculating DSWD Calamity Cash Aid & LGU Quick Response Fund allocations...';
+    if (statusText) statusText.textContent = 'Calculating emergency financial aid allocations...';
   }, 1450);
 
   const t4 = setTimeout(() => {
     setStepState(4, 'completed');
     setStepState(5, 'active');
     if (progressBar) progressBar.style.width = '95%';
-    if (statusText) statusText.textContent = 'Synthesizing Decision Tree recommendation path & confidence rating...';
+    if (statusText) statusText.textContent = 'Synthesizing AI recommendation & confidence rating...';
   }, 1850);
 
   const minAnimationTime = new Promise(resolve => setTimeout(resolve, 2200));
@@ -603,12 +623,12 @@ async function executeDssRecommender() {
     fd.append('modality', selectedModality);
     fd.append('ajax', '1');
 
-    if (document.getElementById('dssAidCustomizeToggle')?.checked) {
+    if (selectedModality === 'both' || selectedModality === 'financial_aid') {
       const aidAmount = document.getElementById('dssInputAidAmount')?.value;
       const aidSponsor = document.getElementById('dssInputAidSponsor')?.value;
       const aidTarget = document.getElementById('dssInputAidTarget')?.value;
       if (aidAmount) fd.append('financial_aid_amount', aidAmount);
-      if (aidSponsor) fd.append('financial_aid_sponsor', aidSponsor);
+      fd.append('financial_aid_sponsor', aidSponsor ? aidSponsor.trim() : '');
       if (aidTarget) fd.append('financial_aid_target', aidTarget);
     }
 

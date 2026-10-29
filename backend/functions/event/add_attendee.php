@@ -142,6 +142,23 @@ $newAttendee = [
     'sms_status' => 'sent'
 ];
 
+$brgyName = 'City-Wide';
+if (!empty($act['barangay_id'])) {
+    $bStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
+    $bStmt->execute([(int)$act['barangay_id']]);
+    $brgyName = $bStmt->fetchColumn() ?: 'Barangay #' . $act['barangay_id'];
+}
+$actorRole = formatRoleName($user['role'] ?? '');
+
+logSystemEvent(
+    'ADD_ATTENDEE',
+    'Preparedness',
+    "{$user['full_name']} ({$actorRole}) added participant '{$residentName}' (Phone: {$phone}, Status: " . ($attended ? 'Attended' : 'Registered') . ") to event #$actId: '{$act['title']}' (Barangay {$brgyName})",
+    $user['id'],
+    $user['full_name'],
+    $user['role']
+);
+
 if ($isAjax) {
     jsonResponse([
         'success' => true,

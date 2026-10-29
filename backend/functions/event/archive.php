@@ -63,8 +63,22 @@ try {
     $updAtt = $db->prepare("UPDATE event_attendees SET is_archived = 1 WHERE activity_id = ?");
     $updAtt->execute([$id]);
     $archivedAttendeesCount = $updAtt->rowCount();
+    $brgyName = 'City-Wide';
+    if (!empty($act['barangay_id'])) {
+        $bStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
+        $bStmt->execute([(int)$act['barangay_id']]);
+        $brgyName = $bStmt->fetchColumn() ?: 'Barangay #' . $act['barangay_id'];
+    }
 
-    logSystemEvent('ARCHIVE_ACTIVITY', 'Preparedness', "Archived event #$id: {$act['title']} and its $archivedAttendeesCount registered participant(s)");
+    $actorRole = formatRoleName($user['role'] ?? '');
+    logSystemEvent(
+        'ARCHIVE_ACTIVITY',
+        'Preparedness',
+        "{$user['full_name']} ({$actorRole}) archived event #$id: '{$act['title']}' (Barangay {$brgyName}) along with {$archivedAttendeesCount} registered participant(s)",
+        $user['id'],
+        $user['full_name'],
+        $user['role']
+    );
 
     $msg = "Event '{$act['title']}' and its registered participant families/members moved to Archives.";
     if ($isAjax) {

@@ -105,8 +105,40 @@ foreach ($evacCenters as &$ec) {
 }
 unset($ec);
 
+// Fetch all active barangays for resident registration dropdown
+$allBarangays = $db->query("SELECT id, name FROM barangays WHERE status = 'active' OR status IS NULL ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch active puroks grouped by barangay_id for dynamic select
+$purokStmt = $db->query("SELECT barangay_id, name FROM puroks WHERE status = 'active' ORDER BY name ASC");
+$puroksByBarangay = [];
+while ($row = $purokStmt->fetch(PDO::FETCH_ASSOC)) {
+  $puroksByBarangay[(int)$row['barangay_id']][] = $row['name'];
+}
+
 $errorMessage = $_SESSION['login_error'] ?? null;
 unset($_SESSION['login_error']);
+
+$successMessage = $_SESSION['login_success'] ?? null;
+unset($_SESSION['login_success']);
+
+$forgotError = $_SESSION['forgot_error'] ?? null;
+unset($_SESSION['forgot_error']);
+
+$registerError = $_SESSION['register_error'] ?? null;
+unset($_SESSION['register_error']);
+
+$registerOld = $_SESSION['register_old'] ?? [];
+unset($_SESSION['register_old']);
+
+$prefillUsername = $_SESSION['login_prefill_username'] ?? '';
+unset($_SESSION['login_prefill_username']);
+
+$activeView = $_GET['view'] ?? 'login';
+if ($forgotError) $activeView = 'forgot';
+if ($registerError) $activeView = 'register';
+if (!in_array($activeView, ['login', 'forgot', 'register'], true)) {
+  $activeView = 'login';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -638,16 +670,16 @@ unset($_SESSION['login_error']);
 
     /* Column 2: Login Box (Right) */
     .login-pane {
-      width: 440px;
-      min-width: 380px;
-      max-width: 480px;
+      width: 480px;
+      min-width: 400px;
+      max-width: 520px;
       height: 100%;
       background: var(--color-surface, #FFFFFF);
       border-left: 1px solid var(--color-border, #D9E0E3);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 44px 38px;
+      padding: 36px 32px;
       box-sizing: border-box;
       box-shadow: -4px 0 20px rgba(23, 50, 77, 0.04);
       z-index: 10;
@@ -655,10 +687,12 @@ unset($_SESSION['login_error']);
     }
 
     .login-header-group {
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
+      text-align: center;
     }
 
     .login-badge {
@@ -676,38 +710,90 @@ unset($_SESSION['login_error']);
     }
 
     .login-title {
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 600;
       color: var(--color-primary, #17324D);
-      margin: 0 0 8px 0;
+      margin: 0 0 6px 0;
       line-height: 1.3;
       font-family: var(--font-primary);
     }
 
     .login-subtitle {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--color-text-secondary, #66737D);
       margin: 0;
-      line-height: 1.5;
+      line-height: 1.45;
       font-family: var(--font-secondary);
     }
 
+    /* Auth Views Transition */
+    .auth-view {
+      display: none;
+      animation: fadeInView 0.22s ease-in-out forwards;
+    }
+
+    .auth-view.active {
+      display: block;
+    }
+
+    @keyframes fadeInView {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Alerts */
+    .auth-alert {
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      margin-bottom: 16px;
+      font-family: var(--font-secondary);
+      line-height: 1.4;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .auth-alert.danger {
+      background-color: var(--color-danger-bg, #FDE8E8);
+      border: 1px solid var(--color-danger-border, #F8B4B4);
+      color: var(--color-danger, #C62828);
+    }
+
+    .auth-alert.success {
+      background-color: var(--color-success-bg, #EAF4EB);
+      border: 1px solid var(--color-success-border, #BCE3C1);
+      color: var(--color-success, #2E7D32);
+    }
+
     .form-group {
-      margin-bottom: 18px;
+      margin-bottom: 15px;
+    }
+
+    .form-row-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
 
     .form-label {
       display: block;
       font-size: 11px;
       font-weight: 500;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
       color: var(--color-text, #24313A);
       font-family: var(--font-primary);
     }
 
     .form-control {
       width: 100%;
-      height: 42px;
+      height: 40px;
       padding: 8px 12px;
       font-size: 12px;
       font-family: var(--font-secondary);
@@ -719,10 +805,65 @@ unset($_SESSION['login_error']);
       transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
+    select.form-control {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2366737D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 11px;
+      padding-right: 28px;
+      cursor: pointer;
+    }
+
     .form-control:focus {
       outline: none;
       border-color: var(--color-primary, #17324D);
       box-shadow: 0 0 0 2px rgba(23, 50, 77, 0.1);
+    }
+
+    .form-helper {
+      font-size: 10px;
+      color: var(--color-text-secondary, #66737D);
+      margin-top: 4px;
+      line-height: 1.35;
+      font-family: var(--font-secondary);
+    }
+
+    .password-toggle-link {
+      font-size: 10px;
+      color: var(--color-secondary, #2F6F73);
+      text-decoration: none;
+      font-weight: 600;
+      font-family: var(--font-primary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .password-toggle-link:hover {
+      text-decoration: underline;
+    }
+
+    .auth-link {
+      color: var(--color-secondary, #2F6F73);
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.15s ease;
+    }
+
+    .auth-link:hover {
+      color: var(--color-primary, #17324D);
+      text-decoration: underline;
+    }
+
+    .auth-switch-text {
+      font-size: 11.5px;
+      color: var(--color-text-secondary, #66737D);
+      text-align: center;
+      margin-top: 16px;
+      font-family: var(--font-secondary);
+      line-height: 1.4;
     }
 
     .btn-submit {
@@ -740,7 +881,7 @@ unset($_SESSION['login_error']);
       align-items: center;
       justify-content: center;
       transition: background 0.15s ease;
-      margin-top: 24px;
+      margin-top: 18px;
     }
 
     .btn-submit:hover {
@@ -752,10 +893,10 @@ unset($_SESSION['login_error']);
     }
 
     .login-footer-info {
-      margin-top: 26px;
-      padding-top: 18px;
+      margin-top: 22px;
+      padding-top: 16px;
       border-top: 1px solid var(--color-border-light, #E7EDF0);
-      font-size: 11px;
+      font-size: 10.5px;
       color: var(--color-text-muted, #8A96A0);
       text-align: center;
       line-height: 1.5;
@@ -890,42 +1031,259 @@ unset($_SESSION['login_error']);
     <div class="login-pane">
       <div>
         <div class="login-header-group">
-          <div class="login-brand-logo" style="margin-bottom: 16px;">
+          <div class="login-brand-logo" style="margin-bottom: 12px;">
             <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Disaster Resource Allocation Recommender"
-              style="max-width: 150px; height: auto; display: block; object-fit: contain;">
+              style="max-width: 145px; height: auto; display: block; object-fit: contain;">
           </div>
         </div>
 
-        <?php if ($errorMessage): ?>
-          <div
-            style="background-color:var(--color-danger-bg, #FDE8E8);border:1px solid var(--color-danger-border, #F8B4B4);color:var(--color-danger, #C62828);padding:10px 12px;border-radius:6px;font-size:11px;margin-bottom:18px;font-family:var(--font-secondary);">
-            <?= clean($errorMessage) ?>
-          </div>
-        <?php endif; ?>
-
-        <form action="<?= BASE_URL ?>/backend/functions/auth/login.php" method="POST">
-          <input type="hidden" name="action" value="login">
-
-          <div class="form-group">
-            <label class="form-label" for="username">Username or Email</label>
-            <input type="text" class="form-control" id="username" name="username"
-              placeholder="e.g. icdrrmo_admin or brgy_hinaplanon" required autofocus>
+        <!-- ================================================================= -->
+        <!-- VIEW 1: SIGN IN (LOGIN)                                          -->
+        <!-- ================================================================= -->
+        <div id="auth-view-login" class="auth-view <?= $activeView === 'login' ? 'active' : '' ?>">
+          <div style="margin-bottom: 18px; text-align: center;">
+            <h2 class="login-title">Portal Authentication</h2>
+            <p class="login-subtitle">Sign in with your credentials to access the coordination portal.</p>
           </div>
 
-          <div class="form-group">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <label class="form-label" for="password" style="margin-bottom:0;">Password</label>
-              <a href="javascript:void(0)" onclick="togglePasswordVisibility()"
-                style="font-size:10px;color:var(--color-secondary, #2F6F73);text-decoration:none;font-weight:600;font-family:var(--font-primary);">Show/Hide</a>
+          <?php if ($successMessage): ?>
+            <div class="auth-alert success">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              <span><?= clean($successMessage) ?></span>
             </div>
-            <input type="password" class="form-control" id="password" name="password"
-              placeholder="Enter your account password" required>
+          <?php endif; ?>
+
+          <?php if ($errorMessage): ?>
+            <div class="auth-alert danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span><?= clean($errorMessage) ?></span>
+            </div>
+          <?php endif; ?>
+
+          <form action="<?= BASE_URL ?>/backend/functions/auth/login.php" method="POST">
+            <input type="hidden" name="action" value="login">
+
+            <div class="form-group">
+              <label class="form-label" for="login_username">Username or Email</label>
+              <input type="text" class="form-control" id="login_username" name="username"
+                placeholder="e.g. icdrrmo_admin or brgy_hinaplanon" value="<?= clean($prefillUsername) ?>" required autofocus>
+            </div>
+
+            <div class="form-group">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <label class="form-label" for="login_password" style="margin-bottom:0;">Password</label>
+                <a href="javascript:void(0)" onclick="togglePasswordVisibility('login_password')" class="password-toggle-link">Show/Hide</a>
+              </div>
+              <input type="password" class="form-control" id="login_password" name="password"
+                placeholder="Enter your account password" required>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;margin-top:-6px;margin-bottom:14px;">
+              <a href="javascript:void(0)" class="auth-link" style="font-size:11px;" onclick="switchAuthView('forgot')">Forgot Password?</a>
+            </div>
+
+            <button type="submit" class="btn-submit">
+              Sign In to Portal
+            </button>
+          </form>
+
+          <div class="auth-switch-text">
+            Don't have an account? 
+            <a href="javascript:void(0)" class="auth-link" onclick="switchAuthView('register')">Create Account</a>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- VIEW 2: FORGOT PASSWORD                                           -->
+        <!-- ================================================================= -->
+        <div id="auth-view-forgot" class="auth-view <?= $activeView === 'forgot' ? 'active' : '' ?>">
+          <div style="margin-bottom: 18px; text-align: center;">
+            <h2 class="login-title">Reset Password</h2>
+            <p class="login-subtitle">Enter your current password and previous password to change your password immediately.</p>
           </div>
 
-          <button type="submit" class="btn-submit">
-            Sign In to Portal
-          </button>
-        </form>
+          <?php if ($forgotError): ?>
+            <div class="auth-alert danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span><?= clean($forgotError) ?></span>
+            </div>
+          <?php endif; ?>
+
+          <form action="<?= BASE_URL ?>/backend/functions/auth/forgot_password.php" method="POST">
+            <div class="form-group">
+              <label class="form-label" for="forgot_username">Username or Email</label>
+              <input type="text" class="form-control" id="forgot_username" name="username"
+                placeholder="Enter your username or email" required>
+            </div>
+
+            <div class="form-group">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <label class="form-label" for="forgot_current_pass" style="margin-bottom:0;">Current Password</label>
+                <a href="javascript:void(0)" onclick="togglePasswordVisibility('forgot_current_pass')" class="password-toggle-link">Show/Hide</a>
+              </div>
+              <input type="password" class="form-control" id="forgot_current_pass" name="current_password"
+                placeholder="Enter current password" required>
+            </div>
+
+            <div class="form-group">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <label class="form-label" for="forgot_prev_pass" style="margin-bottom:0;">Previous Password</label>
+                <a href="javascript:void(0)" onclick="togglePasswordVisibility('forgot_prev_pass')" class="password-toggle-link">Show/Hide</a>
+              </div>
+              <input type="password" class="form-control" id="forgot_prev_pass" name="previous_password"
+                placeholder="Enter previous password" required>
+              <div class="form-helper">
+                Provide the previous password used on this account. (If you have never changed your password before, enter your initial/current password).
+              </div>
+            </div>
+
+            <div class="form-row-2col">
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                  <label class="form-label" for="forgot_new_pass" style="margin-bottom:0;">New Password</label>
+                  <a href="javascript:void(0)" onclick="togglePasswordVisibility('forgot_new_pass')" class="password-toggle-link">Show</a>
+                </div>
+                <input type="password" class="form-control" id="forgot_new_pass" name="new_password"
+                  placeholder="At least 6 characters" minlength="6" required>
+              </div>
+
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                  <label class="form-label" for="forgot_confirm_pass" style="margin-bottom:0;">Confirm New</label>
+                  <a href="javascript:void(0)" onclick="togglePasswordVisibility('forgot_confirm_pass')" class="password-toggle-link">Show</a>
+                </div>
+                <input type="password" class="form-control" id="forgot_confirm_pass" name="confirm_password"
+                  placeholder="Repeat new password" minlength="6" required>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+              Change Password Immediately
+            </button>
+          </form>
+
+          <div class="auth-switch-text">
+            Remembered your password? 
+            <a href="javascript:void(0)" class="auth-link" onclick="switchAuthView('login')">Back to Sign In</a>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- VIEW 3: CREATE ACCOUNT (RESIDENT REGISTRATION)                   -->
+        <!-- ================================================================= -->
+        <div id="auth-view-register" class="auth-view <?= $activeView === 'register' ? 'active' : '' ?>">
+          <div style="margin-bottom: 16px; text-align: center;">
+            <h2 class="login-title">Create Resident Account</h2>
+            <p class="login-subtitle">Register to receive disaster alerts, request relief, and monitor shelters.</p>
+          </div>
+
+          <?php if ($registerError): ?>
+            <div class="auth-alert danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span><?= clean($registerError) ?></span>
+            </div>
+          <?php endif; ?>
+
+          <form action="<?= BASE_URL ?>/backend/functions/auth/register.php" method="POST">
+            <div class="form-row-2col">
+              <div class="form-group">
+                <label class="form-label" for="reg_first_name">First Name *</label>
+                <input type="text" class="form-control" id="reg_first_name" name="first_name"
+                  placeholder="Juan" value="<?= clean($registerOld['first_name'] ?? '') ?>" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reg_last_name">Last Name *</label>
+                <input type="text" class="form-control" id="reg_last_name" name="last_name"
+                  placeholder="Dela Cruz" value="<?= clean($registerOld['last_name'] ?? '') ?>" required>
+              </div>
+            </div>
+
+            <div class="form-row-2col">
+              <div class="form-group">
+                <label class="form-label" for="reg_username">Username *</label>
+                <input type="text" class="form-control" id="reg_username" name="username"
+                  placeholder="jdelacruz" value="<?= clean($registerOld['username'] ?? '') ?>" minlength="3" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reg_email">Email Address *</label>
+                <input type="email" class="form-control" id="reg_email" name="email"
+                  placeholder="juan@email.com" value="<?= clean($registerOld['email'] ?? '') ?>" required>
+              </div>
+            </div>
+
+            <div class="form-row-2col">
+              <div class="form-group">
+                <label class="form-label" for="reg_phone">Phone Number</label>
+                <input type="text" class="form-control" id="reg_phone" name="phone"
+                  placeholder="09123456789" value="<?= clean($registerOld['phone'] ?? '') ?>">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reg_age">Age</label>
+                <input type="number" class="form-control" id="reg_age" name="age" min="1" max="120"
+                  placeholder="e.g. 28" value="<?= clean($registerOld['age'] ?? '') ?>">
+              </div>
+            </div>
+
+            <div class="form-row-2col">
+              <div class="form-group">
+                <label class="form-label" for="reg_gender">Gender</label>
+                <select class="form-control" id="reg_gender" name="gender">
+                  <option value="Male" <?= ($registerOld['gender'] ?? '') === 'Male' ? 'selected' : '' ?>>Male</option>
+                  <option value="Female" <?= ($registerOld['gender'] ?? '') === 'Female' ? 'selected' : '' ?>>Female</option>
+                  <option value="Other" <?= ($registerOld['gender'] ?? '') === 'Other' ? 'selected' : '' ?>>Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="reg_barangay">Barangay *</label>
+                <select class="form-control" id="reg_barangay" name="barangay_id" required onchange="updatePurokDropdown()">
+                  <option value="">-- Select Barangay --</option>
+                  <?php foreach ($allBarangays as $b): ?>
+                    <option value="<?= (int)$b['id'] ?>" <?= ((int)($registerOld['barangay_id'] ?? 0) === (int)$b['id']) ? 'selected' : '' ?>>
+                      <?= clean($b['name']) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            </div>
+
+            <!-- Dynamic Purok Dropdown: Hidden if no barangay is selected yet -->
+            <div class="form-group" id="reg_purok_group" style="display: none;">
+              <label class="form-label" for="reg_purok">Purok / Zone <span id="reg_purok_star">*</span></label>
+              <select class="form-control" id="reg_purok" name="purok">
+                <!-- Dynamically populated via JavaScript based on selected barangay -->
+              </select>
+              <div id="reg_purok_helper" class="form-helper" style="display:none;"></div>
+            </div>
+
+            <div class="form-row-2col">
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                  <label class="form-label" for="reg_password" style="margin-bottom:0;">Password *</label>
+                  <a href="javascript:void(0)" onclick="togglePasswordVisibility('reg_password')" class="password-toggle-link">Show</a>
+                </div>
+                <input type="password" class="form-control" id="reg_password" name="password"
+                  placeholder="Min 6 chars" minlength="6" required>
+              </div>
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                  <label class="form-label" for="reg_confirm_password" style="margin-bottom:0;">Confirm *</label>
+                  <a href="javascript:void(0)" onclick="togglePasswordVisibility('reg_confirm_password')" class="password-toggle-link">Show</a>
+                </div>
+                <input type="password" class="form-control" id="reg_confirm_password" name="confirm_password"
+                  placeholder="Repeat pass" minlength="6" required>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+              Register Resident Account
+            </button>
+          </form>
+
+          <div class="auth-switch-text">
+            Already have an account? 
+            <a href="javascript:void(0)" class="auth-link" onclick="switchAuthView('login')">Sign In here</a>
+          </div>
+        </div>
       </div>
 
       <div class="login-footer-info">
@@ -1225,11 +1583,118 @@ unset($_SESSION['login_error']);
       }
     }
 
-    // Show/Hide password toggle
-    function togglePasswordVisibility() {
-      const pwd = document.getElementById('password');
-      pwd.type = pwd.type === 'password' ? 'text' : 'password';
+    // Show/Hide password toggle supporting custom input element IDs
+    function togglePasswordVisibility(fieldId = 'login_password') {
+      const pwd = document.getElementById(fieldId);
+      if (pwd) {
+        pwd.type = pwd.type === 'password' ? 'text' : 'password';
+      }
     }
+
+    // Switch between Sign In ('login'), Forgot Password ('forgot'), and Register ('register') views
+    function switchAuthView(viewName) {
+      const views = ['login', 'forgot', 'register'];
+      if (!views.includes(viewName)) viewName = 'login';
+
+      views.forEach(v => {
+        const el = document.getElementById('auth-view-' + v);
+        if (el) {
+          el.classList.remove('active');
+        }
+      });
+
+      const targetEl = document.getElementById('auth-view-' + viewName);
+      if (targetEl) {
+        targetEl.classList.add('active');
+        const firstInput = targetEl.querySelector('input:not([type="hidden"])');
+        if (firstInput) {
+          setTimeout(() => firstInput.focus(), 60);
+        }
+      }
+
+      if (history.replaceState) {
+        history.replaceState(null, '', '#' + viewName);
+      }
+    }
+
+    // Puroks dataset grouped by barangay ID
+    const puroksByBarangay = <?= json_encode($puroksByBarangay) ?>;
+    const oldSelectedPurok = <?= json_encode($registerOld['purok'] ?? '') ?>;
+
+    // Dynamic Purok Dropdown handler
+    function updatePurokDropdown() {
+      const bSelect = document.getElementById('reg_barangay');
+      const purokGroup = document.getElementById('reg_purok_group');
+      const purokSelect = document.getElementById('reg_purok');
+      const purokStar = document.getElementById('reg_purok_star');
+      const purokHelper = document.getElementById('reg_purok_helper');
+
+      if (!bSelect || !purokGroup || !purokSelect) return;
+
+      const barangayId = parseInt(bSelect.value) || 0;
+
+      // 1. If no barangay selected yet -> there is NO purok display
+      if (!barangayId) {
+        purokGroup.style.display = 'none';
+        purokSelect.innerHTML = '';
+        purokSelect.required = false;
+        purokSelect.disabled = true;
+        if (purokHelper) purokHelper.style.display = 'none';
+        return;
+      }
+
+      // 2. Barangay is selected -> retrieve its registered puroks
+      const puroks = puroksByBarangay[barangayId] || [];
+
+      if (puroks.length > 0) {
+        // Barangay has designated puroks
+        purokGroup.style.display = 'block';
+        purokSelect.disabled = false;
+        purokSelect.required = true;
+        if (purokStar) purokStar.style.display = 'inline';
+        if (purokHelper) purokHelper.style.display = 'none';
+
+        let html = '<option value="">-- Select Purok --</option>';
+        puroks.forEach(p => {
+          const isSelected = (oldSelectedPurok && oldSelectedPurok === p);
+          html += `<option value="${escapeHtml(p)}"${isSelected ? ' selected' : ''}>${escapeHtml(p)}</option>`;
+        });
+        purokSelect.innerHTML = html;
+      } else {
+        // Barangay has NO puroks -> "no puroks available daun"
+        purokGroup.style.display = 'block';
+        purokSelect.disabled = false;
+        purokSelect.required = false;
+        if (purokStar) purokStar.style.display = 'none';
+        purokSelect.innerHTML = '<option value="No puroks available" selected>No puroks available</option>';
+        if (purokHelper) {
+          purokHelper.textContent = 'This barangay does not have designated puroks registered in the system.';
+          purokHelper.style.display = 'block';
+        }
+      }
+    }
+
+    // Auto-detect active view from URL hash on load
+    document.addEventListener('DOMContentLoaded', function() {
+      updatePurokDropdown();
+
+      const hash = window.location.hash.replace('#', '');
+      if (hash && ['login', 'forgot', 'register'].includes(hash)) {
+        switchAuthView(hash);
+      } else {
+        const serverView = '<?= $activeView ?>';
+        if (serverView && ['login', 'forgot', 'register'].includes(serverView)) {
+          switchAuthView(serverView);
+        }
+      }
+    });
+
+    window.addEventListener('hashchange', function() {
+      const hash = window.location.hash.replace('#', '');
+      if (hash && ['login', 'forgot', 'register'].includes(hash)) {
+        switchAuthView(hash);
+      }
+    });
   </script>
 
 </body>

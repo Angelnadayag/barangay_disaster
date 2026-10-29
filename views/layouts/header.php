@@ -136,7 +136,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     }
   </script>
 </head>
-<body class="<?= $isCitizenOrResponder ? 'citizen-responder-shell' : '' ?>">
+<body class="<?= $isCitizenOrResponder ? 'citizen-responder-shell' : '' ?> role-<?= htmlspecialchars($currentUser['role'] ?? 'guest') ?>">
 <div class="app-shell">
   <!-- Topbar -->
   <header class="topbar">
@@ -149,11 +149,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
-      <?php else: ?>
+      <?php elseif (($currentUser['role'] ?? '') !== 'resident'): ?>
         <a href="<?= BASE_URL ?>/views/<?= $userFolder ?>/dashboard.php" class="portal-brand-link" title="Disaster Portal">
           <img src="<?= BASE_URL ?>/frontend/images/logo-secondary.png" alt="Logo" class="portal-brand-logo">
           <div class="portal-brand-text">
-            <div class="portal-brand-title"><?= $currentUser['role'] === 'responder' ? 'Tactical Responders' : 'Barangay Safety' ?></div>
+            <div class="portal-brand-title"><?= ($currentUser['role'] ?? '') === 'responder' ? 'Tactical Responders' : 'Barangay Safety' ?></div>
             <div class="portal-brand-sub"><?= clean($currentUser['barangay_name'] ?? 'Iligan City') ?></div>
           </div>
         </a>

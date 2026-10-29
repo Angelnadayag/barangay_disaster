@@ -11,6 +11,10 @@ require_once __DIR__ . '/../../backend/services/Auth.php';
 require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireRole('barangay_head');
+
+// User management is restricted to ICDRRMO only — Barangay Heads are redirected away.
+redirectWithFlash(BASE_URL . '/views/barangay/dashboard.php', 'error', 'User management is restricted to ICDRRMO only.');
+
 $user = getCurrentUser();
 $currentUserId = (int) $user['id'];
 $barangayId = (int) $user['barangay_id'];

@@ -1768,13 +1768,19 @@ select.form-control {
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: all 0.15s ease;
   user-select: none;
 }
 
 .dss-sponsor-chip:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.dss-sponsor-chip.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #FFFFFF;
 }
 
 .dss-note {
@@ -2229,6 +2235,16 @@ select.form-control {
   padding: 2px 6px;
   border-radius: var(--radius-sm, 6px);
   display: block;
+}
+
+/* In residents desktop navbar: remove the logo and brand link completely */
+body.role-resident .portal-brand-link,
+body.role-resident .portal-brand-logo {
+  display: none !important;
+}
+
+body.role-resident .topbar-left:empty {
+  display: none;
 }
 
 .portal-brand-text {

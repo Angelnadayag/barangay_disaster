@@ -155,7 +155,8 @@ $dynamicHazardTypes = [];
 
 foreach ($allHazardOptions as $ho) {
   $hName = trim($ho['name']);
-  if ($hName === '') continue;
+  if ($hName === '')
+    continue;
 
   if (!in_array($hName, $dynamicHazardTypes, true)) {
     $dynamicHazardTypes[] = $hName;
@@ -761,27 +762,13 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 </div>
               </td>
 
-              <!-- Action: View & Street View -->
+              <!-- Action: View -->
               <td style="text-align:right;">
-                <div style="display:inline-flex;gap:4px;align-items:center;">
-                  <button type="button" class="btn btn-outline btn-sm"
-                    style="padding:3px 9px;font-size:10px;font-weight:600;"
-                    onclick="viewReportDetails(<?= htmlspecialchars(json_encode($r), ENT_QUOTES, 'UTF-8') ?>)">
-                    View
-                  </button>
-                  <button type="button" class="btn btn-sm"
-                    style="padding:3px 8px;font-size:10px;background:#2563EB;color:#FFF;border-color:#2563EB;display:inline-flex;align-items:center;gap:3px;"
-                    onclick="openStreetViewForReport(<?= htmlspecialchars(json_encode($r), ENT_QUOTES, 'UTF-8') ?>)"
-                    title="Inspect 360° Street View">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="5" r="3"></circle>
-                      <path d="M12 8v8"></path>
-                      <path d="M9 21l3-5 3 5"></path>
-                      <path d="M6 11l6-2 6 2"></path>
-                    </svg>
-                    Street View
-                  </button>
-                </div>
+                <a href="<?= BASE_URL ?>/views/barangay/disaster-report-details.php?id=<?= (int) $r['id'] ?>"
+                  class="btn btn-outline btn-sm"
+                  style="padding:3px 9px;font-size:10px;font-weight:600;text-decoration:none;">
+                  View
+                </a>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -802,7 +789,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
     <div class="modal-header">
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="badge-ongoing-pulse" style="font-size:10px;">Auto-Status: Ongoing</span>
-        <h3 class="modal-title" style="margin:0;">File Disaster Incident Report</h3>
+        <h3 class="modal-title" style="margin:0;">Disaster Incident Report Form</h3>
       </div>
       <button type="button" class="modal-close-btn" onclick="closeModal('createReportModal')">&times;</button>
     </div>
@@ -858,7 +845,9 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           <!-- Inline Dynamic Add Box for Create -->
           <div id="dynamicHazardBox_create"
             style="display:none;margin-top:8px;padding:10px 12px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <label style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New Hazard Type to Database</label>
+            <label
+              style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New
+              Hazard Type to Database</label>
             <div style="display:flex;gap:6px;">
               <input type="text" id="dynamic_hazard_input_create" class="form-control"
                 placeholder="Type hazard (e.g. Flash Flood, Landslide, Fire)" style="font-size:11px;padding:5px 9px;"
@@ -1124,7 +1113,9 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           <!-- Inline Dynamic Add Box for View/Edit -->
           <div id="dynamicHazardBox_view"
             style="display:none;margin-top:8px;padding:10px 12px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <label style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New Hazard Type to Database</label>
+            <label
+              style="display:block;font-size:10px;font-weight:600;color:var(--color-primary);margin-bottom:4px;">Add New
+              Hazard Type to Database</label>
             <div style="display:flex;gap:6px;">
               <input type="text" id="dynamic_hazard_input_view" class="form-control"
                 placeholder="Type hazard (e.g. Flash Flood, Landslide, Fire)" style="font-size:11px;padding:5px 9px;"
@@ -1599,7 +1590,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
           Affected: ${r.affected_families} Fam (${r.displaced_families} Displaced)
         </div>
         <div style="display:flex;gap:4px;margin-top:6px;">
-          <button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:10px;flex:1;" onclick="viewReportDetailsFromMap(${r.id})">View Details</button>
+          <a href="<?= BASE_URL ?>/views/barangay/disaster-report-details.php?id=${r.id}" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:10px;flex:1;text-align:center;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;">View Details</a>
           <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:10px;background:#2563EB;color:#FFF;border-color:#2563EB;flex:1;" onclick="openStreetViewForReportFromMap(${r.id})">🚶 Street View</button>
         </div>
       </div>
@@ -1656,8 +1647,7 @@ require_once __DIR__ . '/../layouts/sidebar.php';
   }
 
   function viewReportDetailsFromMap(id) {
-    const report = allIncidentRequests.find(r => r.id == id);
-    if (report) viewReportDetails(report);
+    window.location.href = `<?= BASE_URL ?>/views/barangay/disaster-report-details.php?id=${id}`;
   }
 
   function openStreetViewForReportFromMap(id) {

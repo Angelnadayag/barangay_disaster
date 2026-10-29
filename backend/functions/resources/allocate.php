@@ -145,6 +145,28 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
             $targetLocalResId = (int)$db->lastInsertId();
         }
 
+        // 4b. Also dynamically credit agency_resources for Barangay local stockroom
+        $agStmt = $db->prepare("SELECT id FROM agencies WHERE barangay_id = ? LIMIT 1");
+        $agStmt->execute([$barangayId]);
+        $agencyId = (int)$agStmt->fetchColumn();
+        if (!$agencyId) {
+            $db->prepare("INSERT INTO agencies (name, agency_type, barangay_id, created_at) VALUES (?, 'BDRRMC', ?, NOW())")
+               ->execute(["BDRRMC - " . $barangay['name'], $barangayId]);
+            $agencyId = (int)$db->lastInsertId();
+        }
+        if ($agencyId && $resourceId) {
+            $chkAr = $db->prepare("SELECT id FROM agency_resources WHERE agency_id = ? AND resource_id = ? LIMIT 1 FOR UPDATE");
+            $chkAr->execute([$agencyId, $resourceId]);
+            $arId = (int)$chkAr->fetchColumn();
+            if ($arId) {
+                $db->prepare("UPDATE agency_resources SET available_quantity = available_quantity + ?, total_quantity = total_quantity + ?, updated_at = NOW() WHERE id = ?")
+                   ->execute([$quantity, $quantity, $arId]);
+            } else {
+                $db->prepare("INSERT INTO agency_resources (agency_id, resource_id, total_quantity, available_quantity, in_use_quantity, damaged_quantity, min_threshold, item_condition, status, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, 20, 'New', 'active', NOW(), NOW())")
+                   ->execute([$agencyId, $resourceId, $quantity, $quantity]);
+            }
+        }
+
         // 5. Create Disaster Request & Recommendation Records
         $trackingCode = 'ALLOC-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
         $chkTrack = $db->prepare("SELECT id FROM disaster_reports WHERE tracking_code = ?");
@@ -232,8 +254,8 @@ if ($subAction === 'direct_allocation' || $subAction === 'direct') {
         ]);
 
         logSystemEvent(
-            'DIRECT_RESOURCE_ALLOCATION',
-            'Resources',
+            'DIRECT_SUPPLY_ALLOCATION',
+            'Supplies',
             "Allocated {$quantity} {$centralRes['unit']} of [{$centralRes['code']}] {$centralRes['name']} to Brgy. {$barangay['name']} ({$purokName}) ({$trackingCode})",
             $user['id']
         );
@@ -393,6 +415,23 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
                 $targetLocalResId = (int)$db->lastInsertId();
             }
 
+            // Also dynamically credit agency_resources for Barangay local stockroom
+            $agStmt = $db->prepare("SELECT id FROM agencies WHERE barangay_id = ? LIMIT 1");
+            $agStmt->execute([$rec['barangay_id']]);
+            $agencyId = (int)$agStmt->fetchColumn();
+            if ($agencyId && !empty($pItem['resource_id'])) {
+                $chkAr = $db->prepare("SELECT id FROM agency_resources WHERE agency_id = ? AND resource_id = ? LIMIT 1 FOR UPDATE");
+                $chkAr->execute([$agencyId, $pItem['resource_id']]);
+                $arId = (int)$chkAr->fetchColumn();
+                if ($arId) {
+                    $db->prepare("UPDATE agency_resources SET available_quantity = available_quantity + ?, total_quantity = total_quantity + ?, updated_at = NOW() WHERE id = ?")
+                       ->execute([$qtyToAlloc, $qtyToAlloc, $arId]);
+                } else {
+                    $db->prepare("INSERT INTO agency_resources (agency_id, resource_id, total_quantity, available_quantity, in_use_quantity, damaged_quantity, min_threshold, item_condition, status, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, 20, 'New', 'active', NOW(), NOW())")
+                       ->execute([$agencyId, $pItem['resource_id'], $qtyToAlloc, $qtyToAlloc]);
+                }
+            }
+
             // Update item record
             $db->prepare("
                 UPDATE recommended_items SET
@@ -463,8 +502,8 @@ elseif ($subAction === 'batch_allocate' || $subAction === 'batch') {
         ]);
 
         logSystemEvent(
-            'BATCH_RESOURCE_ALLOCATION',
-            'Resources',
+            'BATCH_SUPPLY_ALLOCATION',
+            'Supplies',
             "Batch allocated {$allocatedCount} items for {$rec['recommendation_code']} to Brgy. {$rec['barangay_name']}",
             $user['id']
         );
@@ -601,6 +640,23 @@ else {
                 $targetLocalResId = (int)$db->lastInsertId();
             }
 
+            // Also dynamically credit agency_resources for Barangay local stockroom
+            $agStmt = $db->prepare("SELECT id FROM agencies WHERE barangay_id = ? LIMIT 1");
+            $agStmt->execute([$item['barangay_id']]);
+            $agencyId = (int)$agStmt->fetchColumn();
+            if ($agencyId && !empty($item['central_resource_id'])) {
+                $chkAr = $db->prepare("SELECT id FROM agency_resources WHERE agency_id = ? AND resource_id = ? LIMIT 1 FOR UPDATE");
+                $chkAr->execute([$agencyId, $item['central_resource_id']]);
+                $arId = (int)$chkAr->fetchColumn();
+                if ($arId) {
+                    $db->prepare("UPDATE agency_resources SET available_quantity = available_quantity + ?, total_quantity = total_quantity + ?, updated_at = NOW() WHERE id = ?")
+                       ->execute([$allocQty, $allocQty, $arId]);
+                } else {
+                    $db->prepare("INSERT INTO agency_resources (agency_id, resource_id, total_quantity, available_quantity, in_use_quantity, damaged_quantity, min_threshold, item_condition, status, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, 20, 'New', 'active', NOW(), NOW())")
+                       ->execute([$agencyId, $item['central_resource_id'], $allocQty, $allocQty]);
+                }
+            }
+
             // Update recommended_items
             $db->prepare("
                 UPDATE recommended_items SET
@@ -672,8 +728,8 @@ else {
             ]);
 
             logSystemEvent(
-                'ALLOCATE_RESOURCE_ITEM',
-                'Resources',
+                'ALLOCATE_SUPPLY_ITEM',
+                'Supplies',
                 "Allocated {$allocQty} {$item['unit']} of {$item['resource_name']} to Brgy. {$item['barangay_name']} for {$item['tracking_code']}",
                 $user['id']
             );
@@ -741,8 +797,8 @@ else {
             }
 
             logSystemEvent(
-                'REJECT_RESOURCE_ITEM',
-                'Resources',
+                'REJECT_SUPPLY_ITEM',
+                'Supplies',
                 "Declined allocation of {$item['resource_name']} for {$item['tracking_code']} (Brgy. {$item['barangay_name']})",
                 $user['id']
             );

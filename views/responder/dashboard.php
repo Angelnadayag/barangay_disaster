@@ -10,20 +10,20 @@ require_once __DIR__ . '/../../backend/services/Helpers.php';
 
 requireRole('responder');
 $user = getCurrentUser();
-$responderBarangayId = (int)($user['barangay_id'] ?? 0);
+$responderBarangayId = (int) ($user['barangay_id'] ?? 0);
 $db = getDBConnection();
 
 if ($responderBarangayId === 0) {
-    $bStmt = $db->prepare("SELECT barangay_id FROM users WHERE id = ?");
-    $bStmt->execute([(int)$user['id']]);
-    $responderBarangayId = (int)$bStmt->fetchColumn();
+  $bStmt = $db->prepare("SELECT barangay_id FROM users WHERE id = ?");
+  $bStmt->execute([(int) $user['id']]);
+  $responderBarangayId = (int) $bStmt->fetchColumn();
 }
 
 $responderBrgyName = $user['barangay_name'] ?? '';
 if (empty($responderBrgyName) && $responderBarangayId > 0) {
-    $bNameStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
-    $bNameStmt->execute([$responderBarangayId]);
-    $responderBrgyName = $bNameStmt->fetchColumn() ?: '';
+  $bNameStmt = $db->prepare("SELECT name FROM barangays WHERE id = ?");
+  $bNameStmt->execute([$responderBarangayId]);
+  $responderBrgyName = $bNameStmt->fetchColumn() ?: '';
 }
 
 // Latest status of current responder
@@ -31,13 +31,13 @@ $statStmt = $db->prepare("SELECT * FROM responder_field_updates WHERE responder_
 $statStmt->execute([$user['id']]);
 $currentStatus = $statStmt->fetch();
 $activeStatus = $currentStatus['operational_status'] ?? 'Available';
-$activeIncidentId = (int)($currentStatus['disaster_request_id'] ?? 0);
+$activeIncidentId = (int) ($currentStatus['disaster_request_id'] ?? 0);
 $isOnDuty = in_array($activeStatus, ['On Duty', 'Responding'], true) && ($activeIncidentId > 0);
 $activeIncidentCode = '';
 if ($activeIncidentId > 0) {
-    $codeStmt = $db->prepare("SELECT tracking_code FROM disaster_reports WHERE id = ?");
-    $codeStmt->execute([$activeIncidentId]);
-    $activeIncidentCode = $codeStmt->fetchColumn() ?: '';
+  $codeStmt = $db->prepare("SELECT tracking_code FROM disaster_reports WHERE id = ?");
+  $codeStmt->execute([$activeIncidentId]);
+  $activeIncidentCode = $codeStmt->fetchColumn() ?: '';
 }
 
 // Active Incidents (Strictly for assigned barangay)
@@ -116,7 +116,7 @@ $notifStmt = $db->prepare("
       AND n.title NOT LIKE '%Training%'
     ORDER BY n.created_at DESC LIMIT 3
 ");
-$notifStmt->execute([$responderBarangayId, (int)$user['id']]);
+$notifStmt->execute([$responderBarangayId, (int) $user['id']]);
 $urgentAlerts = $notifStmt->fetchAll();
 
 $pageTitle = "Responder Dashboard";
@@ -131,62 +131,68 @@ require_once __DIR__ . '/../layouts/header.php';
 
 
 <style>
-.btn-responder-action {
-  width: 100%;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  transition: all 0.15s ease;
-  box-shadow: 0 1px 2px rgba(16, 35, 54, 0.05);
-}
+  .btn-responder-action {
+    width: 100%;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(16, 35, 54, 0.05);
+  }
 
-.btn-responder-respond {
-  background: #2F6F73;
-  color: #FFFFFF;
-}
-.btn-responder-respond:hover {
-  background: #24585B;
-}
+  .btn-responder-respond {
+    background: #2F6F73;
+    color: #FFFFFF;
+  }
 
-.btn-responder-cancel {
-  background: #EEF2F4;
-  color: #17324D;
-}
-.btn-responder-cancel:hover {
-  background: #E2E8EC;
-}
+  .btn-responder-respond:hover {
+    background: #24585B;
+  }
 
-.btn-responder-finish {
-  background: #17324D;
-  color: #FFFFFF;
-}
-.btn-responder-finish:hover {
-  background: #0F2234;
-}
+  .btn-responder-cancel {
+    background: #EEF2F4;
+    color: #17324D;
+  }
 
-.btn-responder-disabled {
-  background: #EEF2F4;
-  color: #8A96A0;
-  cursor: not-allowed;
-  opacity: 0.65;
-}
+  .btn-responder-cancel:hover {
+    background: #E2E8EC;
+  }
+
+  .btn-responder-finish {
+    background: #17324D;
+    color: #FFFFFF;
+  }
+
+  .btn-responder-finish:hover {
+    background: #0F2234;
+  }
+
+  .btn-responder-disabled {
+    background: #EEF2F4;
+    color: #8A96A0;
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
 </style>
 
 <!-- Responder Profile & Duty Status Header -->
-<div class="card" style="margin-bottom: 14px; border: none; border-radius: 10px; box-shadow: 0 1px 3px rgba(16, 35, 54, 0.05); background: #FFFFFF;">
+<div class="card"
+  style="margin-bottom: 14px; border: none; border-radius: 10px; box-shadow: 0 1px 3px rgba(16, 35, 54, 0.05); background: #FFFFFF;">
   <div style="padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
     <!-- Left: Profile Avatar + Name + Sub Details -->
     <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
-      <div style="width: 40px; height: 40px; border-radius: 50%; background: #EEF2F4; color: #17324D; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <div
+        style="width: 40px; height: 40px; border-radius: 50%; background: #EEF2F4; color: #17324D; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
         <?php if (!empty($user['avatar_url'])): ?>
-          <img src="<?= clean($user['avatar_url']) ?>" alt="Profile" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+          <img src="<?= clean($user['avatar_url']) ?>" alt="Profile"
+            style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
         <?php else: ?>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -195,7 +201,8 @@ require_once __DIR__ . '/../layouts/header.php';
         <?php endif; ?>
       </div>
       <div style="min-width: 0;">
-        <div style="font-size: 13.5px; font-weight: 700; color: #17324D; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <div
+          style="font-size: 13.5px; font-weight: 700; color: #17324D; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           <?= clean($user['full_name']) ?>
         </div>
         <div style="font-size: 10.5px; color: #8A96A0; font-weight: 500; margin-top: 1px;">
@@ -206,7 +213,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
     <!-- Right: Non-clickable Status Box (Available or On Duty) -->
     <div style="flex-shrink: 0;">
-      <div id="topDutyStatusBox" style="padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 700; text-align: center; user-select: none; pointer-events: none; border: none; <?= $isOnDuty ? 'background: #EBF3F5; color: #2F6F73;' : 'background: #EEF2F4; color: #17324D;' ?>">
+      <div id="topDutyStatusBox"
+        style="padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 700; text-align: center; user-select: none; pointer-events: none; border: none; <?= $isOnDuty ? 'background: #EBF3F5; color: #2F6F73;' : 'background: #EEF2F4; color: #17324D;' ?>">
         <?= $isOnDuty ? 'On Duty' : 'Available' ?>
       </div>
     </div>
@@ -216,43 +224,35 @@ require_once __DIR__ . '/../layouts/header.php';
 <!-- Active Disaster Reports (Primary Operational Focus for Responders) -->
 <div class="card"
   style="margin-bottom: 16px; border: none; border-radius: 10px; box-shadow: 0 1px 3px rgba(16, 35, 54, 0.05);">
-  <div class="card-header"
-    style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:14px 18px;border-bottom:1px solid #F0F3F4;">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <h2 style="font-size:14px;font-weight:700;color:var(--color-primary);margin:0;">
-        Active Disaster Reports<?= !empty($responderBrgyName) ? ' — Brgy. ' . clean($responderBrgyName) : '' ?>
-      </h2>
-      <span class="badge badge-neutral" style="font-size:9.5px;padding:2px 7px;">
-        <?= count($activeIncidents) ?> Active
-      </span>
-    </div>
-  </div>
-
   <div class="card-body" style="padding:16px 18px;">
     <?php if (empty($activeIncidents)): ?>
       <div style="text-align:center;padding:28px 16px;color:var(--color-text-muted);">
-        <div style="font-weight:600;font-size:13px;color:var(--color-primary);margin-bottom:3px;">No Active Disaster Incidents</div>
-        <div style="font-size:11px;">There are no active disaster reports in Brgy. <?= clean($responderBrgyName ?: 'your assigned barangay') ?>. Field units remain on standby.</div>
+        <div style="font-weight:600;font-size:13px;color:var(--color-primary);margin-bottom:3px;">No Active Disaster
+          Incidents</div>
+        <div style="font-size:11px;">There are no active disaster reports in Brgy.
+          <?= clean($responderBrgyName ?: 'your assigned barangay') ?>. Field units remain on standby.
+        </div>
       </div>
     <?php else: ?>
       <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(340px, 1fr));gap:14px;">
-        <?php foreach ($activeIncidents as $inc): 
-          $isMyMission = ($isOnDuty && $activeIncidentId === (int)$inc['id']);
+        <?php foreach ($activeIncidents as $inc):
+          $isMyMission = ($isOnDuty && $activeIncidentId === (int) $inc['id']);
           $cardJson = json_encode([
-            "id" => (int)$inc["id"],
+            "id" => (int) $inc["id"],
             "tracking_code" => $inc["tracking_code"],
             "disaster_type" => $inc["disaster_type"],
             "status" => $inc["status"] ?? "Ongoing",
             "severity" => $inc["severity"],
             "purok_name" => $inc["purok_name"],
             "barangay_name" => $inc["barangay_name"],
-            "lat" => !empty($inc["coordinates_lat"]) ? (float)$inc["coordinates_lat"] : 8.246596,
-            "lng" => !empty($inc["coordinates_lng"]) ? (float)$inc["coordinates_lng"] : 124.259474,
-            "affected_families" => (int)$inc["affected_families"],
-            "displaced_families" => (int)$inc["displaced_families"]
+            "lat" => !empty($inc["coordinates_lat"]) ? (float) $inc["coordinates_lat"] : 8.246596,
+            "lng" => !empty($inc["coordinates_lng"]) ? (float) $inc["coordinates_lng"] : 124.259474,
+            "affected_families" => (int) $inc["affected_families"],
+            "displaced_families" => (int) $inc["displaced_families"]
           ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-        ?>
-          <div style="background:#F8FAFB;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;border:none;">
+          ?>
+          <div
+            style="background:#F8FAFB;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;border:none;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
               <div>
                 <div style="font-size:9px;color:var(--color-text-muted);font-weight:600;">
@@ -266,10 +266,11 @@ require_once __DIR__ . '/../layouts/header.php';
                 </div>
               </div>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-                <?php 
-                  $incStatus = ($inc['status'] === 'Completed') ? 'Completed' : 'Ongoing';
+                <?php
+                $incStatus = ($inc['status'] === 'Completed') ? 'Completed' : 'Ongoing';
                 ?>
-                <span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:none;<?= $incStatus === 'Completed' ? 'background:#EEF2F4;color:#17324D;' : 'background:#EBF3F5;color:#2F6F73;' ?>">
+                <span
+                  style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;border:none;<?= $incStatus === 'Completed' ? 'background:#EEF2F4;color:#17324D;' : 'background:#EBF3F5;color:#2F6F73;' ?>">
                   <?= $incStatus ?>
                 </span>
               </div>
@@ -278,7 +279,8 @@ require_once __DIR__ . '/../layouts/header.php';
             <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:6px;text-align:center;">
               <div style="background:#FFFFFF;padding:6px;border-radius:6px;">
                 <div style="font-size:8.5px;color:var(--color-text-muted);">Affected Families</div>
-                <div style="font-size:12px;font-weight:700;color:var(--color-primary);"><?= $inc['affected_families'] ?></div>
+                <div style="font-size:12px;font-weight:700;color:var(--color-primary);"><?= $inc['affected_families'] ?>
+                </div>
               </div>
               <div style="background:#FFFFFF;padding:6px;border-radius:6px;">
                 <div style="font-size:8.5px;color:var(--color-text-muted);">Displaced Families</div>
@@ -321,28 +323,26 @@ require_once __DIR__ . '/../layouts/header.php';
               <?php if ($isMyMission): ?>
                 <?php if ($inc['status'] === 'Completed'): ?>
                   <button type="button" class="btn-responder-action btn-responder-finish"
-                          onclick="handleResponderAction('finish', <?= (int)$inc['id'] ?>, this)"
-                          title="Finish response mission and set status to Available">
+                    onclick="handleResponderAction('finish', <?= (int) $inc['id'] ?>, this)"
+                    title="Finish response mission and set status to Available">
                     Finish Respond
                   </button>
                 <?php else: ?>
                   <button type="button" class="btn-responder-action btn-responder-cancel"
-                          onclick="handleResponderAction('cancel', <?= (int)$inc['id'] ?>, this)"
-                          title="Cancel response and set status to Available">
+                    onclick="handleResponderAction('cancel', <?= (int) $inc['id'] ?>, this)"
+                    title="Cancel response and set status to Available">
                     Cancel Respond
                   </button>
                 <?php endif; ?>
               <?php else: ?>
                 <?php if ($isOnDuty): ?>
-                  <button type="button" class="btn-responder-action btn-responder-disabled"
-                          disabled
-                          title="You already have an active response mission. Finish or cancel it before responding to another incident.">
+                  <button type="button" class="btn-responder-action btn-responder-disabled" disabled
+                    title="You already have an active response mission. Finish or cancel it before responding to another incident.">
                     Respond
                   </button>
                 <?php else: ?>
                   <button type="button" class="btn-responder-action btn-responder-respond"
-                          onclick="handleResponderAction('respond', <?= (int)$inc['id'] ?>, this)"
-                          title="Respond to this incident">
+                    onclick="handleResponderAction('respond', <?= (int) $inc['id'] ?>, this)" title="Respond to this incident">
                     Respond
                   </button>
                 <?php endif; ?>
@@ -358,28 +358,6 @@ require_once __DIR__ . '/../layouts/header.php';
 
 <!-- Evacuation Routing & Safe Shelters Directory (Scroll-Down Section) -->
 <section class="evac-routing-section" id="evacuation-routing">
-  <div class="evac-section-header">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <h2 class="evac-section-title">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          style="color:var(--color-secondary);">
-          <polygon points="3 11 22 2 13 21 11 13 3 11" />
-        </svg>
-        Evacuation Routing &amp; Safe Shelters
-      </h2>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;">
-      <button type="button" class="btn btn-secondary btn-sm" id="respGpsLocateBtn"
-        style="font-size:10px;padding:4px 9px;display:inline-flex;align-items:center;gap:4px;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-        My Location
-      </button>
-    </div>
-  </div>
-
   <!-- Filter Deck -->
   <div class="evac-filter-deck">
     <div class="evac-filter-pills">
@@ -662,7 +640,7 @@ require_once __DIR__ . '/../layouts/header.php';
         : (typeof computeClientStreetNetworkRoute === 'function')
           ? Promise.resolve(computeClientStreetNetworkRoute(unitCoords[0], unitCoords[1], s.lat, s.lng))
           : fetch(`<?= BASE_URL ?>/backend/functions/responder/route_proxy.php?start_lat=${unitCoords[0]}&start_lng=${unitCoords[1]}&end_lat=${s.lat}&end_lng=${s.lng}`)
-              .then(r => r.json());
+            .then(r => r.json());
 
       routerPromise.then(routeResult => {
         if (!routeResult || !routeResult.points || routeResult.points.length < 2) return;
@@ -783,77 +761,77 @@ require_once __DIR__ . '/../layouts/header.php';
 </script>
 
 <script>
-window.handleResponderAction = function(action, incidentId, btnEl) {
-  if (btnEl) {
-    btnEl.disabled = true;
-  }
-
-  const formData = new FormData();
-  formData.append('action', action);
-  if (incidentId) formData.append('disaster_request_id', incidentId);
-  formData.append('ajax', '1');
-
-  fetch('<?= BASE_URL ?>/backend/functions/responder/quick_status.php', {
-    method: 'POST',
-    body: formData,
-    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      if (typeof showToast === 'function') {
-        showToast(data.message || 'Operational status updated.', 'success');
-      }
-      // Update top duty status box immediately
-      const topBox = document.getElementById('topDutyStatusBox');
-      if (topBox) {
-        if (data.is_on_duty) {
-          topBox.textContent = 'On Duty';
-          topBox.style.background = '#EBF3F5';
-          topBox.style.color = '#2F6F73';
-        } else {
-          topBox.textContent = 'Available';
-          topBox.style.background = '#EEF2F4';
-          topBox.style.color = '#17324D';
-        }
-      }
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-    } else {
-      if (btnEl) btnEl.disabled = false;
-      if (typeof showToast === 'function') {
-        showToast(data.message || 'Could not update status.', 'danger');
-      } else {
-        alert(data.message || 'Could not update status.');
-      }
+  window.handleResponderAction = function (action, incidentId, btnEl) {
+    if (btnEl) {
+      btnEl.disabled = true;
     }
-  })
-  .catch(err => {
-    if (btnEl) btnEl.disabled = false;
-    console.warn('Responder action network error:', err);
+
+    const formData = new FormData();
+    formData.append('action', action);
+    if (incidentId) formData.append('disaster_request_id', incidentId);
+    formData.append('ajax', '1');
+
+    fetch('<?= BASE_URL ?>/backend/functions/responder/quick_status.php', {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          if (typeof showToast === 'function') {
+            showToast(data.message || 'Operational status updated.', 'success');
+          }
+          // Update top duty status box immediately
+          const topBox = document.getElementById('topDutyStatusBox');
+          if (topBox) {
+            if (data.is_on_duty) {
+              topBox.textContent = 'On Duty';
+              topBox.style.background = '#EBF3F5';
+              topBox.style.color = '#2F6F73';
+            } else {
+              topBox.textContent = 'Available';
+              topBox.style.background = '#EEF2F4';
+              topBox.style.color = '#17324D';
+            }
+          }
+
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+        } else {
+          if (btnEl) btnEl.disabled = false;
+          if (typeof showToast === 'function') {
+            showToast(data.message || 'Could not update status.', 'danger');
+          } else {
+            alert(data.message || 'Could not update status.');
+          }
+        }
+      })
+      .catch(err => {
+        if (btnEl) btnEl.disabled = false;
+        console.warn('Responder action network error:', err);
+        setTimeout(() => { window.location.reload(); }, 500);
+      });
+  };
+
+  // Legacy fallback
+  window.handleCardQuickStatus = function (status, incidentId, btnEl) {
+    const action = (status === 'Responding' || status === 'On Duty') ? 'respond' : 'cancel';
+    window.handleResponderAction(action, incidentId, btnEl);
+  };
+
+  // Listen for updates triggered from inside the route modal
+  window.addEventListener('responderStatusChanged', function (e) {
+    const topBox = document.getElementById('topDutyStatusBox');
+    if (topBox && e.detail && e.detail.status) {
+      const isDuty = (e.detail.status === 'On Duty' || e.detail.status === 'Responding');
+      topBox.textContent = isDuty ? 'On Duty' : 'Available';
+      topBox.style.background = isDuty ? '#EBF3F5' : '#EEF2F4';
+      topBox.style.color = isDuty ? '#2F6F73' : '#17324D';
+    }
     setTimeout(() => { window.location.reload(); }, 500);
   });
-};
-
-// Legacy fallback
-window.handleCardQuickStatus = function(status, incidentId, btnEl) {
-  const action = (status === 'Responding' || status === 'On Duty') ? 'respond' : 'cancel';
-  window.handleResponderAction(action, incidentId, btnEl);
-};
-
-// Listen for updates triggered from inside the route modal
-window.addEventListener('responderStatusChanged', function(e) {
-  const topBox = document.getElementById('topDutyStatusBox');
-  if (topBox && e.detail && e.detail.status) {
-    const isDuty = (e.detail.status === 'On Duty' || e.detail.status === 'Responding');
-    topBox.textContent = isDuty ? 'On Duty' : 'Available';
-    topBox.style.background = isDuty ? '#EBF3F5' : '#EEF2F4';
-    topBox.style.color = isDuty ? '#2F6F73' : '#17324D';
-  }
-  setTimeout(() => { window.location.reload(); }, 500);
-});
 </script>
 
 <?php require_once __DIR__ . '/partials/route-modal.php'; ?>

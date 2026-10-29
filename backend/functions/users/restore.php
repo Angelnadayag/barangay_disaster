@@ -18,8 +18,9 @@ $returnUrl = $_POST['return_url'] ?? ($_SERVER['HTTP_REFERER'] ?? (BASE_URL . '/
 $targetUserId = (int)($_POST['user_id'] ?? ($_GET['user_id'] ?? 0));
 $userType = trim($_POST['user_type'] ?? ($_GET['user_type'] ?? ''));
 
+// IDs overlap between `users` and `residents`, so only guess when user_type is not provided.
 $isResident = ($userType === 'resident');
-if (!$isResident) {
+if (!$isResident && $userType === '') {
     $chkR = $db->prepare("SELECT id FROM residents WHERE id = ?");
     $chkR->execute([$targetUserId]);
     if ($chkR->fetch()) {

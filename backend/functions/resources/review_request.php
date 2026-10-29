@@ -107,57 +107,7 @@ try {
                 ) VALUES (?, 'Allocation', ?, 'barangay_requisition', ?, ?, ?, NOW())
             ")->execute([
                 $centralRes['id'], $approvedQty, $requestId,
-                "Dispatched {$approvedQty} {$centralRes['unit']} to Brgy. {$req['barangay_name']} for Requisition {$req['request_code']}" . ($reviewRemarks ? " (Note: {$reviewRemarks})" : ''),
-                $user['id']
-            ]);
-
-            // Credit to Barangay's Local Inventory
-            $bResStmt = $db->prepare("SELECT id FROM resources WHERE barangay_id = ? AND (LOWER(name) = LOWER(?) OR LOWER(code) = LOWER(?))");
-            $bResStmt->execute([$barangayId, $centralRes['name'], "BRG{$barangayId}-" . $centralRes['code']]);
-            $bRes = $bResStmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($bRes) {
-                // Restock existing local item
-                $db->prepare("
-                    UPDATE resources SET 
-                        available_quantity = available_quantity + ?,
-                        total_quantity = total_quantity + ?,
-                        updated_at = NOW()
-                    WHERE id = ?
-                ")->execute([$approvedQty, $approvedQty, $bRes['id']]);
-                $targetLocalResId = $bRes['id'];
-            } else {
-                // Create new local inventory item for this Barangay
-                $localCode = "BRG{$barangayId}-" . $centralRes['code'];
-                $chkCode = $db->prepare("SELECT id FROM resources WHERE LOWER(code) = LOWER(?)");
-                $chkCode->execute([$localCode]);
-                if ($chkCode->fetch()) $localCode .= '-' . rand(10, 99);
-
-                $suppIdForLocal = $centralRes['supplier_id'] ?? null;
-                $insLocal = $db->prepare("
-                    INSERT INTO resources (
-                        code, name, category, status, description, unit, total_quantity,
-                        available_quantity, in_use_quantity, damaged_quantity, min_threshold,
-                        supplier_id, item_condition, barangay_id, updated_at, created_at
-                    ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 20, ?, ?, ?, NOW(), NOW())
-                ");
-                $insLocal->execute([
-                    $localCode, $centralRes['name'], $centralRes['category'],
-                    $centralRes['description'], $centralRes['unit'], $approvedQty,
-                    $approvedQty, $suppIdForLocal,
-                    'New', $barangayId
-                ]);
-                $targetLocalResId = (int)$db->lastInsertId();
-            }
-
-            // Log Barangay receipt transaction
-            $db->prepare("
-                INSERT INTO resource_transactions (
-                    resource_id, transaction_type, quantity, reference_type, reference_id, remarks, performed_by, created_at
-                ) VALUES (?, 'Restock', ?, 'icdrrmo_allocation', ?, ?, ?, NOW())
-            ")->execute([
-                $targetLocalResId, $approvedQty, $requestId,
-                "Received {$approvedQty} {$req['unit']} allocated by ICDRRMO (Requisition {$req['request_code']})",
+                "Dispatched {$approvedQty} {$centralRes['unit']} to Brgy. {$req['barangay_name']} for Requisition {$req['request_code']} (Awaiting delivery receipt)" . ($reviewRemarks ? " (Note: {$reviewRemarks})" : ''),
                 $user['id']
             ]);
         }
@@ -184,7 +134,7 @@ try {
             VALUES ('barangay_head', ?, ?, ?, 'info', 'resource_request', ?, NOW())
         ")->execute([$barangayId, "Requisition Accepted: {$req['request_code']}", $notifMsg, $requestId]);
 
-        logSystemEvent('APPROVE_REQUISITION', 'Resources', "ICDRRMO accepted requisition {$req['request_code']} for Brgy. {$req['barangay_name']} ({$approvedQty} {$req['unit']})");
+        logSystemEvent('APPROVE_REQUISITION', 'Supplies', "ICDRRMO accepted requisition {$req['request_code']} for Brgy. {$req['barangay_name']} ({$approvedQty} {$req['unit']})");
 
         $db->commit();
 
@@ -230,7 +180,7 @@ try {
             VALUES ('barangay_head', ?, ?, ?, 'warning', 'resource_request', ?, NOW())
         ")->execute([$barangayId, "Requisition Declined: {$req['request_code']}", $notifMsg, $requestId]);
 
-        logSystemEvent('REJECT_REQUISITION', 'Resources', "ICDRRMO declined requisition {$req['request_code']} for Brgy. {$req['barangay_name']}. Reason: $reviewRemarks");
+        logSystemEvent('REJECT_REQUISITION', 'Supplies', "ICDRRMO declined requisition {$req['request_code']} for Brgy. {$req['barangay_name']}. Reason: $reviewRemarks");
 
         $db->commit();
 

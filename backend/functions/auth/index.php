@@ -12,8 +12,11 @@ switch ($action) {
     case 'logout':
         require __DIR__ . '/logout.php';
         break;
-    case 'switch_role':
-        require __DIR__ . '/switch_role.php';
+    case 'forgot_password':
+        require __DIR__ . '/forgot_password.php';
+        break;
+    case 'register':
+        require __DIR__ . '/register.php';
         break;
     default:
         require_once __DIR__ . '/../../config/config.php';
