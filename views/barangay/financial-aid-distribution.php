@@ -139,7 +139,44 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <style>
-  /* Clean Anti-slop 2-Table Master-Detail Architecture */
+  /* Standardized Typography & Layout: Primary = Roboto, Secondary = Poppins */
+  .main-content,
+  .financial-aid-page,
+  .financial-aid-page * {
+    box-sizing: border-box;
+  }
+
+  .financial-aid-page {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--color-text);
+  }
+
+  /* Headings & Titles: Strictly 14px to 16px, Font Family: Poppins */
+  .financial-aid-page h1,
+  .financial-aid-page h2,
+  .financial-aid-page h3,
+  .financial-aid-page .page-header h1,
+  .financial-aid-page .table-card-title,
+  .financial-aid-page .modal-header h3 {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin: 0;
+  }
+
+  .page-header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  /* Paragraphs, details, descriptions: Strictly 9px to 11px, Font Family: Roboto */
+  .page-header-desc {
+    font-family: 'Roboto', sans-serif;
+    font-size: 10.5px;
+    color: var(--color-text-secondary);
+    margin: 3px 0 0 0;
+  }
+
+  /* Telemetry KPI Summary Row */
   .kpi-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -158,26 +195,28 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .kpi-title {
+    font-family: 'Poppins', sans-serif;
     font-size: 10px;
     font-weight: 600;
     color: var(--color-text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
   }
 
   .kpi-val {
-    font-size: 20px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
     font-weight: 700;
     color: var(--color-primary);
-    font-family: var(--font-secondary);
   }
 
   .kpi-sub {
-    font-size: 10px;
+    font-family: 'Roboto', sans-serif;
+    font-size: 9.5px;
     color: var(--color-text-muted);
   }
 
-  /* Two-Table Master-Detail Layout */
+  /* Two-Table Master-Detail Architecture */
   .dual-table-container {
     display: grid;
     grid-template-columns: 460px 1fr;
@@ -201,7 +240,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .table-card-header {
-    padding: 12px 16px;
+    padding: 10px 16px;
     background: #FAFCFC;
     border-bottom: 1px solid var(--color-border-light);
     display: flex;
@@ -212,7 +251,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .table-card-title {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--color-primary);
     display: flex;
@@ -258,6 +297,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .detail-telemetry-label {
+    font-family: 'Poppins', sans-serif;
     font-size: 9.5px;
     color: var(--color-text-secondary);
     text-transform: uppercase;
@@ -265,55 +305,58 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .detail-telemetry-val {
-    font-size: 13px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
     font-weight: 700;
-    font-family: var(--font-secondary);
     color: var(--color-primary);
   }
 
-  /* Status Badges */
+  /* Standardized Status Badges: Strictly 9px to 9.5px, Roboto */
   .status-badge {
     display: inline-block;
-    padding: 2px 7px;
+    padding: 2px 6px;
     border-radius: 4px;
+    font-family: 'Roboto', sans-serif;
     font-size: 9.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    line-height: 1.3;
   }
 
   .status-badge.claimed {
-    background: #EAF4EB;
-    color: #2E7D32;
-    border: 1px solid #BCE3C1;
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success-border);
   }
 
   .status-badge.pending {
-    background: #FEF8E8;
-    color: #8A6402;
-    border: 1px solid #FCE6AA;
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning-border);
   }
 
   .status-badge.unclaimed {
-    background: #F0F3F4;
-    color: #66737D;
-    border: 1px solid #D9E0E3;
+    background: var(--color-surface-subtle);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
   }
 
   .status-badge.active {
-    background: #EBF3FC;
-    color: #17324D;
-    border: 1px solid #B7D7FA;
+    background: var(--color-info-bg);
+    color: var(--color-primary);
+    border: 1px solid var(--color-info-border);
   }
 
   .status-badge.completed {
-    background: #EAF4EB;
-    color: #2E7D32;
-    border: 1px solid #BCE3C1;
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success-border);
   }
 
   .sms-badge {
     display: inline-block;
+    font-family: 'Roboto', sans-serif;
     font-size: 9px;
     font-weight: 600;
     padding: 1px 5px;
@@ -321,46 +364,95 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .sms-sent {
-    background: #EAF4EB;
-    color: #2E7D32;
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success-border);
   }
 
   .sms-failed {
-    background: #FDE8E8;
-    color: #C62828;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger-border);
   }
 
   .sms-not_sent {
-    background: #F0F3F4;
-    color: #8A96A0;
+    background: var(--color-surface-subtle);
+    color: var(--color-text-muted);
   }
 
   .action-badge {
     display: inline-block;
     padding: 2px 6px;
     border-radius: 4px;
+    font-family: 'Roboto', sans-serif;
     font-size: 9.5px;
     font-weight: 600;
   }
 
   .action-allocated {
-    background: #EBF3FC;
-    color: #17324D;
+    background: var(--color-info-bg);
+    color: var(--color-primary);
   }
 
   .action-disbursed {
-    background: #EAF4EB;
-    color: #2E7D32;
+    background: var(--color-success-bg);
+    color: var(--color-success);
   }
 
   .action-status {
-    background: #FEF8E8;
-    color: #8A6402;
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
   }
 
   .action-voided {
-    background: #FDE8E8;
-    color: #C62828;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+  }
+
+  /* Tables: Headers Poppins 10px, Body Roboto 10.5px */
+  table.data-table th {
+    font-family: 'Poppins', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  table.data-table td {
+    font-family: 'Roboto', sans-serif;
+    font-size: 10.5px;
+    color: var(--color-text);
+  }
+
+  /* Form Elements & Inputs */
+  .form-control,
+  .form-select,
+  input.form-control,
+  select.form-control,
+  textarea.form-control {
+    font-family: 'Roboto', sans-serif;
+    font-size: 10.5px;
+    color: var(--color-text);
+  }
+
+  .form-label {
+    font-family: 'Roboto', sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  /* Buttons */
+  .btn {
+    font-family: 'Roboto', sans-serif;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .btn-sm {
+    font-size: 10px;
+    padding: 4px 8px;
   }
 
   /* Modals */
@@ -398,7 +490,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .modal-header {
-    padding: 14px 18px;
+    padding: 12px 18px;
     border-bottom: 1px solid var(--color-border-light);
     display: flex;
     justify-content: space-between;
@@ -407,7 +499,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .modal-header h3 {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--color-primary);
     margin: 0;
@@ -427,13 +519,15 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 
   .modal-body {
-    padding: 18px;
+    padding: 16px 18px;
     overflow-y: auto;
-    font-size: 11px;
+    font-family: 'Roboto', sans-serif;
+    font-size: 10.5px;
+    color: var(--color-text);
   }
 
   .modal-footer {
-    padding: 12px 18px;
+    padding: 10px 18px;
     border-top: 1px solid var(--color-border-light);
     background: #FAFCFC;
     display: flex;
@@ -442,18 +536,16 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   }
 </style>
 
-<main class="main-content">
+<main class="main-content financial-aid-page">
   <!-- Page Header -->
   <div class="page-header">
     <div class="page-header-title-wrap">
       <h1>Manage Resources — Barangay <?= clean($barangay['name']) ?></h1>
       <p class="page-header-desc">
-        Select an allocated calamity aid fund from ICDRRMO to dynamically inspect and manage recipient distributions,
-        track balances, and audit releases.
+        Calamity assistance programs and beneficiary disbursement ledger.
       </p>
     </div>
     <div class="page-header-actions" style="display: flex; gap: 8px; align-items: center;">
-      <!-- Direct Audit Records Button -->
       <button type="button" class="btn btn-outline" onclick="openAuditRecordsModal()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -472,7 +564,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="kpi-card">
       <div class="kpi-title">Total Calamity Aid Received</div>
       <div class="kpi-val">&#8369;<?= number_format($totalAllocatedSum, 2) ?></div>
-      <div class="kpi-sub"><?= count($allocations) ?> program batches from ICDRRMO</div>
+      <div class="kpi-sub"><?= count($allocations) ?> programs from ICDRRMO</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Total Disbursed to Residents</div>
@@ -482,117 +574,92 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="kpi-card">
       <div class="kpi-title">Overall Remaining Balance</div>
       <div class="kpi-val">&#8369;<?= number_format($totalBalanceSum, 2) ?></div>
-      <div class="kpi-sub">Undisbursed funds across all programs</div>
+      <div class="kpi-sub">Undisbursed program funds</div>
     </div>
   </div>
 
-  <!-- Section 2: Incoming Resource Allocations from ICDRRMO (Pending Reception) -->
-  <div class="card" style="margin-bottom: var(--space-4); border: 1.5px solid <?= !empty($pendingAllocations) ? '#F59E0B' : '#E2E8F0' ?>; background: #FFFFFF; border-radius: var(--radius-primary); overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
-    <div style="padding: 12px 18px; background: <?= !empty($pendingAllocations) ? 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)' : '#FAFCFC' ?>; border-bottom: 1px solid <?= !empty($pendingAllocations) ? '#FDE68A' : '#E2E8F0' ?>; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: <?= !empty($pendingAllocations) ? '#F59E0B' : '#17324D' ?>; color: #FFFFFF; font-size: 15px;">
-          📥
-        </span>
-        <div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <h2 style="margin: 0; font-size: 13.5px; font-weight: 700; color: var(--color-primary);">Incoming Resource Allocations from ICDRRMO</h2>
-            <?php if (!empty($pendingAllocations)): ?>
-              <span class="badge" style="background: #F59E0B; color: #FFFFFF; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">
-                <?= count($pendingAllocations) ?> Pending Confirmation
-              </span>
-            <?php else: ?>
-              <span class="badge" style="background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; font-size: 10px; font-weight: 600; padding: 2px 7px;">
-                ✓ All Allocations Received
-              </span>
-            <?php endif; ?>
-          </div>
-          <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--color-text-secondary);">
-            Review incoming calamity aid allocations dispatched by ICDRRMO. Click <strong>Receive</strong> to accept and store in your Financial Aid Programs ledger below, or <strong>Not Received</strong> if aid was not delivered.
-          </p>
-        </div>
+  <!-- Section 2: Incoming Resource Allocations from ICDRRMO -->
+  <div class="table-card" style="margin-bottom: var(--space-4);">
+    <div class="table-card-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <h2 class="table-card-title" style="margin: 0;">Incoming Allocations from ICDRRMO</h2>
+        <?php if (!empty($pendingAllocations)): ?>
+          <span class="status-badge pending">
+            <?= count($pendingAllocations) ?> Pending
+          </span>
+        <?php else: ?>
+          <span class="status-badge" style="background: var(--color-surface-subtle); color: var(--color-text-secondary); border: 1px solid var(--color-border);">
+            Confirmed
+          </span>
+        <?php endif; ?>
       </div>
-      
-      <?php if (!empty($pendingAllocations)): ?>
-        <span style="font-size: 11px; font-weight: 700; color: #B45309; background: #FFFFFF; padding: 4px 10px; border-radius: 6px; border: 1px solid #FDE68A; display: inline-flex; align-items: center; gap: 5px;">
-          <span>⚠️</span> Awaiting Action: Receive or Not Received
-        </span>
-      <?php endif; ?>
     </div>
 
     <?php if (empty($pendingAllocations)): ?>
-      <div style="padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--color-text-muted);">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>No pending incoming allocations awaiting confirmation. All aid allocations from ICDRRMO are confirmed and stored in the <strong>Financial Aid Programs</strong> below.</span>
-        </div>
-        <span style="font-size: 10.5px; color: var(--color-primary); font-weight: 600;"><?= count($allocations) ?> Active Programs</span>
+      <div style="padding: 12px 16px; font-size: 10.5px; color: var(--color-text-secondary); display: flex; justify-content: space-between; align-items: center;">
+        <span>No pending incoming allocations awaiting confirmation.</span>
+        <span style="font-size: 10px; color: var(--color-text-muted);"><?= count($allocations) ?> Active Programs</span>
       </div>
     <?php else: ?>
-      <!-- Incoming Pending Allocations Table -->
       <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
         <table class="data-table" style="width: 100%; border-collapse: collapse;">
           <thead>
-            <tr style="background: #FAFCFC; border-bottom: 1px solid var(--color-border); font-size: 10px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.3px;">
-              <th style="padding: 9px 14px; text-align: left;">Program & Calamity</th>
-              <th style="padding: 9px 14px; text-align: left;">Target Scope & Families</th>
-              <th style="padding: 9px 14px; text-align: right;">Total Program Fund</th>
-              <th style="padding: 9px 14px; text-align: right;">Amount / Family</th>
-              <th style="padding: 9px 14px; text-align: center;">Source Type</th>
-              <th style="padding: 9px 14px; text-align: center; width: 230px;">Action / Confirmation</th>
+            <tr>
+              <th style="padding: 8px 12px; text-align: left;">Program &amp; Calamity</th>
+              <th style="padding: 8px 12px; text-align: left;">Target Scope</th>
+              <th style="padding: 8px 12px; text-align: right;">Total Fund</th>
+              <th style="padding: 8px 12px; text-align: right;">Amount / Family</th>
+              <th style="padding: 8px 12px; text-align: center;">Source</th>
+              <th style="padding: 8px 12px; text-align: center; width: 190px;">Action</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($pendingAllocations as $pa): ?>
-              <tr style="border-bottom: 1px solid var(--color-border-light); font-size: 11.5px; transition: background 0.15s ease;">
-                <td style="padding: 10px 14px;">
-                  <div style="font-weight: 700; color: var(--color-primary); font-size: 12px;"><?= htmlspecialchars($pa['program_name']) ?></div>
-                  <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap;">
-                    <span class="badge" style="background: #EFF6FF; color: #1D4ED8; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border: 1px solid #BFDBFE;"><?= htmlspecialchars($pa['allocation_code']) ?></span>
-                    <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 9.5px; font-weight: 600; padding: 1px 6px;"><?= htmlspecialchars($pa['disaster_type'] ?? 'General Calamity') ?></span>
-                    <span style="font-size: 10px; color: var(--color-text-muted);"><?= date('M d, Y', strtotime($pa['created_at'])) ?></span>
+              <tr style="border-bottom: 1px solid var(--color-border-light);">
+                <td style="padding: 9px 12px;">
+                  <div style="font-weight: 600; color: var(--color-primary); font-size: 11px;"><?= htmlspecialchars($pa['program_name']) ?></div>
+                  <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                    <span class="status-badge active" style="font-size: 9px; padding: 1px 5px;"><?= htmlspecialchars($pa['allocation_code']) ?></span>
+                    <span style="font-size: 9.5px; color: var(--color-text-muted);"><?= htmlspecialchars($pa['disaster_type'] ?? 'General Calamity') ?> &bull; <?= date('M d, Y', strtotime($pa['created_at'])) ?></span>
                   </div>
                 </td>
-                <td style="padding: 10px 14px;">
-                  <div style="font-weight: 600; color: var(--color-text);"><?= htmlspecialchars($pa['target_purok'] ?? 'All Puroks') ?></div>
-                  <div style="font-size: 10.5px; color: var(--color-text-muted); margin-top: 2px;">
-                    👨‍👩‍👧‍👦 <strong><?= number_format((int)$pa['target_beneficiaries']) ?></strong> qualified families
+                <td style="padding: 9px 12px;">
+                  <div style="font-weight: 500; font-size: 10.5px; color: var(--color-text);"><?= htmlspecialchars($pa['target_purok'] ?? 'All Puroks') ?></div>
+                  <div style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 1px;">
+                    <?= number_format((int)$pa['target_beneficiaries']) ?> families
                   </div>
                 </td>
-                <td style="padding: 10px 14px; text-align: right;">
-                  <div style="font-weight: 700; color: #0F766E; font-size: 13px; font-family: var(--font-secondary);">
-                    ₱<?= number_format((float)$pa['total_budget'], 2) ?>
+                <td style="padding: 9px 12px; text-align: right;">
+                  <div style="font-weight: 600; font-size: 11px; color: var(--color-text);">
+                    &#8369;<?= number_format((float)$pa['total_budget'], 2) ?>
                   </div>
                   <div style="font-size: 9.5px; color: var(--color-text-muted);"><?= htmlspecialchars($pa['funding_source']) ?></div>
                 </td>
-                <td style="padding: 10px 14px; text-align: right;">
-                  <div style="font-weight: 700; color: var(--color-primary); font-size: 12px; font-family: var(--font-secondary);">
-                    ₱<?= number_format((float)$pa['amount_per_beneficiary'], 2) ?>
+                <td style="padding: 9px 12px; text-align: right;">
+                  <div style="font-weight: 600; font-size: 11px; color: var(--color-text);">
+                    &#8369;<?= number_format((float)$pa['amount_per_beneficiary'], 2) ?>
                   </div>
                   <div style="font-size: 9.5px; color: var(--color-text-muted);">per family</div>
                 </td>
-                <td style="padding: 10px 14px; text-align: center;">
+                <td style="padding: 9px 12px; text-align: center;">
                   <?php if (($pa['added_type'] ?? '') === 'ai_recommended'): ?>
-                    <span class="badge" style="background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; font-size: 9.5px; font-weight: 600; padding: 2px 7px;">🤖 AI Recommended</span>
+                    <span class="status-badge active" style="font-size: 9px;">AI Recommended</span>
                   <?php else: ?>
-                    <span class="badge" style="background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; font-size: 9.5px; font-weight: 600; padding: 2px 7px;">👤 Added by Admin</span>
+                    <span class="status-badge unclaimed" style="font-size: 9px;">Admin Added</span>
                   <?php endif; ?>
                 </td>
-                <td style="padding: 10px 14px; text-align: center;">
+                <td style="padding: 9px 12px; text-align: center;">
                   <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
-                    <!-- Receive Button -->
-                    <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/confirm_receipt.php" style="margin: 0;" onsubmit="return confirm('Confirm receipt of allocation <?= htmlspecialchars($pa['allocation_code']) ?> (₱<?= number_format((float)$pa['total_budget'], 2) ?>)?\n\nIt will be automatically stored in your Financial Aid Programs section below.');">
+                    <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/confirm_receipt.php" style="margin: 0;" onsubmit="return confirm('Confirm receipt of allocation <?= htmlspecialchars($pa['allocation_code']) ?> (₱<?= number_format((float)$pa['total_budget'], 2) ?>)?');">
                       <input type="hidden" name="allocation_id" value="<?= $pa['id'] ?>">
                       <input type="hidden" name="receipt_status" value="Received">
-                      <button type="submit" class="btn btn-sm" style="background: #059669; color: #FFFFFF; border: 1px solid #047857; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; box-shadow: 0 1px 3px rgba(5,150,105,0.25);">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        <span>Receive</span>
+                      <button type="submit" class="btn btn-sm btn-primary" style="font-size: 10.5px; padding: 4px 10px;">
+                        Receive
                       </button>
                     </form>
 
-                    <!-- Not Received Button -->
-                    <button type="button" class="btn btn-sm btn-outline" onclick="openNotReceivedAidModal(<?= $pa['id'] ?>, '<?= htmlspecialchars(addslashes($pa['allocation_code'])) ?>', '<?= htmlspecialchars(addslashes($pa['program_name'])) ?>', '<?= number_format((float)$pa['total_budget'], 2) ?>')" style="font-size: 11px; font-weight: 600; padding: 5px 10px; color: #DC2626; border-color: #FCA5A5; display: inline-flex; align-items: center; gap: 4px; border-radius: 5px;">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                      <span>Not Received</span>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="openNotReceivedAidModal(<?= $pa['id'] ?>, '<?= htmlspecialchars(addslashes($pa['allocation_code'])) ?>', '<?= htmlspecialchars(addslashes($pa['program_name'])) ?>', '<?= number_format((float)$pa['total_budget'], 2) ?>')" style="font-size: 10.5px; padding: 4px 10px; color: var(--color-danger); border-color: var(--color-danger-border);">
+                      Not Received
                     </button>
                   </div>
                 </td>
@@ -606,30 +673,15 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 
   <?php if (empty($allocations)): ?>
     <div class="card"
-      style="padding: 32px 24px; text-align: center; background: #FFFFFF; border: 1px solid var(--color-border); border-radius: var(--radius-primary); margin-bottom: var(--space-4);">
-      <div
-        style="width: 52px; height: 52px; border-radius: 50%; background: #F0F4F8; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; color: var(--color-primary);">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-        </svg>
-      </div>
-      <h3 style="font-size: 15px; font-weight: 700; color: var(--color-primary); margin-bottom: 8px;">No Financial Aid
-        Program or Event Scheduled Yet</h3>
-      <p
-        style="font-size: 12px; color: var(--color-text-secondary); max-width: 560px; margin: 0 auto 20px; line-height: 1.6;">
-        This module is dynamically linked to your scheduled events. When you schedule an event with Activity Type
-        <strong>"Social Welfare and Assistance"</strong> and <strong>"Financial Aid Distribution"</strong>, its target
-        purok household families will automatically appear here with one-click release and tracking ledger.
+      style="padding: 30px 20px; text-align: center; background: #FFFFFF; border: 1px solid var(--color-border); border-radius: var(--radius-primary); margin-bottom: var(--space-4);">
+      <h3 style="font-size: 14px; font-weight: 600; color: var(--color-primary); margin-bottom: 6px;">No Financial Aid Programs Scheduled</h3>
+      <p style="font-size: 10.5px; color: var(--color-text-secondary); max-width: 480px; margin: 0 auto 16px;">
+        Schedule an assistance event in Manage Events to configure and disburse calamity aid.
       </p>
       <div>
         <a href="<?= BASE_URL ?>/views/barangay/events.php?create=1&type=Social+Welfare+and+Assistance"
-          class="btn btn-primary"
-          style="padding: 9px 20px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          + Schedule Financial Aid Event
+          class="btn btn-primary" style="font-size: 11px; padding: 6px 14px;">
+          + Schedule Event
         </a>
       </div>
     </div>
@@ -648,11 +700,11 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               <?= count($allocations) ?>
             </span>
           </div>
-          <span style="font-size: 10px; color: var(--color-text-muted);">Click a program to inspect</span>
+          <span style="font-size: 9.5px; color: var(--color-text-muted);">Select program</span>
         </div>
 
         <div style="padding: 8px 12px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF;">
-          <input type="text" id="allocSearchInput" class="form-control" placeholder="Search aid programs..."
+          <input type="text" id="allocSearchInput" class="form-control" placeholder="Search programs..."
             style="font-size: 10.5px; padding: 5px 9px;" oninput="filterAllocationsTable(this.value)">
         </div>
 
@@ -662,13 +714,13 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               <tr
                 style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 1;">
                 <th
-                  style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">
-                  Program & Scope</th>
+                  style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">
+                  Program &amp; Scope</th>
                 <th
-                  style="padding: 9px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 110px;">
+                  style="padding: 8px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 110px;">
                   Program Fund</th>
                 <th
-                  style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 75px;">
+                  style="padding: 8px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 75px;">
                   Status</th>
               </tr>
             </thead>
@@ -679,42 +731,41 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
                 ?>
                 <tr class="alloc-row <?= $isSelected ? 'active' : '' ?>" id="alloc_row_<?= $row['id'] ?>"
                   onclick="selectAllocation(<?= $row['id'] ?>)">
-                  <td style="padding: 10px 12px;">
+                  <td style="padding: 9px 12px;">
                     <div
                       style="font-weight: 600; font-size: 11px; color: var(--color-primary); line-height: 1.3; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                       <span><?= htmlspecialchars($row['program_name']) ?></span>
                       <?php if (!empty($row['event_id'])): ?>
                         <span
-                          style="font-size: 8.5px; font-weight: 700; background: #EBF3FC; color: #17324D; padding: 1px 5px; border-radius: 3px;">EVENT</span>
+                          style="font-size: 8.5px; font-weight: 700; background: var(--color-info-bg); color: var(--color-primary); padding: 1px 5px; border-radius: 3px;">EVENT</span>
                       <?php endif; ?>
                     </div>
                     <div
-                      style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 2px; font-family: var(--font-secondary);">
+                      style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 2px;">
                       <?= htmlspecialchars($row['allocation_code']) ?> &bull;
                       <?= htmlspecialchars($row['target_purok'] ?? 'All Puroks') ?> &bull;
                       <?= $isInitiated ? ('&#8369;' . number_format($row['amount_per_beneficiary'], 2) . '/family') : 'Awaiting Setup' ?>
                     </div>
                   </td>
-                  <td style="padding: 10px 12px; text-align: right;">
+                  <td style="padding: 9px 12px; text-align: right;">
                     <div
-                      style="font-family: var(--font-secondary); font-weight: 700; font-size: 11.5px; color: var(--color-text);"
+                      style="font-weight: 700; font-size: 11px; color: var(--color-text);"
                       id="alloc_fund_<?= $row['id'] ?>">
                       &#8369;<?= $isInitiated ? number_format($row['total_budget'], 2) : '0.00' ?>
                     </div>
-                    <div style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 2px;"
+                    <div style="font-size: 9.5px; color: var(--color-text-muted); margin-top: 1px;"
                       id="alloc_rem_<?= $row['id'] ?>">
                       Rem: &#8369;<?= $isInitiated ? number_format($row['remaining_budget'], 2) : '0.00' ?>
                     </div>
                   </td>
-                  <td style="padding: 10px 12px; text-align: center;">
+                  <td style="padding: 9px 12px; text-align: center;">
                     <?php if ($isInitiated): ?>
                       <span class="status-badge <?= strtolower($row['status']) ?>">
                         <?= htmlspecialchars($row['status']) ?>
                       </span>
                     <?php else: ?>
-                      <span class="status-badge"
-                        style="background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; font-size: 9px;">
-                        PENDING
+                      <span class="status-badge unclaimed">
+                        Pending
                       </span>
                     <?php endif; ?>
                   </td>
@@ -728,27 +779,26 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       <!-- Table 2 (Right): Disbursement Registry & Beneficiary Ledger -->
       <div class="table-card">
 
-        <!-- Table 2 Header with Dynamic Program Title & Add Button -->
+        <!-- Table 2 Header -->
         <div class="table-card-header">
           <div>
             <div class="table-card-title">
-              <span id="detailProgramTitle">Disbursement Registry & Beneficiary Ledger</span>
+              <span id="detailProgramTitle">Beneficiary Ledger</span>
             </div>
             <div id="detailProgramCode"
-              style="font-size: 10px; color: var(--color-text-muted); margin-top: 2px; font-family: var(--font-secondary);">
+              style="font-size: 10px; color: var(--color-text-secondary); margin-top: 2px;">
               Loading selected allocation...
             </div>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <button type="button" class="btn btn-primary" onclick="openDistributeModalForCurrent()"
-              style="padding: 5px 10px; font-size: 10.5px;">
-
-              Distribute Financial Aid
+              style="padding: 5px 12px; font-size: 10.5px;">
+              Distribute Aid
             </button>
           </div>
         </div>
 
-        <!-- Dynamic Live Auto-Computed Telemetry Sub-bar -->
+        <!-- Telemetry Sub-bar -->
         <div class="detail-telemetry-bar">
           <div class="detail-telemetry-item">
             <span class="detail-telemetry-label">Received Budget</span>
@@ -764,22 +814,18 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
             <span class="detail-telemetry-val" id="detailRemainingBudget">&#8369;0.00</span>
           </div>
           <div class="detail-telemetry-item">
-            <span class="detail-telemetry-label">Beneficiaries Released</span>
+            <span class="detail-telemetry-label">Released Families</span>
             <span class="detail-telemetry-val" id="detailBeneficiariesRatio">0 / 0</span>
           </div>
         </div>
 
         <!-- Notice Banner when program aid distribution is not yet initiated -->
         <div id="uninitiatedNoticeBanner"
-          style="display: none; margin: 10px 14px 0; padding: 10px 14px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; font-size: 11px; color: #92400E; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 14px;">ℹ️</span>
-            <span>Financial assistance has not been initiated for this program yet. Funds and received budget will remain
-              <strong>₱0.00</strong> until you click "+ Distribute Aid" to configure the program fund.</span>
-          </div>
-          <button type="button" class="btn btn-primary" onclick="openDistributeModalForCurrent()"
-            style="padding: 4px 10px; font-size: 10px; font-weight: 600; white-space: nowrap;">
-            + Distribute Aid
+          style="display: none; margin: 10px 14px 0; padding: 8px 12px; background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: 6px; font-size: 10.5px; color: var(--color-text-secondary); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <span>Distribution plan not initialized for this program.</span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="openDistributeModalForCurrent()"
+            style="padding: 3px 8px; font-size: 10px; white-space: nowrap;">
+            Distribute Aid
           </button>
         </div>
 
@@ -788,7 +834,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
           style="padding: 8px 14px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
           <div style="flex: 1; min-width: 170px;">
             <input type="text" id="beneficiarySearchInput" class="form-control"
-              placeholder="Search family, representative, ref no, or phone..."
+              placeholder="Search families, ref no, or contact..."
               style="font-size: 10.5px; padding: 5px 9px;" oninput="filterBeneficiariesTable()">
           </div>
           <div style="width: 150px;">
@@ -823,31 +869,31 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               <tr
                 style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 1;">
                 <th
-                  style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 125px;">
+                  style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 125px;">
                   Reference No</th>
                 <th
-                  style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">
+                  style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">
                   Household Family / Representative</th>
                 <th
-                  style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 85px;">
+                  style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 85px;">
                   Purok</th>
                 <th
-                  style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 120px;">
+                  style="padding: 8px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 110px;">
                   Family Members</th>
                 <th
-                  style="padding: 9px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 95px;">
+                  style="padding: 8px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 95px;">
                   Aid Amount</th>
                 <th
-                  style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 85px;">
+                  style="padding: 8px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 85px;">
                   Status</th>
                 <th
-                  style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 60px;">
+                  style="padding: 8px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 60px;">
                   SMS</th>
                 <th
-                  style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 115px;">
+                  style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 115px;">
                   Release Date</th>
                 <th
-                  style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 125px;">
+                  style="padding: 8px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 115px;">
                   Action</th>
               </tr>
             </thead>
@@ -864,33 +910,22 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
   <?php endif; ?>
 </main>
 
-<!-- Modal: Create Financial Aid Distribution (Plan & Allocation) -->
+<!-- Modal: Create Financial Aid Distribution -->
 <div class="modal" id="distributeModal">
-  <div class="modal-dialog" style="max-width: 620px;">
-    <div class="modal-header" style="padding: 14px 18px; border-bottom: 1px solid var(--color-border-light);">
-      <h3 style="font-size: 14px; font-weight: 700; color: #0F2942; margin: 0;">Create Financial Aid Distribution</h3>
+  <div class="modal-dialog" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3>Create Financial Aid Distribution</h3>
       <button type="button" class="modal-close" onclick="closeDistributeModal()">&times;</button>
     </div>
     <?php if (empty($allocations)): ?>
       <div class="modal-body" style="padding: 24px; text-align: center;">
-        <div
-          style="width: 44px; height: 44px; border-radius: 50%; background: #FEF2F2; color: #DC2626; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>
-        <div style="font-size: 13px; font-weight: 700; color: var(--color-primary); margin-bottom: 6px;">No Financial Aid
-          Program or Event Created Yet</div>
-        <p
-          style="font-size: 11px; color: var(--color-text-secondary); max-width: 400px; margin: 0 auto 16px; line-height: 1.5;">
-          To distribute financial assistance, please first schedule an event with Activity Type <strong>"Social Welfare
-            and Assistance"</strong> or <strong>"Financial Aid Distribution"</strong> in Manage Events.
+        <div style="font-size: 13px; font-weight: 600; color: var(--color-primary); margin-bottom: 6px;">No Financial Aid Program Created</div>
+        <p style="font-size: 10.5px; color: var(--color-text-secondary); max-width: 380px; margin: 0 auto 16px;">
+          To distribute assistance, please schedule an event in Manage Events first.
         </p>
         <a href="<?= BASE_URL ?>/views/barangay/events.php?create=1&type=Social+Welfare+and+Assistance"
-          class="btn btn-primary btn-sm" style="font-size: 11px; padding: 6px 14px;">
-          + Schedule Financial Aid Event
+          class="btn btn-primary btn-sm" style="font-size: 10.5px; padding: 5px 12px;">
+          + Schedule Event
         </a>
       </div>
       <div class="modal-footer">
@@ -904,25 +939,18 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
         <input type="hidden" name="allocation_id" id="dist_allocation_id" value="<?= (int) $selectedAllocId ?>">
         <input type="hidden" name="custom_target_purok" id="dist_custom_target_purok" value="">
 
-        <div class="modal-body" style="padding: 16px 20px;">
-          <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="modal-body">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
 
-            <!-- Program Name * -->
             <div>
-              <label class="form-label form-label-required"
-                style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Program Name</label>
+              <label class="form-label form-label-required" style="margin-bottom: 3px; display: block;">Program Name</label>
               <input type="text" name="program_name" id="dist_program_name" class="form-control"
-                placeholder="e.g. Typhoon Kristine Emergency Cash Relief" required
-                style="font-size: 11.5px; padding: 7px 10px;">
+                placeholder="e.g. Typhoon Relief Cash Assistance" required style="padding: 6px 9px;">
             </div>
 
-            <!-- Disaster / Calamity Type -->
             <div>
-              <label class="form-label"
-                style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Disaster / Calamity
-                Type</label>
-              <select name="disaster_type" id="dist_disaster_type" class="form-control"
-                style="font-size: 11.5px; padding: 7px 10px;">
+              <label class="form-label" style="margin-bottom: 3px; display: block;">Disaster / Calamity Type</label>
+              <select name="disaster_type" id="dist_disaster_type" class="form-control" style="padding: 6px 9px;">
                 <option value="Typhoon">Typhoon</option>
                 <option value="Flood">Flood</option>
                 <option value="Landslide">Landslide</option>
@@ -932,179 +960,136 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               </select>
             </div>
 
-            <!-- Distribution Puroks (Hinaplanon) * (Full width, spacious 4-column checklist) -->
             <div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <label class="form-label form-label-required"
-                  style="font-size: 11px; font-weight: 600; margin-bottom: 0;">Distribution Puroks (Hinaplanon)</label>
-                <span id="dist_purok_family_counter"
-                  style="font-size: 10px; font-weight: 600; color: var(--color-primary); background: #EBF3FC; padding: 2px 8px; border-radius: 4px;">0
-                  families</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="form-label form-label-required" style="margin-bottom: 0;">Distribution Puroks</label>
+                <span id="dist_purok_family_counter" class="status-badge active" style="font-size: 9px;">0 families</span>
               </div>
               <input type="hidden" name="target_purok" id="dist_target_purok" value="All Puroks">
 
-              <!-- Disabled Checklist: Cannot be unchecked, dynamically set from event's selected puroks -->
-              <div
-                style="background: #F8FAFC; border: 1px solid var(--color-border); border-radius: 6px; padding: 10px 12px; max-height: 140px; overflow-y: auto;">
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px;">
+              <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: 6px; padding: 8px 10px; max-height: 120px; overflow-y: auto;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 8px;">
                   <?php foreach ($barangayPuroks as $p): ?>
-                    <label
-                      style="font-size: 10px; display: flex; align-items: center; gap: 6px; margin-bottom: 0; cursor: not-allowed; color: var(--color-text); white-space: nowrap;">
-                      <input type="checkbox" class="dist-event-purok-cb" value="<?= htmlspecialchars($p) ?>" disabled
-                        style="cursor: not-allowed; accent-color: var(--color-primary);">
+                    <label style="font-size: 10px; display: flex; align-items: center; gap: 5px; margin-bottom: 0; color: var(--color-text); cursor: not-allowed;">
+                      <input type="checkbox" class="dist-event-purok-cb" value="<?= htmlspecialchars($p) ?>" disabled>
                       <span><?= htmlspecialchars($p) ?></span>
                     </label>
                   <?php endforeach; ?>
                 </div>
               </div>
-              <div style="font-size: 9px; color: var(--color-text-muted); margin-top: 3px;">
-                * Locked: Dynamically based on the puroks selected when creating this event.
+              <div style="font-size: 9px; color: var(--color-text-muted); margin-top: 2px;">
+                Configured from event scope.
               </div>
             </div>
 
-            <!-- Total Budget (PHP) * & Amount per Family (PHP) * -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div>
-                <label class="form-label form-label-required"
-                  style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Total Budget
-                  (PHP)</label>
+                <label class="form-label form-label-required" style="margin-bottom: 3px; display: block;">Total Budget (PHP)</label>
                 <input type="number" step="0.01" min="1" name="total_budget" id="dist_total_budget" class="form-control"
-                  placeholder="e.g. 500000.00" required style="font-size: 11.5px; padding: 7px 10px;"
-                  oninput="onCustomBudgetInput()">
+                  placeholder="500000.00" required style="padding: 6px 9px;" oninput="onCustomBudgetInput()">
               </div>
               <div>
-                <label class="form-label form-label-required"
-                  style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Amount per Family
-                  (PHP)</label>
+                <label class="form-label form-label-required" style="margin-bottom: 3px; display: block;">Amount per Family (PHP)</label>
                 <input type="number" step="0.01" min="1" name="amount_per_beneficiary" id="dist_rate_budget"
-                  class="form-control" placeholder="e.g. 3000.00" required style="font-size: 11.5px; padding: 7px 10px;"
-                  oninput="onCustomRateInput()">
+                  class="form-control" placeholder="3000.00" required style="padding: 6px 9px;" oninput="onCustomRateInput()">
               </div>
             </div>
 
-            <!-- 2 AI Action Buttons -->
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-outline" onclick="aiSuggestBudgetAndRate()"
-                style="font-size: 10.5px; padding: 5px 12px; color: #15803D; border-color: #BBF7D0; background: #F0FDF4; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;"
-                title="Auto-suggest total budget and amount per family based on disaster type and total households">
-                🤖 AI Suggest Budget &amp; Amount per Family
+            <!-- AI Action Buttons -->
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="aiSuggestBudgetAndRate()">
+                AI Suggest Budget
               </button>
-              <button type="button" class="btn btn-outline" onclick="aiDivideBudgetByHouseholds()"
-                style="font-size: 10.5px; padding: 5px 12px; color: #0369A1; border-color: #BAE6FD; background: #F0F9FF; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;"
-                title="User sets total budget, then AI divides total budget / total households to calculate amount per family">
-                🤖 AI Divide Total Budget / Total Households
+              <button type="button" class="btn btn-outline btn-sm" onclick="aiDivideBudgetByHouseholds()">
+                AI Divide by Families
               </button>
             </div>
 
-            <!-- Computed Preview Card (matches attached screenshot) -->
-            <div
-              style="background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px; padding: 9px 14px; display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 11px; color: #64748B;">Calculated Beneficiary Capacity:</span>
-              <span id="dist_target_preview"
-                style="font-size: 13px; font-weight: 700; color: #0F172A; font-family: var(--font-secondary);">0
-                families</span>
+            <!-- Calculated Preview Card -->
+            <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: 6px; padding: 7px 12px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 10.5px; color: var(--color-text-secondary);">Calculated Capacity:</span>
+              <span id="dist_target_preview" style="font-size: 11px; font-weight: 700; color: var(--color-primary);">0 families</span>
             </div>
 
-            <!-- AI Recommendation Notice Badge -->
-            <div id="dist_ai_recommend_badge"
-              style="font-size: 10px; color: #166534; background: #DCFCE7; border: 1px solid #BBF7D0; border-radius: 4px; padding: 6px 10px; display: none; line-height: 1.4;">
-            </div>
+            <div id="dist_ai_recommend_badge" style="display: none; padding: 5px 8px; border-radius: 4px; font-size: 9.5px; line-height: 1.4;"></div>
 
-            <!-- Funding Source & Budget Source Type -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div>
-                <label class="form-label"
-                  style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Funding Source</label>
+                <label class="form-label" style="margin-bottom: 3px; display: block;">Funding Source</label>
                 <input type="text" name="funding_source" id="dist_funding_source" class="form-control"
-                  value="LGU Calamity Fund" placeholder="e.g. Quick Response Fund (QRF)"
-                  style="font-size: 11.5px; padding: 7px 10px;">
+                  value="LGU Calamity Fund" placeholder="Funding source" style="padding: 6px 9px;">
               </div>
               <div>
-                <label class="form-label"
-                  style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Budget Source
-                  Type</label>
-                <select name="added_type" id="dist_added_type" class="form-control"
-                  style="font-size: 11.5px; padding: 7px 10px;">
-                  <option value="ai_recommended">🤖 AI Recommended</option>
-                  <option value="added_by_admin">👤 Added by Admin</option>
+                <label class="form-label" style="margin-bottom: 3px; display: block;">Budget Source Type</label>
+                <select name="added_type" id="dist_added_type" class="form-control" style="padding: 6px 9px;">
+                  <option value="ai_recommended">AI Recommended</option>
+                  <option value="added_by_admin">Admin Configured</option>
                 </select>
               </div>
             </div>
 
-            <!-- Administrative Notes -->
             <div>
-              <label class="form-label"
-                style="font-size: 11px; font-weight: 600; margin-bottom: 4px; display: block;">Administrative
-                Notes</label>
+              <label class="form-label" style="margin-bottom: 3px; display: block;">Administrative Notes</label>
               <textarea name="notes" id="dist_notes" class="form-control" rows="2"
-                placeholder="Eligibility conditions, allocation guidelines, or remarks..."
-                style="font-size: 11.5px; padding: 7px 10px;"></textarea>
+                placeholder="Optional notes or allocation guidelines..." style="padding: 6px 9px;"></textarea>
             </div>
 
           </div>
         </div>
-        <div class="modal-footer"
-          style="padding: 12px 20px; background: #FAFCFC; border-top: 1px solid var(--color-border-light); display: flex; justify-content: flex-end; gap: 8px;">
-          <button type="button" class="btn btn-outline" onclick="closeDistributeModal()"
-            style="padding: 7px 16px; font-size: 11.5px;">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn_submit_distribution"
-            style="background: #0F2942; border-color: #0F2942; padding: 7px 18px; font-size: 11.5px; font-weight: 600;">Distribute
-            Fund</button>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline btn-sm" onclick="closeDistributeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btn_submit_distribution">Save Distribution</button>
         </div>
       </form>
     <?php endif; ?>
   </div>
 </div>
 
-<!-- Modal: Eligible Families (Ayuda Roster) -->
+<!-- Modal: Eligible Families -->
 <div class="modal" id="eligibleFamiliesModal">
-  <div class="modal-dialog modal-lg" style="max-width: 920px;">
+  <div class="modal-dialog modal-lg" style="max-width: 880px;">
     <div class="modal-header">
       <div>
-        <h3 style="margin:0;font-size:13px;font-weight:700;color:var(--color-primary);">
-          Eligible Families Roster (Pamilyang Pwede Bigyan ng Ayuda) — <span id="efModalProgramBadge"
-            style="font-weight:600;color:var(--color-text-secondary);"></span>
-        </h3>
-        <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">
-          Master directory of household families with 1 Authorized Representative, PWD count, and payout eligibility.
+        <h3>Eligible Families Directory &mdash; <span id="efModalProgramBadge" style="font-weight: 400; color: var(--color-text-secondary);"></span></h3>
+        <div style="font-size: 10px; color: var(--color-text-muted); margin-top: 2px;">
+          Household families and distribution eligibility status.
         </div>
       </div>
       <button type="button" class="modal-close" onclick="closeEligibleFamiliesModal()">&times;</button>
     </div>
 
     <!-- Telemetry Sub-bar -->
-    <div class="detail-telemetry-bar" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+    <div class="detail-telemetry-bar">
       <div class="detail-telemetry-item">
         <span class="detail-telemetry-label">Total Families</span>
         <span class="detail-telemetry-val" id="efTotalFamiliesCount">0</span>
       </div>
       <div class="detail-telemetry-item">
-        <span class="detail-telemetry-label">Families With PWD</span>
-        <span class="detail-telemetry-val" id="efPwdFamiliesCount" style="color: #8A6402;">0</span>
+        <span class="detail-telemetry-label">With PWD</span>
+        <span class="detail-telemetry-val" id="efPwdFamiliesCount" style="color: var(--color-warning);">0</span>
       </div>
       <div class="detail-telemetry-item">
-        <span class="detail-telemetry-label">Senior Families</span>
+        <span class="detail-telemetry-label">With Seniors</span>
         <span class="detail-telemetry-val" id="efSeniorFamiliesCount">0</span>
       </div>
       <div class="detail-telemetry-item">
-        <span class="detail-telemetry-label">Claimed This Batch</span>
+        <span class="detail-telemetry-label">Released</span>
         <span class="detail-telemetry-val" id="efClaimedCount" style="color: var(--color-success);">0</span>
       </div>
       <div class="detail-telemetry-item">
-        <span class="detail-telemetry-label">Unclaimed (Eligible)</span>
-        <span class="detail-telemetry-val" id="efUnclaimedCount" style="color: var(--color-primary);">0</span>
+        <span class="detail-telemetry-label">Unreleased</span>
+        <span class="detail-telemetry-val" id="efUnclaimedCount">0</span>
       </div>
     </div>
 
     <!-- Filter Bar -->
-    <div
-      style="padding: 10px 16px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <div style="padding: 8px 16px; border-bottom: 1px solid var(--color-border-light); background: #FFFFFF; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
       <div style="flex: 1; min-width: 170px;">
         <input type="text" id="efSearchInput" class="form-control" placeholder="Search family, head, or code..."
-          style="font-size: 10px; height: 28px; padding: 4px 8px;" oninput="renderEligibleFamiliesTable()">
+          style="font-size: 10px; padding: 4px 8px;" oninput="renderEligibleFamiliesTable()">
       </div>
       <div style="width: 135px;">
-        <select id="efPurokFilter" class="form-control" style="font-size: 10px; height: 28px; padding: 4px 8px;"
+        <select id="efPurokFilter" class="form-control" style="font-size: 10px; padding: 4px 8px;"
           onchange="renderEligibleFamiliesTable()">
           <option value="">All Puroks</option>
           <?php foreach ($barangayPuroks as $p): ?>
@@ -1113,20 +1098,20 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
         </select>
       </div>
       <div style="width: 145px;">
-        <select id="efPriorityFilter" class="form-control" style="font-size: 10px; height: 28px; padding: 4px 8px;"
+        <select id="efPriorityFilter" class="form-control" style="font-size: 10px; padding: 4px 8px;"
           onchange="renderEligibleFamiliesTable()">
           <option value="">All Families</option>
           <option value="pwd">With PWD Members</option>
           <option value="seniors">With Senior Citizens</option>
-          <option value="indigent">Indigent / Low Income</option>
+          <option value="indigent">Indigent</option>
         </select>
       </div>
       <div style="width: 135px;">
-        <select id="efClaimFilter" class="form-control" style="font-size: 10px; height: 28px; padding: 4px 8px;"
+        <select id="efClaimFilter" class="form-control" style="font-size: 10px; padding: 4px 8px;"
           onchange="renderEligibleFamiliesTable()">
-          <option value="">All Claim Status</option>
-          <option value="unclaimed" selected>Not Yet Claimed</option>
-          <option value="claimed">Already Claimed</option>
+          <option value="">All Statuses</option>
+          <option value="unclaimed" selected>Unreleased</option>
+          <option value="claimed">Released</option>
         </select>
       </div>
     </div>
@@ -1135,22 +1120,18 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="modal-body" style="padding: 0; max-height: 480px; overflow-y: auto;">
       <table class="data-table" style="width: 100%; border-collapse: collapse; margin-bottom: 0;">
         <thead>
-          <tr
-            style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 2;">
+          <tr style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 2;">
             <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; width: 90px;">HH Code</th>
             <th style="padding: 8px 12px; font-size: 10px; font-weight: 600;">Family Name</th>
-            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600;">1 Authorized Rep & Contact</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600;">Representative &amp; Contact</th>
             <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; width: 85px;">Purok</th>
-            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: center; width: 120px;">
-              Demographics</th>
-            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: center; width: 110px;">Aid
-              Status</th>
-            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: right; width: 110px;">Action
-            </th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: center; width: 110px;">Demographics</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: center; width: 100px;">Aid Status</th>
+            <th style="padding: 8px 12px; font-size: 10px; font-weight: 600; text-align: right; width: 100px;">Action</th>
           </tr>
         </thead>
         <tbody id="efTableBody">
-          <!-- Dynamically populated via renderEligibleFamiliesTable() -->
+          <!-- Populated via JS -->
         </tbody>
       </table>
     </div>
@@ -1166,42 +1147,29 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="modal" id="auditRecordsModal">
   <div class="modal-dialog modal-lg">
     <div class="modal-header">
-      <h3>Financial Aid Audit Records — Barangay <?= clean($barangay['name']) ?></h3>
+      <h3>Financial Aid Audit Records &mdash; Barangay <?= clean($barangay['name']) ?></h3>
       <button type="button" class="modal-close" onclick="closeAuditRecordsModal()">&times;</button>
     </div>
     <div class="modal-body" style="padding: 0;">
-      <div
-        style="padding: 10px 16px; background: #FAFCFC; border-bottom: 1px solid var(--color-border-light); font-size: 10px; color: var(--color-text-secondary); display: flex; justify-content: space-between;">
-        <span>Chronological record of allocations, disbursements, and voided transactions.</span>
+      <div style="padding: 8px 16px; background: #FAFCFC; border-bottom: 1px solid var(--color-border-light); font-size: 10px; color: var(--color-text-secondary); display: flex; justify-content: space-between;">
+        <span>Chronological record of allocations and disbursements.</span>
         <span><?= count($audits) ?> logged entries</span>
       </div>
       <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
         <table class="data-table" style="width: 100%; border-collapse: collapse;">
           <thead>
-            <tr
-              style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 1;">
-              <th
-                style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 120px;">
-                Timestamp</th>
-              <th
-                style="padding: 8px 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 90px;">
-                Action</th>
-              <th
-                style="padding: 8px 12px; text-align: right; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 90px;">
-                Amount</th>
-              <th
-                style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary);">
-                Audit Details</th>
-              <th
-                style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; color: var(--color-text-secondary); width: 120px;">
-                Recorded By</th>
+            <tr style="position: sticky; top: 0; background: #FAFCFC; border-bottom: 1px solid var(--color-border); z-index: 1;">
+              <th style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; width: 120px;">Timestamp</th>
+              <th style="padding: 8px 12px; text-align: center; font-size: 10px; font-weight: 600; width: 90px;">Action</th>
+              <th style="padding: 8px 12px; text-align: right; font-size: 10px; font-weight: 600; width: 90px;">Amount</th>
+              <th style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600;">Details</th>
+              <th style="padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 600; width: 120px;">Recorded By</th>
             </tr>
           </thead>
           <tbody>
             <?php if (empty($audits)): ?>
               <tr>
-                <td colspan="5"
-                  style="padding: 24px; text-align: center; color: var(--color-text-muted); font-size: 11px;">
+                <td colspan="5" style="padding: 24px; text-align: center; color: var(--color-text-muted); font-size: 10.5px;">
                   No audit logs recorded for this barangay yet.
                 </td>
               </tr>
@@ -1210,8 +1178,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
                 $actClass = 'action-' . strtolower(str_replace(' ', '', $a['action']));
                 ?>
                 <tr style="border-bottom: 1px solid var(--color-border-light);">
-                  <td
-                    style="padding: 8px 12px; font-size: 10px; color: var(--color-text-muted); font-family: var(--font-secondary); white-space: nowrap;">
+                  <td style="padding: 8px 12px; font-size: 10px; color: var(--color-text-muted); white-space: nowrap;">
                     <?= date('Y-m-d H:i', strtotime($a['created_at'])) ?>
                   </td>
                   <td style="padding: 8px 12px; text-align: center;">
@@ -1219,8 +1186,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
                       <?= htmlspecialchars($a['action']) ?>
                     </span>
                   </td>
-                  <td
-                    style="padding: 8px 12px; text-align: right; font-family: var(--font-secondary); font-size: 10.5px; font-weight: 600; color: var(--color-text);">
+                  <td style="padding: 8px 12px; text-align: right; font-size: 10.5px; font-weight: 600; color: var(--color-text);">
                     <?= ($a['amount'] > 0) ? '&#8369;' . number_format($a['amount'], 2) : '&mdash;' ?>
                   </td>
                   <td style="padding: 8px 12px; font-size: 10.5px; color: var(--color-text); line-height: 1.4;">
@@ -1237,50 +1203,48 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       </div>
     </div>
     <div class="modal-footer">
-      <button type="button" class="btn btn-outline" onclick="closeAuditRecordsModal()">Close</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick="closeAuditRecordsModal()">Close</button>
     </div>
   </div>
 </div>
 
 <!-- Modal: View Household Family Members -->
 <div class="modal" id="householdMembersModal">
-  <div class="modal-dialog" style="max-width: 620px;">
-    <div class="modal-header" style="padding: 12px 18px; border-bottom: 1px solid var(--color-border-light); display: flex; justify-content: space-between; align-items: center;">
+  <div class="modal-dialog" style="max-width: 600px;">
+    <div class="modal-header">
       <div style="display: flex; align-items: center; gap: 8px;">
-        <h3 style="font-size: 14px; font-weight: 700; color: var(--color-primary); margin: 0;">Family Members</h3>
-        <span class="badge badge-neutral" style="font-size: 10px; font-weight: 600;" id="fam_members_badge"></span>
+        <h3>Family Members</h3>
+        <span class="status-badge unclaimed" id="fam_members_badge"></span>
       </div>
       <button type="button" class="modal-close" onclick="closeHouseholdMembersModal()">&times;</button>
     </div>
-    <div class="modal-body" style="padding: 16px 18px;">
-      <!-- Household Info Summary Banner -->
-      <div style="background: #FFFFFF; border: 1px solid var(--color-border); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <div class="modal-body">
+      <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 9px 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
         <div>
-          <div style="font-size: 13px; font-weight: 700; color: var(--color-primary);" id="fam_members_family_name">—</div>
-          <div style="font-size: 11px; color: var(--color-text-secondary); margin-top: 2px;" id="fam_members_rep_info">—</div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--color-primary);" id="fam_members_family_name">&mdash;</div>
+          <div style="font-size: 10.5px; color: var(--color-text-secondary); margin-top: 1px;" id="fam_members_rep_info">&mdash;</div>
         </div>
         <div style="text-align: right;">
-          <div style="font-size: 9.5px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600;">Purok & HH Code</div>
-          <div style="font-size: 11px; font-weight: 600; color: var(--color-text);" id="fam_members_purok_code">—</div>
+          <div style="font-size: 9px; color: var(--color-text-secondary); text-transform: uppercase; font-weight: 600;">Purok &amp; Code</div>
+          <div style="font-size: 10.5px; font-weight: 600; color: var(--color-text);" id="fam_members_purok_code">&mdash;</div>
         </div>
       </div>
 
-      <!-- Members Table Container -->
       <div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <label style="font-size: 10px; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; margin: 0; letter-spacing: 0.3px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <label style="font-size: 10px; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; margin: 0;">
             Registered Household Members
           </label>
-          <span style="font-size: 10px; font-weight: 600; color: var(--color-primary); background: #F1F5F9; padding: 2px 7px; border-radius: 4px; border: 1px solid #E2E8F0;" id="fam_members_count_pill">
+          <span style="font-size: 9.5px; color: var(--color-primary); background: var(--color-surface-subtle); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--color-border);" id="fam_members_count_pill">
             0 Members
           </span>
         </div>
-        <div id="fam_members_table_box" style="max-height: 280px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 6px; background: #FFFFFF;">
+        <div id="fam_members_table_box" style="max-height: 260px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 6px; background: #FFFFFF;">
           <!-- Loaded dynamically -->
         </div>
       </div>
     </div>
-    <div class="modal-footer" style="padding: 10px 18px; border-top: 1px solid var(--color-border-light); display: flex; justify-content: flex-end;">
+    <div class="modal-footer">
       <button type="button" class="btn btn-outline btn-sm" onclick="closeHouseholdMembersModal()">Close</button>
     </div>
   </div>
@@ -1289,35 +1253,32 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 <!-- Modal: Report Aid Allocation Not Received -->
 <div class="modal" id="notReceivedAidModal">
   <div class="modal-dialog" style="max-width: 480px;">
-    <div class="modal-header" style="padding: 12px 18px; border-bottom: 1px solid var(--color-border-light); display: flex; justify-content: space-between; align-items: center;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; background: #FEF2F2; color: #DC2626; font-size: 14px;">⚠️</span>
-        <h3 style="font-size: 14px; font-weight: 700; color: #DC2626; margin: 0;">Report Aid Not Received</h3>
-      </div>
+    <div class="modal-header">
+      <h3 style="color: var(--color-danger);">Report Aid Not Received</h3>
       <button type="button" class="modal-close" onclick="closeNotReceivedAidModal()">&times;</button>
     </div>
     <form method="POST" action="<?= BASE_URL ?>/backend/functions/financial_aid/confirm_receipt.php">
       <input type="hidden" name="allocation_id" id="not_received_alloc_id" value="">
       <input type="hidden" name="receipt_status" value="Not Received">
-      <div class="modal-body" style="padding: 16px 18px;">
-        <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 11px; color: #991B1B; line-height: 1.5;">
-          You are confirming that this financial aid allocation from ICDRRMO was <strong>NOT RECEIVED</strong> by the Barangay. This will log a central audit record and alert ICDRRMO Central Depot.
+      <div class="modal-body">
+        <div style="background: var(--color-danger-bg); border: 1px solid var(--color-danger-border); border-radius: 6px; padding: 9px 12px; margin-bottom: 12px; font-size: 10.5px; color: var(--color-danger); line-height: 1.4;">
+          Confirming this allocation as not received will record an audit entry and notify ICDRRMO Central Depot.
         </div>
 
-        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 11.5px; display: flex; flex-direction: column; gap: 4px;">
-          <div><strong style="color: var(--color-text-secondary);">Program:</strong> <span id="not_received_program_name" style="color: var(--color-primary); font-weight: 700;">—</span></div>
-          <div><strong style="color: var(--color-text-secondary);">Ref Code:</strong> <span id="not_received_alloc_code" style="font-family: var(--font-secondary); font-weight: 600;">—</span></div>
-          <div><strong style="color: var(--color-text-secondary);">Total Fund:</strong> <span id="not_received_budget" style="color: #0F766E; font-weight: 700;">—</span></div>
+        <div style="background: var(--color-surface-subtle); border: 1px solid var(--color-border); border-radius: 6px; padding: 9px 12px; margin-bottom: 12px; font-size: 10.5px; display: flex; flex-direction: column; gap: 3px;">
+          <div><strong style="color: var(--color-text-secondary);">Program:</strong> <span id="not_received_program_name" style="color: var(--color-primary); font-weight: 600;">&mdash;</span></div>
+          <div><strong style="color: var(--color-text-secondary);">Code:</strong> <span id="not_received_alloc_code" style="font-weight: 600;">&mdash;</span></div>
+          <div><strong style="color: var(--color-text-secondary);">Fund:</strong> <span id="not_received_budget" style="font-weight: 600; color: var(--color-primary);">&mdash;</span></div>
         </div>
 
         <div>
-          <label class="form-label form-label-required" style="font-size: 11px; font-weight: 700; margin-bottom: 4px; display: block; color: var(--color-primary);">Reason / Remarks for Non-Delivery</label>
-          <textarea name="receipt_remarks" class="form-control" rows="3" placeholder="Please specify reason (e.g. Funds not received in barangay treasury, discrepancy in transfer, incorrect barangay allocation)..." required style="font-size: 11.5px;"></textarea>
+          <label class="form-label form-label-required" style="margin-bottom: 3px; display: block;">Reason for Non-Delivery</label>
+          <textarea name="receipt_remarks" class="form-control" rows="3" placeholder="Specify reason for non-delivery..." required style="padding: 6px 9px;"></textarea>
         </div>
       </div>
-      <div class="modal-footer" style="padding: 10px 18px; border-top: 1px solid var(--color-border-light); display: flex; justify-content: flex-end; gap: 8px;">
+      <div class="modal-footer">
         <button type="button" class="btn btn-outline btn-sm" onclick="closeNotReceivedAidModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm" style="background: #DC2626; border-color: #DC2626; font-weight: 700;">Confirm Not Received</button>
+        <button type="submit" class="btn btn-sm btn-outline" style="color: var(--color-danger); border-color: var(--color-danger-border); font-weight: 600;">Confirm Not Received</button>
       </div>
     </form>
   </div>
@@ -1559,27 +1520,27 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 
       let demoBadges = '';
       if (Number(fam.pwd_count) > 0) {
-        demoBadges += `<span class="badge badge-warning" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">${fam.pwd_count} PWD</span>`;
+        demoBadges += `<span class="status-badge pending" style="font-size:9px;margin-left:4px;padding:1px 4px;">${fam.pwd_count} PWD</span>`;
       }
       if (Number(fam.seniors_count) > 0) {
-        demoBadges += `<span class="badge badge-neutral" style="font-size:8.5px;margin-left:4px;padding:1px 4px;">${fam.seniors_count} Senior</span>`;
+        demoBadges += `<span class="status-badge" style="font-size:9px;margin-left:4px;padding:1px 4px;background:var(--color-surface-subtle);color:var(--color-text-secondary);border:1px solid var(--color-border);">${fam.seniors_count} Senior</span>`;
       }
 
       const claimDateStr = isClaimed && dist.claim_date
-        ? `<div style="font-family: var(--font-secondary);">${dist.claim_date.substring(0, 16)}</div><div style="font-size: 9.5px; color: var(--color-text-muted);">${escapeHtml(dist.disbursing_officer || 'Barangay Office')}</div>`
-        : '<span style="color: var(--color-text-muted); font-style: italic;">Pending</span>';
+        ? `<div>${dist.claim_date.substring(0, 16)}</div><div style="font-size: 9.5px; color: var(--color-text-muted);">${escapeHtml(dist.disbursing_officer || 'Barangay Office')}</div>`
+        : '<span style="color: var(--color-text-muted);">Pending</span>';
 
       // Status Badge
       const statusBadge = isClaimed
         ? `<span class="status-badge claimed">Released</span>`
         : (isInitiated
           ? `<span class="status-badge unclaimed">Unreleased</span>`
-          : `<span class="status-badge" style="background:#F1F5F9; color:#94A3B8; border:1px solid #E2E8F0;">Not Initiated</span>`
+          : `<span class="status-badge unclaimed">Pending</span>`
         );
 
       // Reference Number Cell HTML
       const refNoHtml = `
-      <span style="font-family: var(--font-secondary); font-size: 10px; font-weight: 700; color: var(--color-primary); letter-spacing: 0.2px;">
+      <span style="font-size: 10px; font-weight: 600; color: var(--color-primary);">
         ${escapeHtml(effectiveRefNo)}
       </span>
     `;
@@ -1590,10 +1551,8 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       if (smsStatus === 'sent') {
         smsHtml = `
         <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-          <span class="sms-badge sms-sent" style="font-size: 8px; font-weight: 700; background: #DCFCE7; color: #166534; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;">
-            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Sent
-          </span>
-          <button type="button" class="btn btn-outline" id="btn_sms_${fam.id}" style="padding: 1px 6px; font-size: 8.5px; border-color: #CBD5E1; color: var(--color-text-secondary); cursor: pointer;" onclick="sendSmsToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.head_phone || '')}', '${escapeJs(effectiveRefNo)}')" title="Resend SMS Notification">
+          <span class="status-badge claimed" style="font-size: 8.5px; padding: 1px 5px;">Sent</span>
+          <button type="button" class="btn btn-outline" id="btn_sms_${fam.id}" style="padding: 1px 5px; font-size: 8.5px; color: var(--color-text-secondary); border-color: var(--color-border); cursor: pointer;" onclick="sendSmsToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.head_phone || '')}', '${escapeJs(effectiveRefNo)}')" title="Resend SMS Notification">
             Resend
           </button>
         </div>
@@ -1601,10 +1560,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       } else if (smsStatus === 'failed') {
         smsHtml = `
         <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-          <span class="sms-badge sms-failed" style="font-size: 8px; font-weight: 700; background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 4px;">
+          <span class="status-badge" style="font-size: 8.5px; padding: 1px 5px; background: var(--color-danger-bg); color: var(--color-danger); border: 1px solid var(--color-danger-border);">
             Failed
           </span>
-          <button type="button" class="btn btn-outline" id="btn_sms_${fam.id}" style="padding: 1px 6px; font-size: 8.5px; border-color: #F87171; color: #DC2626; cursor: pointer;" onclick="sendSmsToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.head_phone || '')}', '${escapeJs(effectiveRefNo)}')" title="Retry Sending SMS">
+          <button type="button" class="btn btn-outline" id="btn_sms_${fam.id}" style="padding: 1px 5px; font-size: 8.5px; color: var(--color-danger); border-color: var(--color-danger-border); cursor: pointer;" onclick="sendSmsToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.head_phone || '')}', '${escapeJs(effectiveRefNo)}')" title="Retry Sending SMS">
             Retry
           </button>
         </div>
@@ -1612,35 +1571,34 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       } else {
         if (fam.head_phone && fam.head_phone.trim() !== '') {
           smsHtml = `
-          <button type="button" class="btn btn-outline" id="btn_sms_${fam.id}" style="padding: 3px 8px; font-size: 9.5px; font-weight: 600; color: #0284C7; border-color: #BAE6FD; background: #F0F9FF; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; white-space: nowrap;" onclick="sendSmsToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.head_phone || '')}', '${escapeJs(effectiveRefNo)}')" title="Send SMS Notification to ${escapeHtml(fam.head_phone)}">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          <button type="button" class="btn btn-outline" id="btn_sms_${fam.id}" style="padding: 2px 7px; font-size: 9.5px; color: var(--color-primary); border-color: var(--color-border); cursor: pointer; white-space: nowrap;" onclick="sendSmsToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.head_phone || '')}', '${escapeJs(effectiveRefNo)}')" title="Send SMS Notification to ${escapeHtml(fam.head_phone)}">
             Send SMS
           </button>
         `;
         } else {
-          smsHtml = `<span style="font-size: 9px; color: var(--color-text-muted); font-style: italic;">No Phone</span>`;
+          smsHtml = `<span style="font-size: 9px; color: var(--color-text-muted);">&mdash;</span>`;
         }
       }
 
       const actionHtml = isClaimed
         ? `
         <div style="display: inline-flex; gap: 4px; align-items: center; justify-content: center;">
-          <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 9.5px; color: var(--color-danger); border-color: #F8D7DA;" onclick="voidHouseholdAid(${fam.id}, ${dist.id}, '${escapeJs(fam.family_name)}')" title="Void Release & Revert Funds">
+          <button type="button" class="btn btn-outline" style="padding: 2px 6px; font-size: 9.5px; color: var(--color-danger); border-color: var(--color-danger-border);" onclick="voidHouseholdAid(${fam.id}, ${dist.id}, '${escapeJs(fam.family_name)}')" title="Void Release">
             Void
           </button>
-          <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 9.5px;" onclick="resendSms(${dist.id})" title="Send SMS Confirmation">
+          <button type="button" class="btn btn-outline" style="padding: 2px 6px; font-size: 9.5px;" onclick="resendSms(${dist.id})" title="Send SMS">
             SMS
           </button>
         </div>
       `
         : (isInitiated
           ? `
-            <button type="button" class="btn btn-primary" id="btn_release_${fam.id}" style="padding: 3px 9px; font-size: 10px; font-weight: 600;" onclick="releaseAidToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.purok_name)}', '${escapeJs(fam.head_phone || '')}', ${rateAmount}, '${escapeJs(effectiveRefNo)}')" title="Release ${formatMoney(rateAmount)} Aid to this Family">
+            <button type="button" class="btn btn-primary" id="btn_release_${fam.id}" style="padding: 3px 8px; font-size: 10px; font-weight: 500;" onclick="releaseAidToHousehold(${fam.id}, '${escapeJs(fam.family_name)}', '${escapeJs(fam.head_full_name)}', '${escapeJs(fam.purok_name)}', '${escapeJs(fam.head_phone || '')}', ${rateAmount}, '${escapeJs(effectiveRefNo)}')" title="Release ${formatMoney(rateAmount)} Aid">
               Release Aid
             </button>
           `
           : `
-            <button type="button" class="btn btn-outline" style="padding: 3px 9px; font-size: 10px; color: var(--color-primary); border-color: #BAE6FD; background: #F0F9FF; font-weight: 600;" onclick="openDistributeModalForCurrent()" title="Configure financial aid budget first via Distribute Aid">
+            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 10px; color: var(--color-primary); border-color: var(--color-border); font-weight: 500;" onclick="openDistributeModalForCurrent()" title="Configure budget first">
               Set Budget
             </button>
           `
@@ -1648,39 +1606,38 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 
       html += `
       <tr style="border-bottom: 1px solid var(--color-border-light);">
-        <td style="padding: 9px 12px;">
+        <td style="padding: 8px 12px;">
           ${refNoHtml}
         </td>
-        <td style="padding: 9px 12px;">
-          <div style="font-weight: 700; font-size: 11px; color: var(--color-primary); line-height: 1.3;">
+        <td style="padding: 8px 12px;">
+          <div style="font-weight: 600; font-size: 11px; color: var(--color-primary); line-height: 1.3;">
             [${escapeHtml(fam.household_code)}] ${escapeHtml(fam.family_name)} ${demoBadges}
           </div>
-          <div style="font-size: 9.5px; color: var(--color-text-secondary); margin-top: 2px;">
+          <div style="font-size: 9.5px; color: var(--color-text-secondary); margin-top: 1px;">
             Rep: <strong>${escapeHtml(fam.head_full_name)}</strong> &bull; ${escapeHtml(fam.head_phone || 'No Contact')}
           </div>
         </td>
-        <td style="padding: 9px 12px; font-size: 10.5px; color: var(--color-text);">
+        <td style="padding: 8px 12px; font-size: 10.5px; color: var(--color-text);">
           ${escapeHtml(fam.purok_name)}
         </td>
-        <td style="padding: 9px 12px; text-align: center;">
-          <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 9.5px; font-weight: 600; color: var(--color-primary); border-color: #CBD5E1; background: #FFFFFF; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; cursor: pointer; white-space: nowrap;" onclick="viewHouseholdMembers(${fam.id})" title="View Registered Family Members">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            View Members (${Number(fam.total_members || 1)})
+        <td style="padding: 8px 12px; text-align: center;">
+          <button type="button" class="btn btn-outline" style="padding: 2px 6px; font-size: 9.5px; color: var(--color-primary); border-color: var(--color-border); cursor: pointer; white-space: nowrap;" onclick="viewHouseholdMembers(${fam.id})">
+            ${Number(fam.total_members || 1)} Members
           </button>
         </td>
-        <td style="padding: 9px 12px; text-align: right; font-family: var(--font-secondary); font-weight: 700; font-size: 11px; color: var(--color-text);">
-          ${isInitiated ? formatMoney(amount) : '<span style="color:var(--color-text-muted);">—</span>'}
+        <td style="padding: 8px 12px; text-align: right; font-weight: 600; font-size: 11px; color: var(--color-text);">
+          ${isInitiated ? formatMoney(amount) : '<span style="color:var(--color-text-muted);">&mdash;</span>'}
         </td>
-        <td style="padding: 9px 12px; text-align: center;">
+        <td style="padding: 8px 12px; text-align: center;">
           ${statusBadge}
         </td>
-        <td style="padding: 9px 12px; text-align: center;">
+        <td style="padding: 8px 12px; text-align: center;">
           ${smsHtml}
         </td>
-        <td style="padding: 9px 12px; font-size: 10px;">
+        <td style="padding: 8px 12px; font-size: 9.5px;">
           ${claimDateStr}
         </td>
-        <td style="padding: 9px 12px; text-align: center;">
+        <td style="padding: 8px 12px; text-align: center;">
           ${actionHtml}
         </td>
       </tr>
@@ -1879,7 +1836,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       }
 
       renderBeneficiariesTable();
-      alert(`✓ SMS dispatched successfully!\nRecipient: ${headName} (${phone})\nRef No: ${res.reference_no || referenceNo}\nStatus: ${res.sms_status}`);
+      alert(`SMS dispatched successfully.\nRecipient: ${headName} (${phone})\nRef No: ${res.reference_no || referenceNo}\nStatus: ${res.sms_status}`);
     } catch (err) {
       alert('SMS Notification Error: ' + err.message);
       if (btn) {
@@ -1986,10 +1943,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     const badge = document.getElementById('dist_ai_recommend_badge');
     if (badge) {
       badge.style.display = 'block';
-      badge.style.background = '#DCFCE7';
-      badge.style.borderColor = '#BBF7D0';
-      badge.style.color = '#166534';
-      badge.innerHTML = `🤖 <strong>AI Suggestion Applied:</strong> ₱${rate.toLocaleString()}/family benchmark for <strong>${escapeHtml(disasterType)}</strong> &times; <strong>${totalHouseholds.toLocaleString()} event households</strong> = <strong>₱${totalBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> total budget.`;
+      badge.style.background = 'var(--color-surface-subtle)';
+      badge.style.border = '1px solid var(--color-border)';
+      badge.style.color = 'var(--color-primary)';
+      badge.innerHTML = `<strong>AI Suggestion Applied:</strong> ₱${rate.toLocaleString()}/family benchmark for <strong>${escapeHtml(disasterType)}</strong> &times; <strong>${totalHouseholds.toLocaleString()} event households</strong> = <strong>₱${totalBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> total budget.`;
     }
   }
 
@@ -2023,10 +1980,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     const badge = document.getElementById('dist_ai_recommend_badge');
     if (badge) {
       badge.style.display = 'block';
-      badge.style.background = '#F0F9FF';
-      badge.style.borderColor = '#BAE6FD';
-      badge.style.color = '#0369A1';
-      badge.innerHTML = `🤖 <strong>AI Division Applied:</strong> ₱${totalBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total budget &divide; <strong>${totalHouseholds.toLocaleString()} total households</strong> = <strong>₱${calculatedRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> per family.`;
+      badge.style.background = 'var(--color-surface-subtle)';
+      badge.style.border = '1px solid var(--color-border)';
+      badge.style.color = 'var(--color-primary)';
+      badge.innerHTML = `<strong>AI Division Applied:</strong> ₱${totalBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total budget &divide; <strong>${totalHouseholds.toLocaleString()} total households</strong> = <strong>₱${calculatedRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> per family.`;
     }
   }
 
@@ -2037,10 +1994,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     const badge = document.getElementById('dist_ai_recommend_badge');
     if (badge) {
       badge.style.display = 'block';
-      badge.style.background = '#EFF6FF';
-      badge.style.borderColor = '#BFDBFE';
-      badge.style.color = '#1D4ED8';
-      badge.innerHTML = `👤 <strong>Custom Budget:</strong> Manually adjusted by Admin. Use the AI buttons above to calculate recommendations.`;
+      badge.style.background = 'var(--color-surface-subtle)';
+      badge.style.border = '1px solid var(--color-border)';
+      badge.style.color = 'var(--color-text-secondary)';
+      badge.innerHTML = `<strong>Manual Entry:</strong> Total budget adjusted by administrator.`;
     }
   }
 
@@ -2051,10 +2008,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
     const badge = document.getElementById('dist_ai_recommend_badge');
     if (badge) {
       badge.style.display = 'block';
-      badge.style.background = '#EFF6FF';
-      badge.style.borderColor = '#BFDBFE';
-      badge.style.color = '#1D4ED8';
-      badge.innerHTML = `👤 <strong>Custom Rate:</strong> Manually adjusted rate per family. Beneficiary capacity recalculated.`;
+      badge.style.background = 'var(--color-surface-subtle)';
+      badge.style.border = '1px solid var(--color-border)';
+      badge.style.color = 'var(--color-text-secondary)';
+      badge.innerHTML = `<strong>Manual Entry:</strong> Rate per family adjusted. Capacity recalculated.`;
     }
   }
 
@@ -2120,10 +2077,10 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
       const badge = document.getElementById('dist_ai_recommend_badge');
       if (badge) {
         badge.style.display = 'block';
-        badge.style.background = '#EFF6FF';
-        badge.style.borderColor = '#BFDBFE';
-        badge.style.color = '#1D4ED8';
-        badge.innerHTML = `👤 <strong>Saved Configuration:</strong> Total budget ₱${Number(alloc.total_budget).toLocaleString('en-US', { minimumFractionDigits: 2 })} (₱${Number(alloc.amount_per_beneficiary).toLocaleString('en-US', { minimumFractionDigits: 2 })}/family).`;
+        badge.style.background = 'var(--color-surface-subtle)';
+        badge.style.border = '1px solid var(--color-border)';
+        badge.style.color = 'var(--color-text)';
+        badge.innerHTML = `<strong>Saved Configuration:</strong> Total budget ₱${Number(alloc.total_budget).toLocaleString('en-US', { minimumFractionDigits: 2 })} (₱${Number(alloc.amount_per_beneficiary).toLocaleString('en-US', { minimumFractionDigits: 2 })}/family).`;
       }
     } else {
       // Uninitiated program: fields start empty/zero awaiting user input or AI button recommendation
@@ -2267,26 +2224,26 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 
       let demoBadges = [];
       if (Number(fam.pwd_count) > 0) {
-        demoBadges.push(`<span class="badge badge-warning" style="font-size:9px;">${fam.pwd_count} PWD</span>`);
+        demoBadges.push(`<span class="status-badge pending" style="font-size: 9px; padding: 1px 5px;">${fam.pwd_count} PWD</span>`);
       }
       if (Number(fam.seniors_count) > 0) {
-        demoBadges.push(`<span class="badge badge-neutral" style="font-size:9px;">${fam.seniors_count} Senior</span>`);
+        demoBadges.push(`<span class="status-badge unclaimed" style="font-size: 9px; padding: 1px 5px;">${fam.seniors_count} Senior</span>`);
       }
       if (demoBadges.length === 0) {
         demoBadges.push(`<span style="color:var(--color-text-muted);font-size:9.5px;">Standard</span>`);
       }
 
       const statusHtml = isClaimed
-        ? `<span class="status-badge claimed">${escapeHtml(dist.claim_status || 'Claimed')}</span><div style="font-size:9px;color:var(--color-text-muted);margin-top:2px;font-family:var(--font-secondary);">${escapeHtml(dist.reference_no || '')}</div>`
-        : `<span class="status-badge active">Eligible</span>`;
+        ? `<span class="status-badge claimed">${escapeHtml(dist.claim_status || 'Claimed')}</span><div style="font-size:9px;color:var(--color-text-muted);margin-top:2px;">${escapeHtml(dist.reference_no || '')}</div>`
+        : `<span class="status-badge unclaimed">Eligible</span>`;
 
       const actionHtml = isClaimed
         ? `<span style="font-size:9.5px;color:var(--color-text-muted);">Payout Complete</span>`
-        : `<button type="button" class="btn btn-primary btn-sm" style="font-size:9.5px;padding:3px 8px;" onclick="selectFamilyForAyuda(${fam.id})">Give Ayuda</button>`;
+        : `<button type="button" class="btn btn-primary" style="font-size:9.5px;padding:3px 8px;" onclick="selectFamilyForAyuda(${fam.id})">Release Aid</button>`;
 
       html += `
       <tr style="border-bottom: 1px solid var(--color-border-light);">
-        <td style="padding: 8px 12px; font-family: var(--font-secondary); font-size: 10px; font-weight: 600; color: var(--color-primary);">
+        <td style="padding: 8px 12px; font-size: 10px; font-weight: 600; color: var(--color-primary);">
           ${escapeHtml(fam.household_code)}
         </td>
         <td style="padding: 8px 12px;">
@@ -2295,7 +2252,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
         </td>
         <td style="padding: 8px 12px;">
           <div style="font-weight: 600; font-size: 10.5px; color: var(--color-primary);">${escapeHtml(fam.head_full_name)}</div>
-          <div style="font-size: 9.5px; color: var(--color-text-muted); font-family: var(--font-secondary);">${escapeHtml(fam.head_phone || '—')}</div>
+          <div style="font-size: 9.5px; color: var(--color-text-muted);">${escapeHtml(fam.head_phone || '—')}</div>
         </td>
         <td style="padding: 8px 12px; font-size: 10px; color: var(--color-text);">
           ${escapeHtml(fam.purok_name)}
@@ -2514,13 +2471,13 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
         let mHtml = `
           <table class="data-table" style="font-size: 11px; width: 100%; margin: 0; border-collapse: collapse;">
             <thead>
-              <tr style="position: sticky; top: 0; background: #FAFCFC; z-index: 2; border-bottom: 1px solid var(--color-border);">
-                <th style="padding: 6px 10px; text-align: center; font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 35px;">#</th>
-                <th style="padding: 6px 10px; text-align: left; font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px;">Member Name</th>
-                <th style="padding: 6px 10px; text-align: left; font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 95px;">Relationship</th>
-                <th style="padding: 6px 10px; text-align: center; font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 65px;">Gender</th>
-                <th style="padding: 6px 10px; text-align: center; font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 55px;">Age</th>
-                <th style="padding: 6px 10px; text-align: left; font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 110px;">Classification</th>
+              <tr style="position: sticky; top: 0; background: var(--color-surface-subtle); z-index: 2; border-bottom: 1px solid var(--color-border);">
+                <th style="padding: 6px 10px; text-align: center; font-family: var(--font-secondary); font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 35px;">#</th>
+                <th style="padding: 6px 10px; text-align: left; font-family: var(--font-secondary); font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px;">Member Name</th>
+                <th style="padding: 6px 10px; text-align: left; font-family: var(--font-secondary); font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 95px;">Relationship</th>
+                <th style="padding: 6px 10px; text-align: center; font-family: var(--font-secondary); font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 65px;">Gender</th>
+                <th style="padding: 6px 10px; text-align: center; font-family: var(--font-secondary); font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 55px;">Age</th>
+                <th style="padding: 6px 10px; text-align: left; font-family: var(--font-secondary); font-weight: 600; color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; width: 110px;">Classification</th>
               </tr>
             </thead>
             <tbody>
@@ -2534,7 +2491,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
           if (m.is_pwd == 1 || m.is_pwd === '1') tags.push('PWD');
 
           const tagsHtml = tags.length > 0
-            ? tags.map(t => `<span style="display:inline-block;padding:1px 5px;font-size:9px;font-weight:600;color:var(--color-primary);background:#F1F5F9;border:1px solid var(--color-border);border-radius:3px;margin-right:3px;">${t}</span>`).join('')
+            ? tags.map(t => `<span class="status-badge unclaimed" style="font-size: 8.5px; padding: 1px 4px; margin-right: 2px;">${t}</span>`).join('')
             : '<span style="font-size:9.5px;color:var(--color-text-muted);">Regular</span>';
 
           mHtml += `
@@ -2543,7 +2500,7 @@ $audits = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
               <td style="padding: 6px 10px;">
                 <div style="font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <span>${escapeHtml(m.full_name || '—')}</span>
-                  ${isRep ? '<span style="font-size: 9px; color: #166534; background: #DCFCE7; border: 1px solid #BBF7D0; padding: 1px 5px; border-radius: 3px; font-weight: 600;">Authorized Rep</span>' : ''}
+                  ${isRep ? '<span class="status-badge claimed" style="font-size: 8.5px; padding: 1px 4px;">Authorized Rep</span>' : ''}
                 </div>
               </td>
               <td style="padding: 6px 10px; font-size: 10.5px; color: var(--color-text-secondary);">${escapeHtml(m.relationship || 'Member')}</td>
