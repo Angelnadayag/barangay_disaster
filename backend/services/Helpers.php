@@ -457,12 +457,32 @@ if (!function_exists('syncEventFinancialAidAllocation')) {
 function syncEventFinancialAidAllocation($db, $eventId = null, $barangayId = null) {
     if (!$db) return;
 
-    // Self-heal event_id, household_id columns if missing
+    // Self-heal event_id, household_id, and delivery receipt columns if missing
     try {
         $cols = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'event_id'")->fetchAll();
         if (empty($cols)) {
             $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN event_id INT(11) NULL DEFAULT NULL AFTER id");
             $db->exec("ALTER TABLE financial_aid_allocations ADD KEY idx_alloc_event (event_id)");
+        }
+        $colsRec = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'received_status'")->fetchAll();
+        if (empty($colsRec)) {
+            $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN received_status ENUM('Pending','Received','Not Received') NOT NULL DEFAULT 'Received' AFTER status");
+        }
+        $colsDistr = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'is_distributed'")->fetchAll();
+        if (empty($colsDistr)) {
+            $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN is_distributed TINYINT(1) NOT NULL DEFAULT 0 AFTER received_status");
+        }
+        $colsRecAt = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'received_at'")->fetchAll();
+        if (empty($colsRecAt)) {
+            $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN received_at DATETIME DEFAULT NULL AFTER is_distributed");
+        }
+        $colsRecBy = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'received_by'")->fetchAll();
+        if (empty($colsRecBy)) {
+            $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN received_by INT(11) DEFAULT NULL AFTER received_at");
+        }
+        $colsRecRem = $db->query("SHOW COLUMNS FROM financial_aid_allocations LIKE 'receipt_remarks'")->fetchAll();
+        if (empty($colsRecRem)) {
+            $db->exec("ALTER TABLE financial_aid_allocations ADD COLUMN receipt_remarks TEXT DEFAULT NULL AFTER received_by");
         }
         $colsDist = $db->query("SHOW COLUMNS FROM financial_aid_distributions LIKE 'event_id'")->fetchAll();
         if (empty($colsDist)) {
@@ -753,6 +773,64 @@ function ensureNotificationColumns($db = null): bool {
         } catch (Throwable $e) {}
 
         $chk2 = $db->query("SHOW COLUMNS FROM `notifications` LIKE 'target_puroks'");
+        $columnsReady = ($chk2 && $chk2->rowCount() > 0);
+        return $columnsReady;
+    } catch (Throwable $e) {
+        $columnsReady = false;
+        return false;
+    }
+}
+}
+
+/**
+ * Ensure financial_aid_allocations reception tracking and event columns exist in the database.
+ * Auto-migrates received_status, is_distributed, received_at, received_by, receipt_remarks, and event_id if missing.
+ */
+if (!function_exists('ensureFinancialAidAllocationColumns')) {
+function ensureFinancialAidAllocationColumns($db = null): bool {
+    static $columnsReady = null;
+    if ($columnsReady !== null) {
+        return $columnsReady;
+    }
+
+    if (!$db) {
+        $db = getDBConnection();
+    }
+
+    try {
+        $chk = $db->query("SHOW COLUMNS FROM `financial_aid_allocations` LIKE 'received_status'");
+        if ($chk && $chk->rowCount() > 0) {
+            $columnsReady = true;
+            return true;
+        }
+
+        // Attempt on-the-fly column migration
+        try {
+            $db->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `event_id` int(11) DEFAULT NULL AFTER `id`");
+            $db->exec("ALTER TABLE `financial_aid_allocations` ADD KEY `idx_alloc_event` (`event_id`)");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `received_status` enum('Pending','Received','Not Received') NOT NULL DEFAULT 'Received' AFTER `status`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `is_distributed` tinyint(1) NOT NULL DEFAULT 0 AFTER `received_status`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `received_at` datetime DEFAULT NULL AFTER `is_distributed`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `received_by` int(11) DEFAULT NULL AFTER `received_at`");
+        } catch (Throwable $e) {}
+
+        try {
+            $db->exec("ALTER TABLE `financial_aid_allocations` ADD COLUMN `receipt_remarks` text DEFAULT NULL AFTER `received_by`");
+        } catch (Throwable $e) {}
+
+        $chk2 = $db->query("SHOW COLUMNS FROM `financial_aid_allocations` LIKE 'received_status'");
         $columnsReady = ($chk2 && $chk2->rowCount() > 0);
         return $columnsReady;
     } catch (Throwable $e) {

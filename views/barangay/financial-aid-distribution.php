@@ -30,21 +30,29 @@ require_once __DIR__ . '/../layouts/sidebar.php';
 
 // Auto-sync any existing or newly scheduled Social Welfare & Financial Aid events for this barangay
 syncEventFinancialAidAllocation($db, null, $barangayId);
+$hasReceivedStatusCol = function_exists('ensureFinancialAidAllocationColumns') ? ensureFinancialAidAllocationColumns($db) : false;
 
 // Fetch pending incoming allocations from ICDRRMO awaiting Barangay Head confirmation
-$pendingAllocStmt = $db->prepare("
-    SELECT a.*, u.full_name AS allocator_name
-    FROM financial_aid_allocations a
-    LEFT JOIN users u ON a.allocated_by = u.id
-    WHERE a.barangay_id = ? 
-      AND a.received_status = 'Pending' 
-      AND a.status != 'Archived'
-    ORDER BY a.created_at DESC
-");
-$pendingAllocStmt->execute([$barangayId]);
-$pendingAllocations = $pendingAllocStmt->fetchAll(PDO::FETCH_ASSOC);
+$pendingAllocations = [];
+if ($hasReceivedStatusCol) {
+    $pendingAllocStmt = $db->prepare("
+        SELECT a.*, u.full_name AS allocator_name
+        FROM financial_aid_allocations a
+        LEFT JOIN users u ON a.allocated_by = u.id
+        WHERE a.barangay_id = ? 
+          AND a.received_status = 'Pending' 
+          AND a.status != 'Archived'
+        ORDER BY a.created_at DESC
+    ");
+    $pendingAllocStmt->execute([$barangayId]);
+    $pendingAllocations = $pendingAllocStmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Fetch all confirmed received allocations for this barangay (prioritizing event-linked programs)
+$receivedFilter = $hasReceivedStatusCol 
+    ? "AND (a.received_status = 'Received' OR (a.event_id IS NOT NULL AND a.received_status != 'Not Received'))" 
+    : "";
+
 $allocStmt = $db->prepare("
     SELECT a.*,
            e.title AS event_title, e.activity_type AS event_activity_type, e.status AS event_status,
@@ -55,7 +63,7 @@ $allocStmt = $db->prepare("
     FROM financial_aid_allocations a
     LEFT JOIN events e ON a.event_id = e.id
     WHERE a.barangay_id = ? 
-      AND (a.received_status = 'Received' OR (a.event_id IS NOT NULL AND a.received_status != 'Not Received'))
+      {$receivedFilter}
       AND a.status != 'Archived'
     ORDER BY (a.event_id IS NOT NULL) DESC, a.created_at DESC
 ");

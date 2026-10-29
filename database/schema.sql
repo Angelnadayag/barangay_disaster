@@ -764,6 +764,7 @@ DROP TABLE IF EXISTS `financial_aid_allocations`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `financial_aid_allocations` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `event_id` int(11) DEFAULT NULL,
   `allocation_code` varchar(50) NOT NULL,
   `program_name` varchar(150) NOT NULL,
   `disaster_type` varchar(100) DEFAULT NULL,
@@ -777,6 +778,7 @@ CREATE TABLE `financial_aid_allocations` (
   `target_beneficiaries` int(11) NOT NULL DEFAULT 0,
   `status` enum('Active','Completed','Archived') NOT NULL DEFAULT 'Active',
   `received_status` enum('Pending','Received','Not Received') NOT NULL DEFAULT 'Received',
+  `is_distributed` tinyint(1) NOT NULL DEFAULT 0,
   `received_at` datetime DEFAULT NULL,
   `received_by` int(11) DEFAULT NULL,
   `receipt_remarks` text DEFAULT NULL,
